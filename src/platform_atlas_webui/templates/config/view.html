@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+{% block title %}Settings — Platform Atlas{% endblock %}
+{% block crumb %}Settings{% endblock %}
+{% block content %}
+<header class="flex items-end justify-between gap-6 pb-5 border-b border-line mb-6">
+  <div>
+    <div class="eyebrow"><span class="dot"></span> Settings</div>
+    <h1 class="text-[36px] leading-[1.05] font-semibold tracking-[-0.038em] mt-2 mb-1.5">
+      Configuration, <em class="not-italic text-text-3 font-mono text-[28px]">~/.atlas/config.json</em>
+    </h1>
+    <p class="text-[14px] text-text-2 max-w-[64ch]">
+      Workspace identity, default tier, behaviour, and WebUI appearance.
+      Connection details (Platform URI, OAuth client, Gateway 4) live on each
+      <a href="/environments" class="text-accent hover:text-accent-hover">environment</a> — switch to one to edit them.
+      Need a health check first? <a href="/config/doctor" class="text-accent hover:text-accent-hover">Run Config Doctor →</a>
+    </p>
+  </div>
+</header>
+
+<section class="card mb-4">
+  <div class="card-head">
+    <h3>Appearance</h3>
+    <span class="sub">applied app-wide, persisted to <code>config.json</code></span>
+  </div>
+  <div class="card-body flex flex-col gap-[22px]">
+    <div>
+      <div class="text-[11px] tracking-[0.1em] uppercase font-semibold text-text-4 pb-2.5 flex items-center gap-1.5">
+        <span class="w-[5px] h-[5px] rounded-full bg-current opacity-65 shrink-0"></span>Theme
+      </div>
+      <fieldset class="theme-pick grid gap-2.5 border-0 p-0 m-0" data-atlas-theme-segment
+                style="grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));">
+        <legend class="sr-only">Theme</legend>
+
+        <label class="theme-pick-card{% if prefs.theme == 'itential' or not prefs.theme %} is-active{% endif %}">
+          <input type="radio" name="theme" value="itential" {% if prefs.theme == 'itential' or not prefs.theme %}checked{% endif %}>
+          <span class="theme-pick-swatches" aria-hidden="true">
+            <span class="sw" style="background:#101625;"></span>
+            <span class="sw" style="background:#FFFFFF; box-shadow: inset 0 0 0 1px rgba(16,22,37,0.18);"></span>
+            <span class="sw" style="background:#1B93D2;"></span>
+            <span class="sw" style="background:#FF6633;"></span>
+          </span>
+          <span class="theme-pick-name">Itential</span>
+          <span class="theme-pick-hint">Brand-true · mode-locked</span>
+        </label>
+
+        <label class="theme-pick-card{% if prefs.theme == 'aurora' %} is-active{% endif %}">
+          <input type="radio" name="theme" value="aurora" {% if prefs.theme == 'aurora' %}checked{% endif %}>
+          <span class="theme-pick-swatches" aria-hidden="true">
+            <span class="sw" style="background:#0A1628;"></span>
+            <span class="sw" style="background:#152944;"></span>
+            <span class="sw" style="background:#4D9FFF;"></span>
+            <span class="sw" style="background:#E8EEF5;"></span>
+          </span>
+          <span class="theme-pick-name">Aurora</span>
+          <span class="theme-pick-hint">Confident, technical</span>
+        </label>
+
+        <label class="theme-pick-card{% if prefs.theme == 'horizon' %} is-active{% endif %}">
+          <input type="radio" name="theme" value="horizon" {% if prefs.theme == 'horizon' %}checked{% endif %}>
+          <span class="theme-pick-swatches" aria-hidden="true">
+            <span class="sw" style="background:#1A1815;"></span>
+            <span class="sw" style="background:#2C2823;"></span>
+            <span class="sw" style="background:#E07B52;"></span>
+            <span class="sw" style="background:#E8DED0;"></span>
+          </span>
+          <span class="theme-pick-name">Horizon</span>
+          <span class="theme-pick-hint">Warm, editorial</span>
+        </label>
+
+        <label class="theme-pick-card{% if prefs.theme == 'obsidian' %} is-active{% endif %}">
+          <input type="radio" name="theme" value="obsidian" {% if prefs.theme == 'obsidian' %}checked{% endif %}>
+          <span class="theme-pick-swatches" aria-hidden="true">
+            <span class="sw" style="background:#000000;"></span>
+            <span class="sw" style="background:#161622;"></span>
+            <span class="sw" style="background:#A78BFA;"></span>
+            <span class="sw" style="background:#ECEAFF;"></span>
+          </span>
+          <span class="theme-pick-name">Obsidian</span>
+          <span class="theme-pick-hint">High-contrast, violet</span>
+        </label>
+
+        <label class="theme-pick-card{% if prefs.theme == 'meadow' %} is-active{% endif %}">
+          <input type="radio" name="theme" value="meadow" {% if prefs.theme == 'meadow' %}checked{% endif %}>
+          <span class="theme-pick-swatches" aria-hidden="true">
+            <span class="sw" style="background:#0E1812;"></span>
+            <span class="sw" style="background:#1B2A22;"></span>
+            <span class="sw" style="background:#84A98C;"></span>
+            <span class="sw" style="background:#DCE8DD;"></span>
+          </span>
+          <span class="theme-pick-name">Meadow</span>
+          <span class="theme-pick-hint">Calm, sage green</span>
+        </label>
+
+        <label class="theme-pick-card{% if prefs.theme == 'carbon' %} is-active{% endif %}">
+          <input type="radio" name="theme" value="carbon" {% if prefs.theme == 'carbon' %}checked{% endif %}>
+          <span class="theme-pick-swatches" aria-hidden="true">
+            <span class="sw" style="background:#0F0F0F;"></span>
+            <span class="sw" style="background:#292929;"></span>
+            <span class="sw" style="background:#E0E0E0;"></span>
+            <span class="sw" style="background:#F0F0F0;"></span>
+          </span>
+          <span class="theme-pick-name">Carbon</span>
+          <span class="theme-pick-hint">Pure grayscale</span>
+        </label>
+
+        <label class="theme-pick-card{% if prefs.theme == 'dracula' %} is-active{% endif %}">
+          <input type="radio" name="theme" value="dracula" {% if prefs.theme == 'dracula' %}checked{% endif %}>
+          <span class="theme-pick-swatches" aria-hidden="true">
+            <span class="sw" style="background:#1E1F29;"></span>
+            <span class="sw" style="background:#282A36;"></span>
+            <span class="sw" style="background:#FF79C6;"></span>
+            <span class="sw" style="background:#F8F8F2;"></span>
+          </span>
+          <span class="theme-pick-name">Dracula</span>
+          <span class="theme-pick-hint">Iconic, vampiric pink</span>
+        </label>
+      </fieldset>
+    </div>
+
+    <div>
+      <div class="text-[11px] tracking-[0.1em] uppercase font-semibold text-text-4 pb-2 flex items-center gap-1.5">
+        <span class="w-[5px] h-[5px] rounded-full bg-current opacity-65 shrink-0"></span>Mode
+      </div>
+      <fieldset class="seg border-0 p-[3px] m-0" data-atlas-mode-segment>
+        <legend class="sr-only">Mode</legend>
+        <label>
+          <input type="radio" name="mode" value="light" {% if prefs.mode == 'light' %}checked{% endif %}>
+          Light
+        </label>
+        <label>
+          <input type="radio" name="mode" value="dark" {% if prefs.mode == 'dark' %}checked{% endif %}>
+          Dark
+        </label>
+        <label title="Follow the operating system's light/dark preference">
+          <input type="radio" name="mode" value="auto" {% if prefs.mode == 'auto' %}checked{% endif %}>
+          Auto
+        </label>
+      </fieldset>
+    </div>
+  </div>
+</section>
+
+<form class="form" method="post" action="/config">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <fieldset>
+    <legend>Identity &amp; tier
+      <span class="legend-scope">workspace-scoped, persisted to <code>config.json</code></span>
+    </legend>
+    <div class="field">
+      <label for="organization_name">Organization name</label>
+      <input id="organization_name" name="organization_name" type="text" value="{{ cfg.get('organization_name') or '' }}">
+    </div>
+    <div class="field">
+      <label for="tier">Default tier</label>
+      <select id="tier" name="tier">
+        <option value="standard" {% if cfg.get('tier') == 'standard' %}selected{% endif %}>Standard — application + Gateway 4 audit</option>
+        <option value="extended" {% if cfg.get('tier') == 'extended' %}selected{% endif %}>Extended — full infrastructure audit</option>
+      </select>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Credentials
+      <span class="legend-scope">workspace-scoped, secrets in OS keyring or Vault</span>
+    </legend>
+    <div class="field">
+      <label for="credential_backend">Credential backend</label>
+      <select id="credential_backend" name="credential_backend">
+        <option value="keyring" {% if cfg.get('credential_backend') in (None, '', 'keyring') %}selected{% endif %}>OS keyring</option>
+        <option value="vault" {% if cfg.get('credential_backend') == 'vault' %}selected{% endif %}>HashiCorp Vault</option>
+      </select>
+      <span class="hint">Where Atlas stores secrets fetched at runtime — Platform OAuth, Gateway 4, MongoDB, Redis, SSH. Never written to <code>config.json</code>.</span>
+    </div>
+    <div class="field field--row col-span-full">
+      <a href="/config/credentials" class="btn text-[12px] py-1 px-3.5">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1">
+          <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+        Manage credentials
+      </a>
+      <span class="hint self-center m-0">
+        View status, set or remove secrets, and verify Vault connectivity.
+      </span>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>WebUI
+      <span class="legend-scope">browser-only features, persisted to <code>config.json</code></span>
+    </legend>
+    <div class="field field--row">
+      {# Default is enabled — `cfg.get('webui_palette_enabled', True)` so a
+         fresh install (no key yet) renders the checkbox checked. The form
+         submits "1" when checked and an empty string when unchecked, which
+         _coerce turns into True / False respectively. #}
+      <input id="webui_palette_enabled" name="webui_palette_enabled" type="checkbox" value="1"
+             {% if cfg.get('webui_palette_enabled', True) %}checked{% endif %}>
+      <label for="webui_palette_enabled">Enable <kbd class="font-mono text-[11px] px-1 py-px rounded border border-line bg-surface-2">⌘K</kbd> / <kbd class="font-mono text-[11px] px-1 py-px rounded border border-line bg-surface-2">Ctrl K</kbd> command palette</label>
+    </div>
+    <div class="field field--row col-span-full">
+      <span class="hint">
+        Lets you jump to any session, environment, ruleset, or page by name.
+        Disable if the shortcut conflicts with another tool, or if you'd rather
+        free up the binding. <em>Applied on next page load.</em>
+      </span>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Behaviour
+      <span class="legend-scope">workspace-scoped, persisted to <code>config.json</code></span>
+    </legend>
+    <div class="field field--row">
+      <input id="verify_ssl" name="verify_ssl" type="checkbox" value="1" {% if cfg.get('verify_ssl') %}checked{% endif %}>
+      <label for="verify_ssl">Verify SSL certificates against Platform</label>
+    </div>
+    <div class="field field--row col-span-full">
+      <span class="hint">Connection URLs and OAuth client IDs are environment-scoped — manage them on the
+        <a href="/environments" class="text-accent hover:text-accent-hover">environments page</a>.</span>
+    </div>
+    <div class="field field--row">
+      <input id="extended_validation_checks" name="extended_validation_checks" type="checkbox" value="1" {% if cfg.get('extended_validation_checks', True) %}checked{% endif %}>
+      <label for="extended_validation_checks">Run extended validation checks</label>
+    </div>
+    <div class="field field--row">
+      <input id="debug" name="debug" type="checkbox" value="1" {% if cfg.get('debug') %}checked{% endif %}>
+      <label for="debug">Debug logging</label>
+    </div>
+    <div class="field">
+      <label for="manual_input_mode">Manual input mode</label>
+      <select id="manual_input_mode" name="manual_input_mode">
+        <option value="html" {% if cfg.get('manual_input_mode') in (None, '', 'html') %}selected{% endif %}>HTML form (default)</option>
+        <option value="cli" {% if cfg.get('manual_input_mode') == 'cli' %}selected{% endif %}>CLI prompts</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="theme">CLI Rich theme</label>
+      <select id="theme" name="theme">
+        <option value="horizon-dark" {% if cfg.get('theme') == 'horizon-dark' %}selected{% endif %}>Horizon Dark</option>
+        <option value="horizon-core" {% if cfg.get('theme') == 'horizon-core' %}selected{% endif %}>Horizon Core</option>
+        <option value="horizon-prism" {% if cfg.get('theme') == 'horizon-prism' %}selected{% endif %}>Horizon Prism</option>
+      </select>
+      <span class="hint">Used by the terminal CLI only — not the WebUI. WebUI appearance is configured at the top of this page.</span>
+    </div>
+    <div class="field field--row">
+      <input id="dark_mode" name="dark_mode" type="checkbox" value="1" {% if cfg.get('dark_mode', True) %}checked{% endif %}>
+      <label for="dark_mode">Dark mode (CLI)</label>
+    </div>
+  </fieldset>
+
+  <div class="form-actions">
+    <button type="submit" class="btn primary">Save changes</button>
+  </div>
+</form>
+
+<hr class="rule-line">
+<details>
+  <summary class="footnote cursor-pointer">Raw <code>config.json</code></summary>
+  <pre class="job-stream mt-2.5 max-h-[400px]">{{ cfg | tojson(indent=2) }}</pre>
+</details>
+{% endblock %}

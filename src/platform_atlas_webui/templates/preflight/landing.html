@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}Preflight — Platform Atlas{% endblock %}
+{% block crumb %}Preflight{% endblock %}
+{% block content %}
+
+<header class="flex items-end justify-between gap-6 pb-5 border-b border-line mb-6">
+  <div>
+    <div class="eyebrow"><span class="dot"></span> Connectivity check</div>
+    <h1 class="text-[36px] leading-[1.05] font-semibold tracking-[-0.038em] mt-2 mb-1.5">
+      Preflight, <em class="not-italic text-text-3">before you capture</em>
+    </h1>
+    <p class="text-[14px] text-text-2 max-w-[64ch]">
+      Verifies SSH, MongoDB, Redis, Platform OAuth, and gateway connectivity to every
+      target in the active environment. <b>Standard mode</b> skips SSH/Mongo/Redis automatically.
+    </p>
+  </div>
+  <div class="flex items-center gap-2">
+    <a class="btn" href="/jobs">Recent jobs</a>
+  </div>
+</header>
+
+<section class="preflight-bar">
+  <div class="preflight-bar__meta">
+    <div class="preflight-bar__title">
+      <h3>Targets</h3>
+      <span class="preflight-bar__count">{{ targets|length }} {{ "device" if targets|length == 1 else "devices" }}</span>
+      {% if job %}
+        <span id="pf-summary" class="preflight-bar__count" style="background: var(--accent-soft); color: var(--accent);">running&hellip;</span>
+      {% endif %}
+    </div>
+    <div class="preflight-bar__sub">
+      {% if active_env %}
+        Environment <strong>{{ active_env }}</strong>
+      {% else %}
+        No active environment
+      {% endif %}
+      {% if tier %}· Tier <strong>{{ tier }}</strong>{% endif %}
+      {% if scope %}· Scope <strong>{{ scope }}</strong>{% endif %}
+    </div>
+  </div>
+  {% if job %}
+  <div class="preflight-bar__action" style="display:flex; gap:8px;">
+    <a class="btn" href="/preflight">New preflight</a>
+    <a class="btn primary" href="/jobs/{{ job.id }}">Open full output &rarr;</a>
+  </div>
+  {% else %}
+  <form method="post" action="/preflight" class="preflight-bar__action">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button type="submit" class="btn primary" {% if not targets %}disabled{% endif %}>Run preflight</button>
+  </form>
+  {% endif %}
+</section>
+
+{% if job %}
+{# Hidden plumbing — the shared SSE client (job-stream.js) connects to this
+   element by id and routes events to the per-card state updaters in the
+   preflight inline-script below. No visible UI from this div on /preflight. #}
+<div class="job-stream mode-human" id="job-stream" hidden
+     data-job-id="{{ job.id }}"
+     data-job-kind="preflight"
+     data-started-at="{{ job_started_at_epoch }}"></div>
+<script src="{{ url_for('static', path='js/job-stream.js') }}?v={{ asset_version }}" defer></script>
+{% endif %}
+
+{% if targets %}
+  <section class="targets-grid">
+    {% for t in targets %}
+      <article class="target-card" data-target-name="{{ t.name }}"
+               data-target-role="{{ t.role or '' }}"
+               data-target-modules="{{ t.modules | join(',') }}"
+               data-pf-state="{% if job %}pending{% else %}idle{% endif %}">
+        <header class="target-card__head">
+          <span class="role-badge role-{{ t.role or 'other' }}">{{ (t.role or 'node')|upper }}</span>
+          {% if t.primary %}
+            <span class="target-card__primary" title="Runs protocol-level collectors">primary</span>
+          {% endif %}
+          <span class="target-card__transport">{{ t.transport }}</span>
+          <span class="pf-status-badge" hidden></span>
+
+          {# Live ping — small Test button per target. POSTs to
+             /preflight/test/<name> and swaps the response chip into the
+             .pf-status-chip slot to the right. The form holds the in-flight
+             state via x-data so the button stays disabled while we wait.
+             During a full preflight run (job set) we hide the chip column
+             entirely so it doesn't fight the SSE-driven .pf-status-badge. #}
+          {% if not job %}
+            <span class="ml-auto inline-flex items-center gap-2"
+                  x-data="{ busy: false }">
+              <span class="pf-status-chip text-[11px] text-text-4" id="pf-chip-{{ t.name }}"></span>
+              <form hx-post="/preflight/test/{{ t.name }}"
+                    hx-target="#pf-chip-{{ t.name }}"
+                    hx-swap="innerHTML"
+                    hx-disabled-elt="find button"
+                    @htmx:before-request="busy = true"
+                    @htmx:after-request="busy = false"
+                    class="inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit"
+                        :disabled="busy"
+                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-line-2 text-[11px] text-text-2 hover:bg-surface-2 disabled:opacity-60 disabled:cursor-wait">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" x-show="!busy"><path d="M3 12h3l2-6 4 12 2-6h7"/></svg>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" x-show="busy" x-cloak class="animate-spin"><path d="M21 12a9 9 0 1 1-3-6.7"/></svg>
+                  <span x-text="busy ? 'Testing…' : 'Test'"></span>
+                </button>
+              </form>
+            </span>
+          {% endif %}
+        </header>
+
+        <div class="target-card__name">{{ t.name }}</div>
+
+        <div class="target-card__addr">
+          {% if t.transport == 'ssh' %}
+            {% if t.host %}
+              <span class="target-card__user">{{ t.ssh_user or 'atlas' }}@</span>{{ t.host }}<span class="target-card__port">:{{ t.ssh_port or 22 }}</span>
+            {% else %}
+              <span class="target-card__addr--empty">no host configured</span>
+            {% endif %}
+          {% elif t.transport == 'kubernetes' %}
+            {{ t.host or 'kubernetes cluster' }}
+          {% elif t.transport == 'local' %}
+            {{ t.host or 'localhost' }}
+          {% else %}
+            {{ t.host or '—' }}
+          {% endif %}
+        </div>
+
+        {% if t.modules %}
+          <div class="target-card__modules">
+            {% for m in t.modules %}
+              <span class="module-chip">{{ m }}</span>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="target-card__modules target-card__modules--empty">no modules</div>
+        {% endif %}
+      </article>
+    {% endfor %}
+  </section>
+{% else %}
+  <section class="card">
+    <div class="card-body">
+      <div class="empty" style="border:0; padding: 12px 0;">
+        <strong>No targets configured</strong>
+        <span style="color: var(--text-3);">Create or activate an environment first.</span>
+        <div style="margin-top:10px;">
+          <a class="btn sm" href="/environments">Manage environments</a>
+        </div>
+      </div>
+    </div>
+  </section>
+{% endif %}
+
+{% endblock %}

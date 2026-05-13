@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}Alerts — Platform Atlas{% endblock %}
+{% block crumb %}Alerts{% endblock %}
+{% block content %}
+
+<header class="flex items-end justify-between gap-6 pb-5 border-b border-line mb-6">
+  <div>
+    <div class="eyebrow"><span class="dot"></span> Drift alerts</div>
+    <h1 class="text-[36px] leading-[1.05] font-semibold tracking-[-0.038em] mt-2 mb-1.5">Alerts</h1>
+    <p class="text-[14px] text-text-2 max-w-[64ch]">
+      One alert per rule whose observed value changed since the previous continuous-audit run.
+      Acknowledged alerts re-open if drift recurs on the same rule.
+    </p>
+  </div>
+  <div class="flex items-center gap-2">
+    <a class="btn" href="/continuous">← Continuous Audit</a>
+    {% if counts.unacked > 0 %}
+      <form method="post" action="/alerts/ack-all" class="inline"
+            data-confirm-action data-confirm-message="Acknowledge all {{ counts.unacked }} unacked alert(s)?">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" class="btn primary" data-loading-label="Acknowledging…">Acknowledge all ({{ counts.unacked }})</button>
+      </form>
+    {% endif %}
+  </div>
+</header>
+
+{# ── Filter bar ── #}
+<div class="toolbar">
+  <a class="filter-tab {% if not filter_severity and not filter_unacked %}active{% endif %}" href="/alerts">All ({{ counts.total }})</a>
+  <a class="filter-tab {% if filter_unacked %}active{% endif %}" href="/alerts?unacked=1">Unacked ({{ counts.unacked }})</a>
+  {% for sev, n in counts.by_severity.items() %}
+    <a class="filter-tab {% if filter_severity == sev %}active{% endif %}" href="/alerts?severity={{ sev }}">{{ sev }} ({{ n }})</a>
+  {% endfor %}
+</div>
+
+{# ── Alerts table ── #}
+<section class="card" style="margin-bottom:12px;">
+  <div class="card-head">
+    <h3>Active alerts</h3>
+    <span class="sub">{{ alerts|length }} shown</span>
+  </div>
+  {% if not alerts %}
+    <div class="empty" style="border:0; padding:32px 24px;">
+      <div style="font-size:28px; line-height:1; margin-bottom:10px;" aria-hidden="true">🔔</div>
+      <strong>No alerts yet</strong>
+      <span style="color:var(--text-3);">
+        Drift events appear here when an observed value changes between consecutive Continuous Audit runs.
+      </span>
+      <div style="margin-top:16px; display:flex; gap:8px; justify-content:center;">
+        <a class="btn primary" href="/continuous">Open Continuous Audit</a>
+        <a class="btn" href="/sessions">View sessions</a>
+      </div>
+    </div>
+  {% else %}
+    <div style="overflow-x:auto;">
+      <table style="width:100%; border-collapse:collapse; font-size:13px;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--line);">
+            <th style="text-align:left; padding:10px 14px; font-size:11px; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:.06em;">State</th>
+            <th style="text-align:left; padding:10px 14px; font-size:11px; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:.06em;">Severity</th>
+            <th style="text-align:left; padding:10px 14px; font-size:11px; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:.06em;">Rule</th>
+            <th style="text-align:left; padding:10px 14px; font-size:11px; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:.06em;">Path</th>
+            <th style="text-align:left; padding:10px 14px; font-size:11px; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:.06em;">Previous → Current</th>
+            <th style="text-align:right; padding:10px 14px; font-size:11px; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:.06em;">Count</th>
+            <th style="text-align:left; padding:10px 14px; font-size:11px; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:.06em;">Last seen</th>
+            <th style="text-align:right; padding:10px 14px; font-size:11px; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:.06em;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in alerts %}
+            {% set _rule_label = a.rule_name or a.rule_number %}
+            <tr class="alert-row {% if a.status == AlertStatus.UNACKED %}is-unacked{% else %}is-acked{% endif %}"
+                style="border-bottom:1px solid var(--line);"
+                x-data="{ acking: false }"
+                :class="acking && 'opacity-40 transition-opacity duration-300'">
+              <td style="padding:7px 14px;">
+                {% if a.status == AlertStatus.UNACKED %}
+                  <span class="chip warn"><span class="dot"></span>Unacked</span>
+                {% else %}
+                  <span class="chip ok"><span class="dot"></span>Acked</span>
+                {% endif %}
+              </td>
+              <td style="padding:7px 14px; font-family:var(--mono); font-size:12px; color:var(--text-3);">{{ a.severity or '—' }}</td>
+              <td style="padding:7px 14px;">
+                {% if _rule_label %}
+                  <div style="font-weight:500;">{{ _rule_label }}</div>
+                {% else %}
+                  <div style="font-weight:500; color:var(--text-4); font-style:italic;" title="The rule referenced by this alert no longer exists in the active ruleset.">(rule deleted)</div>
+                {% endif %}
+                <div style="font-size:11px; color:var(--text-4); font-family:var(--mono); margin-top:2px;">{{ a.alert_id }}</div>
+              </td>
+              <td style="padding:7px 14px; font-family:var(--mono); font-size:12px; color:var(--text-3); max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ a.path }}">{{ a.path or '—' }}</td>
+              <td style="padding:7px 14px; font-family:var(--mono); font-size:12px;">
+                <span style="color:var(--text-3);">{{ a.latest_previous }}</span>
+                <span style="color:var(--text-4); margin:0 4px;">→</span>
+                <span style="color:var(--warn); font-weight:500;">{{ a.latest_current }}</span>
+              </td>
+              <td style="padding:7px 14px; font-family:var(--mono); font-size:12px; text-align:right;">{{ a.occurrence_count }}</td>
+              <td style="padding:7px 14px; font-family:var(--mono); font-size:12px; color:var(--text-3);">{{ a.last_seen }}</td>
+              <td style="padding:7px 14px; text-align:right;">
+                {% if a.status == AlertStatus.UNACKED %}
+                  <form method="post" action="/alerts/{{ a.alert_id }}/ack" class="inline" @submit="acking = true">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button type="submit" class="btn sm" data-loading-label="Acking…" :disabled="acking">Ack</button>
+                  </form>
+                {% else %}
+                  <span style="color:var(--text-4); font-size:12px;">{{ a.acked_at[:10] if a.acked_at else '' }}</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</section>
+
+{# ── Recent events (timeline) ── #}
+<section class="card">
+  <div class="card-head">
+    <h3>Recent drift events</h3>
+    <span class="sub">last 100, newest first</span>
+  </div>
+  {% if not events %}
+    <div class="empty" style="border:0; padding:24px;">
+      <span style="color:var(--text-3);">No events recorded yet.</span>
+    </div>
+  {% else %}
+    <div style="max-height:420px; overflow-y:auto;">
+      {% for ev in events %}
+        <div style="display:grid; grid-template-columns: 190px 80px 1fr 1fr; gap:12px; padding:8px 16px; border-bottom:1px solid var(--line); font-size:13px; align-items:center;">
+          <span style="font-family:var(--mono); font-size:12px; color:var(--text-3);">{{ ev.detected_at }}</span>
+          <span style="font-family:var(--mono); font-size:12px; color:var(--text-3);">{{ ev.severity }}</span>
+          <span style="font-weight:500;">{{ ev.rule_name }} <span style="color:var(--text-4); font-family:var(--mono); font-size:11px; font-weight:400;">({{ ev.rule_number }})</span></span>
+          <span style="font-family:var(--mono); font-size:12px; color:var(--text-2);">{{ ev.previous }} → <span style="color:var(--warn); font-weight:500;">{{ ev.current }}</span></span>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+</section>
+
+{% endblock %}

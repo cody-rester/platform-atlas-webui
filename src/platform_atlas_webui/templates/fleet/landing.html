@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+{% block title %}Fleet — Platform Atlas{% endblock %}
+{% block crumb %}Fleet{% endblock %}
+{% block content %}
+
+{% macro age_label(seconds) -%}
+  {% if seconds is none %}—
+  {% elif seconds < 60 %}{{ seconds }}s
+  {% elif seconds < 3600 %}{{ (seconds // 60) }}m
+  {% elif seconds < 86400 %}{{ (seconds // 3600) }}h
+  {% else %}{{ (seconds // 86400) }}d
+  {% endif %}
+{%- endmacro %}
+
+{% macro pass_rate(pct) -%}
+  {% if pct is none %}<span style="color:var(--text-4);">—</span>
+  {% elif pct >= 95 %}<span style="color:var(--ok); font-weight:600;">{{ '%.1f' | format(pct) }}%</span>
+  {% elif pct >= 80 %}<span style="color:var(--warn); font-weight:600;">{{ '%.1f' | format(pct) }}%</span>
+  {% else %}<span style="color:var(--bad); font-weight:600;">{{ '%.1f' | format(pct) }}%</span>
+  {% endif %}
+{%- endmacro %}
+
+{% macro severity_chip(sev) -%}
+  {% if not sev %}<span style="color:var(--text-4);">—</span>
+  {% elif sev == 'critical' or sev == 'high' %}<span class="chip" style="background: color-mix(in oklch, var(--bad) 14%, transparent); border-color: color-mix(in oklch, var(--bad) 40%, transparent); color:var(--text);"><span class="dot" style="background:var(--bad);"></span>{{ sev }}</span>
+  {% elif sev == 'warning' or sev == 'medium' %}<span class="chip" style="background: color-mix(in oklch, var(--warn) 14%, transparent); border-color: color-mix(in oklch, var(--warn) 40%, transparent); color:var(--text);"><span class="dot" style="background:var(--warn);"></span>{{ sev }}</span>
+  {% else %}<span class="chip"><span class="dot"></span>{{ sev }}</span>
+  {% endif %}
+{%- endmacro %}
+
+<header class="flex items-end justify-between gap-6 pb-5 border-b border-line mb-6">
+  <div>
+    <div class="eyebrow"><span class="dot"></span> Fleet overview</div>
+    <h1 class="text-[36px] leading-[1.05] font-semibold tracking-[-0.038em] mt-2 mb-1.5">Compliance at a glance</h1>
+    <p class="text-[14px] text-text-2 max-w-[64ch]">
+      Local-cache snapshot of every configured environment — last session age, pass rate, continuous-audit
+      state, and unacked alerts. Read-only; this page never triggers a capture.
+    </p>
+  </div>
+  <div class="flex items-center gap-2">
+    <a class="btn" href="/fleet/data.json">JSON</a>
+    <a class="btn primary" href="/environments">Manage environments →</a>
+  </div>
+</header>
+
+{% if not fleet %}
+  <section class="card">
+    <div class="card-body">
+      <div class="empty" style="border:0; padding:32px 24px;">
+        <strong>No environments configured</strong>
+        <span style="color:var(--text-3);">
+          The fleet view aggregates per-environment local state. Create an environment to see it here.
+        </span>
+        <div style="margin-top:12px;"><a class="btn primary" href="/environments/new">Create environment</a></div>
+      </div>
+    </div>
+  </section>
+{% else %}
+
+<section class="metrics" data-cascade>
+  <div class="tile-wrap">
+    <div class="tile">
+      <div class="tile-head"><span>Environments</span></div>
+      <div class="tile-value">
+        <span class="num">{{ fleet_summary.total_envs }}</span>
+        <span class="delta">{{ fleet_summary.envs_with_sessions }} audited</span>
+      </div>
+      <div class="tile-foot">
+        <span style="color:var(--text-3);">Across all configured</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="tile-wrap">
+    <div class="tile">
+      <div class="tile-head"><span>Continuous audit</span></div>
+      <div class="tile-value">
+        <span class="num">{{ fleet_summary.continuous_enabled_envs }}</span>
+        <span class="delta">/ {{ fleet_summary.total_envs }}</span>
+      </div>
+      <div class="tile-foot">
+        <span style="color:var(--text-3);">Enabled environments</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="tile-wrap">
+    <div class="tile">
+      <div class="tile-head"><span>Fleet pass rate</span></div>
+      <div class="tile-value">
+        <span class="num">
+          {% if fleet_summary.fleet_pass_rate_pct is not none %}
+            {{ '%.1f' | format(fleet_summary.fleet_pass_rate_pct) }}<span style="font-size:.5em; color:var(--text-3); margin-left:2px;">%</span>
+          {% else %}—{% endif %}
+        </span>
+      </div>
+      <div class="tile-foot">
+        <span style="color:var(--text-3);">Weighted across validated sessions</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="tile-wrap">
+    <div class="tile">
+      <div class="tile-head"><span>Unacked drift</span></div>
+      <div class="tile-value">
+        <span class="num">{{ fleet_summary.total_unacked_alerts }}</span>
+        {% if fleet_summary.worst_unacked_severity %}
+          <span class="delta">worst: {{ fleet_summary.worst_unacked_severity }}</span>
+        {% endif %}
+      </div>
+      <div class="tile-foot">
+        <span style="color:var(--text-3);">Across the fleet</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="margin-top:18px;">
+  <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:14px;">
+    <h3 style="margin:0; font-size:15px; font-weight:700;">Environments</h3>
+    <span class="footnote" style="margin:0;">Sorted: stale + critical first · click a tile to drill in</span>
+  </div>
+  <div class="fleet-wall">
+    {% for entry in fleet %}
+      {% set cstatus = (entry.continuous_last_status or '').lower() %}
+      <a class="fleet-tile {{ entry.state }}" href="/environments/{{ entry.name }}">
+        <div class="fleet-tile-head">
+          <div>
+            <div class="fleet-tile-name">
+              {% if entry.is_active %}<span class="dot" style="background:var(--accent); box-shadow:0 0 0 3px color-mix(in oklch, var(--accent) 18%, transparent); margin-right:6px; vertical-align:middle;"></span>{% endif %}
+              {{ entry.name }}
+            </div>
+            {% if entry.organization_name %}
+              <div class="fleet-tile-org">{{ entry.organization_name }}</div>
+            {% endif %}
+          </div>
+          <div class="fleet-tile-score">
+            {% if entry.state == 'cold' or entry.pass_rate_pct is none %}
+              —
+            {% else %}
+              {{ '%.0f' | format(entry.pass_rate_pct) }}<span style="font-size:.42em; opacity:.6; margin-left:1px;">%</span>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="fleet-tile-ekg" data-history="{{ entry.score_history | tojson }}"></div>
+
+        <div class="fleet-tile-meta">
+          <span>
+            {% if entry.tier %}{{ entry.tier }}{% else %}(inherit){% endif %}
+            ·
+            {% if entry.last_session_age_seconds is not none %}
+              {{ age_label(entry.last_session_age_seconds) }} ago
+            {% else %}
+              no sessions
+            {% endif %}
+          </span>
+          <span class="fleet-tile-chip {{ entry.state }}">
+            {% if entry.alerts_unacked %}{{ entry.alerts_unacked }} unacked{% else %}{{ entry.state }}{% endif %}
+          </span>
+        </div>
+
+        {% if entry.continuous_enabled or entry.alerts_worst_unacked_severity %}
+          <div class="fleet-tile-foot">
+            {% if entry.continuous_enabled %}
+              {% if cstatus == 'ok' %}
+                <span class="chip ok"><span class="dot"></span>continuous · {{ age_label(entry.continuous_last_run_age_seconds) }}</span>
+              {% elif cstatus == 'error' %}
+                <span class="chip" style="background: color-mix(in oklch, var(--bad) 14%, transparent); border-color: color-mix(in oklch, var(--bad) 40%, transparent);"><span class="dot" style="background:var(--bad);"></span>continuous · error</span>
+              {% else %}
+                <span class="chip"><span class="dot"></span>continuous · pending</span>
+              {% endif %}
+            {% endif %}
+            {% if entry.alerts_worst_unacked_severity %}
+              {{ severity_chip(entry.alerts_worst_unacked_severity) }}
+            {% endif %}
+          </div>
+        {% endif %}
+      </a>
+    {% endfor %}
+  </div>
+</section>
+
+<p style="color:var(--text-4); font-size:11px; margin-top:14px; text-align:center;">
+  Snapshot · {{ fleet_summary.last_activity_at or 'no activity yet' }}
+</p>
+
+<script>
+(function () {
+  const ns = 'http://www.w3.org/2000/svg';
+  const W = 240, H = 44, pad = 2;
+  document.querySelectorAll('.fleet-tile-ekg').forEach((host) => {
+    let data;
+    try { data = JSON.parse(host.dataset.history || '[]'); }
+    catch (e) { data = []; }
+    if (!Array.isArray(data) || data.length < 2) {
+      host.classList.add('fleet-tile-ekg--empty');
+      host.textContent = data.length === 1 ? 'one validated session — too few for a trend' : 'no validated sessions yet';
+      return;
+    }
+    const min = Math.min(...data);
+    const max = Math.max(...data);
+    const span = (max - min) || 1;
+    const xs = data.map((_, i) => pad + (i / (data.length - 1)) * (W - pad * 2));
+    const ys = data.map((v) => H - pad - ((v - min) / span) * (H - pad * 2));
+    const last = data[data.length - 1];
+    const color = last >= 95 ? 'var(--ok)' : last >= 80 ? 'var(--warn)' : 'var(--bad)';
+    const d = xs.map((x, i) => (i === 0 ? `M${x},${ys[i]}` : `L${x},${ys[i]}`)).join(' ');
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.setAttribute('preserveAspectRatio', 'none');
+    const path = document.createElementNS(ns, 'path');
+    path.setAttribute('d', d);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', color);
+    path.setAttribute('stroke-width', '1.6');
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(path);
+    const dot = document.createElementNS(ns, 'circle');
+    dot.setAttribute('cx', xs[xs.length - 1]);
+    dot.setAttribute('cy', ys[ys.length - 1]);
+    dot.setAttribute('r', '2.4');
+    dot.setAttribute('fill', color);
+    svg.appendChild(dot);
+    host.appendChild(svg);
+  });
+})();
+</script>
+
+{% endif %}
+
+{% endblock %}

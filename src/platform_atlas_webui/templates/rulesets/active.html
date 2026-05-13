@@ -1,0 +1,492 @@
+{% extends "base.html" %}
+{% block title %}Rulesets — Platform Atlas{% endblock %}
+{% block crumb %}Rulesets{% endblock %}
+{% block content %}
+
+{# ── Page-scoped styles ───────────────────────────────────────────────────
+   Stat strip / toolbar / search / filter buttons are now driven by Tailwind
+   utilities directly on the elements below. What remains here are the
+   table styles, the severity / category / status pills, and the drawer —
+   they're applied through Jinja loops with conditional class names AND
+   are toggled by the inline JS at the bottom (it does
+   classList.toggle('is-active', ...)), so keeping them as named CSS rules
+   is meaningfully cleaner than inlining utilities on every <tr>/<td>. #}
+<style nonce="{{ csp_nonce }}">
+  /* Active state for filter buttons — JS toggles .is-active. Keeping the
+     visual definition near its trigger so a future reader doesn't have to
+     hunt across two files to understand what the button looks like. */
+  .rs-filter-btn.is-active {
+    background: var(--accent-soft);
+    border-color: transparent;
+    color: var(--accent);
+  }
+  .rs-filter-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* Table */
+  .rs-table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 0 0 var(--r-lg) var(--r-lg);
+    overflow: hidden;
+  }
+  .rs-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .rs-table thead th {
+    text-align: left; padding: 10px 14px;
+    font-size: 10.5px; font-weight: 600;
+    color: var(--text-3); letter-spacing: .07em; text-transform: uppercase;
+    background: var(--surface-2); border-bottom: 1px solid var(--line);
+    white-space: nowrap; position: sticky; top: 0; z-index: 1;
+  }
+  .rs-table tbody tr {
+    border-bottom: 1px solid var(--line);
+    transition: background-color .1s;
+    cursor: pointer;
+  }
+  .rs-table tbody tr:hover { background: var(--surface-2); }
+  .rs-table tbody tr.is-disabled { opacity: .55; }
+  .rs-table tbody tr.is-open { background: var(--surface-2); }
+  .rs-table td { padding: 10px 14px; vertical-align: middle; }
+  .rs-table tbody tr:last-child td { border-bottom: none; }
+  .rs-table .col-num   { font-family: var(--mono); font-size: 11.5px; color: var(--text-3); white-space: nowrap; }
+  .rs-table .col-sev   { width: 92px; }
+  .rs-table .col-cat   { width: 110px; }
+  .rs-table .col-name  { font-weight: 500; color: var(--text); }
+  .rs-table .col-name .desc { display: block; font-weight: 400; color: var(--text-3); font-size: 11.5px; margin-top: 2px; }
+  .rs-table .col-path  { font-family: var(--mono); font-size: 11px; color: var(--text-3); white-space: nowrap; max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
+  .rs-table .col-status { width: 92px; text-align: right; }
+
+  /* Compact density — toggled via .rs-density-btn buttons, persisted in
+     localStorage. Tightens vertical padding, drops the rule description
+     subtitle, and shrinks pill sizing so 2× more rules fit on screen
+     without changing the underlying table semantics. */
+  .rs-table.is-compact { font-size: 11.5px; }
+  .rs-table.is-compact thead th { padding: 5px 14px; }
+  .rs-table.is-compact tbody td { padding: 4px 14px; }
+  .rs-table.is-compact .col-num,
+  .rs-table.is-compact .col-path { font-size: 10.5px; }
+  .rs-table.is-compact .col-name .desc { display: none; }
+  .rs-table.is-compact .sev-pill,
+  .rs-table.is-compact .cat-pill { font-size: 9.5px; padding: 1px 7px; }
+  .rs-table.is-compact .status-pill { font-size: 10px; }
+
+  .sev-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 10.5px; font-weight: 600; padding: 3px 9px;
+    border-radius: 999px; border: 1px solid;
+    text-transform: uppercase; letter-spacing: .05em;
+  }
+  .sev-pill.is-critical { color: var(--bad);  border-color: oklch(from var(--bad) l c h / .35);  background: var(--bad-soft); }
+  .sev-pill.is-warning  { color: var(--warn); border-color: oklch(from var(--warn) l c h / .35); background: var(--warn-soft); }
+  .sev-pill.is-info     { color: var(--info); border-color: oklch(from var(--info) l c h / .35); background: oklch(from var(--info) l c h / .08); }
+  .sev-pill.is-other    { color: var(--text-3); border-color: var(--line-2); }
+
+  .cat-pill {
+    display: inline-block; font-size: 10.5px; padding: 2px 8px;
+    border-radius: 4px; border: 1px solid var(--line-2);
+    color: var(--text-2); background: var(--surface-2);
+    font-family: var(--mono); letter-spacing: .02em;
+  }
+
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; color: var(--text-3);
+  }
+  .status-pill .dot { width: 6px; height: 6px; border-radius: 999px; background: var(--text-4); }
+  .status-pill.is-on .dot { background: var(--ok); box-shadow: 0 0 0 2px oklch(from var(--ok) l c h / .15); }
+  /* Disabled-in-profile variant — visibly distinct from a plain "Disabled"
+     so users can tell at a glance the disable came from the profile overlay
+     (editable in rules/rulesets/profiles/) rather than the base ruleset. */
+  .status-pill.is-profile-off {
+    color: var(--text-2);
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 1px 8px;
+  }
+  .status-pill.is-profile-off .dot { background: var(--text-3); }
+
+  /* Expanded row drawer */
+  .rs-drawer-row td { padding: 0 !important; background: var(--bg); }
+  .rs-drawer { padding: 16px 22px 18px; border-top: 1px dashed var(--line-2); display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 18px; }
+  .rs-drawer h5 { margin: 0 0 6px; font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--text-3); }
+  .rs-drawer p, .rs-drawer .kv { font-size: 12.5px; color: var(--text-2); line-height: 1.55; margin: 0 0 12px; }
+  .rs-drawer .kv code { font-family: var(--mono); font-size: 11.5px; color: var(--text); background: var(--surface); padding: 1px 6px; border: 1px solid var(--line); border-radius: 4px; }
+  .rs-msg { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; padding: 8px 10px; border-radius: 6px; margin-bottom: 6px; line-height: 1.45; }
+  .rs-msg.is-pass { color: var(--ok);  background: var(--ok-soft);  border: 1px solid oklch(from var(--ok) l c h / .25); }
+  .rs-msg.is-fail { color: var(--bad); background: var(--bad-soft); border: 1px solid oklch(from var(--bad) l c h / .25); }
+  .rs-msg .label { font-weight: 600; text-transform: uppercase; font-size: 9.5px; letter-spacing: .07em; padding: 1px 6px; border-radius: 3px; background: rgba(255,255,255,.1); flex-shrink: 0; margin-top: 1px; }
+
+  .rs-empty { padding: 50px 20px; text-align: center; color: var(--text-3); }
+  .rs-empty strong { display: block; margin-bottom: 4px; color: var(--text); font-size: 14px; }
+
+  @media (max-width: 920px) {
+    .rs-table .col-path { display: none; }
+    .rs-drawer { grid-template-columns: 1fr; }
+  }
+
+  /* Defensive: ensure [hidden] on a drawer <tr> beats user-agent table-row default */
+  tr[hidden] { display: none !important; }
+</style>
+
+<header class="flex items-end justify-between gap-6 pb-5 border-b border-line mb-6">
+  <div>
+    <div class="eyebrow"><span class="dot"></span> Active ruleset</div>
+    <h1 class="text-[36px] leading-[1.05] font-semibold tracking-[-0.038em] mt-2 mb-1.5">
+      {{ ruleset.name or ruleset.ruleset_id or 'No ruleset loaded' }}{% if ruleset.profile %}, <em class="not-italic text-text-3">{{ ruleset.profile }}</em>{% endif %}
+    </h1>
+    {% if ruleset.description %}
+      <p class="text-[14px] text-text-2 max-w-[64ch]">{{ ruleset.description }}</p>
+    {% endif %}
+    {% if ruleset.ruleset_id %}
+      <div class="flex flex-wrap gap-y-1.5 gap-x-3.5 mt-2.5 text-[12px] text-text-3 [&_.sep]:text-text-4 [&_b]:text-text-2 [&_b]:font-medium">
+        <span><b>{{ ruleset.rule_count }}</b> rules</span>
+        {% if ruleset.version %}<span class="sep">·</span><span>v{{ ruleset.version }}</span>{% endif %}
+        {% if ruleset.target_product %}<span class="sep">·</span><span>{{ ruleset.target_product }}</span>{% endif %}
+        {% if ruleset.author %}<span class="sep">·</span><span>{{ ruleset.author }}</span>{% endif %}
+        {% if ruleset.updated_at %}<span class="sep">·</span><span>updated {{ ruleset.updated_at }}</span>{% endif %}
+        {% if is_standard %}<span class="sep">·</span><span class="text-accent">Standard tier</span>{% endif %}
+      </div>
+    {% endif %}
+  </div>
+</header>
+
+{# ── Stat strip ── #}
+{% if ruleset.rule_count %}
+{% set _stat_base = "bg-surface border border-line rounded-lg px-3.5 py-3 flex flex-col gap-1 transition-colors hover:border-line-2" %}
+<section class="grid gap-2.5 mb-[18px]" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));">
+  {% for label, value, sub, accent in [
+    ('Total',    ruleset.rule_count,                    ruleset.enabled_count ~ ' enabled',    None),
+    ('Critical', ruleset.severities.get('critical', 0), 'block-level findings',                'bad'),
+    ('Warning',  ruleset.severities.get('warning', 0),  'should-fix findings',                 'warn'),
+    ('Info',     ruleset.severities.get('info', 0),     'advisory findings',                   'info'),
+    ('Categories', ruleset.categories|length,           ruleset.categories.keys()|join(', '),  'ok'),
+  ] %}
+    <div class="{{ _stat_base }} {% if accent %}border-l-[3px] border-l-{{ accent }}{% endif %}">
+      <span class="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-text-3">{{ label }}</span>
+      <span class="text-[22px] font-semibold text-text tracking-[-0.02em] leading-none tabular-nums">{{ value }}</span>
+      <span class="text-[11px] text-text-4">{{ sub }}</span>
+    </div>
+  {% endfor %}
+</section>
+{% endif %}
+
+{# ── Switch & available — compact 2-column ── #}
+<section class="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-3 mb-[18px]">
+  <div class="card">
+    <div class="card-head"><h3>Switch ruleset / profile</h3></div>
+    <div class="card-body">
+      <form class="form" method="post" action="/rulesets/activate">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <fieldset>
+          <div class="field">
+            <label for="ruleset_id">Ruleset</label>
+            <select id="ruleset_id" name="ruleset_id" required>
+              {% for r in rulesets %}
+                <option value="{{ r.id }}" {% if r.is_active %}selected{% endif %}>
+                  {{ r.name or r.id }} · {{ r.rule_count }} rules{% if r.version %} · v{{ r.version }}{% endif %}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label for="profile_id">Profile <span class="font-normal text-text-3">(optional overlay)</span></label>
+            <select id="profile_id" name="profile_id">
+              <option value="">— None —</option>
+              {% for p in profiles %}
+                <option value="{{ p.id }}" {% if p.is_active %}selected{% endif %}>
+                  {{ p.id }}{% if p.description %} — {{ p.description }}{% endif %}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+        </fieldset>
+        <div class="form-actions">
+          <button type="submit" class="btn primary">Activate</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>Available rulesets</h3>
+      <span class="sub">{{ rulesets|length }} on disk</span>
+    </div>
+    <div class="py-1">
+      {% for r in rulesets %}
+        <div class="flex items-center gap-2.5 px-4 py-2.5 border-b border-line last:border-b-0">
+          <span class="w-[7px] h-[7px] rounded-full shrink-0 {% if r.is_active %}bg-ok{% else %}bg-text-4{% endif %}"></span>
+          <div class="flex-1 min-w-0">
+            <div class="text-[12.5px] font-medium text-text">{{ r.name or r.id }}</div>
+            <div class="text-[11px] text-text-4 font-mono mt-px">{{ r.id }}</div>
+          </div>
+          <span class="text-[11px] text-text-3 whitespace-nowrap">
+            {{ r.rule_count }} rules{% if r.version %} · v{{ r.version }}{% endif %}
+          </span>
+          {% if r.is_active %}
+            <span class="chip ok shrink-0" style="font-size: 10px;"><span class="dot"></span>Active</span>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{# ── Rules table ── #}
+{% if ruleset.rules %}
+
+{% set _filter_base = "rs-filter-btn h-[26px] px-2.5 border border-line rounded-full bg-surface-2 text-text-2 text-[11.5px] font-medium cursor-pointer inline-flex items-center gap-1 transition-colors hover:border-line-2 hover:text-text" %}
+<div class="flex flex-wrap gap-3 items-center px-3.5 py-3 bg-surface border border-line border-b-0 rounded-t-lg">
+  <input type="search" id="rs-search"
+         placeholder="Search rules — name, number, path, category…"
+         autocomplete="off" spellcheck="false"
+         class="flex-1 min-w-[220px] h-[34px] pl-[34px] pr-3 bg-bg text-text border border-line rounded-md text-[13px] outline-hidden focus:border-accent focus:shadow-[0_0_0_3px_var(--accent-soft)] transition-[border-color,box-shadow] duration-100"
+         style="background-image: url(&quot;data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236b7480' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='7'/><line x1='21' y1='21' x2='16.65' y2='16.65'/></svg>&quot;); background-repeat: no-repeat; background-position: 11px center;">
+
+  <div class="inline-flex items-center gap-1">
+    <span class="text-[11px] text-text-3 mr-1 uppercase tracking-wider font-semibold">Severity</span>
+    <button type="button" class="{{ _filter_base }} is-active" data-filter="severity" data-value="">All</button>
+    {% for sev in ['critical', 'warning', 'info'] %}
+      {% set count = ruleset.severities.get(sev, 0) %}
+      {% if count %}
+        <button type="button" class="{{ _filter_base }}" data-filter="severity" data-value="{{ sev }}">
+          {{ sev|capitalize }} <span class="tabular-nums opacity-70 text-[10.5px]">{{ count }}</span>
+        </button>
+      {% endif %}
+    {% endfor %}
+  </div>
+
+  <div class="inline-flex items-center gap-1">
+    <span class="text-[11px] text-text-3 mr-1 uppercase tracking-wider font-semibold">Category</span>
+    <button type="button" class="{{ _filter_base }} is-active" data-filter="category" data-value="">All</button>
+    {% for cat, count in ruleset.categories.items()|sort %}
+      <button type="button" class="{{ _filter_base }}" data-filter="category" data-value="{{ cat }}">
+        {{ cat }} <span class="tabular-nums opacity-70 text-[10.5px]">{{ count }}</span>
+      </button>
+    {% endfor %}
+  </div>
+
+  <div class="inline-flex items-center gap-1 ml-auto">
+    <span class="text-[11px] text-text-3 mr-1 uppercase tracking-wider font-semibold">Density</span>
+    <button type="button" class="{{ _filter_base }} rs-density-btn is-active" data-density="cozy"
+            title="Default row height">Cozy</button>
+    <button type="button" class="{{ _filter_base }} rs-density-btn" data-density="compact"
+            title="Denser rows — hides the rule description subtitle">Compact</button>
+  </div>
+</div>
+
+<div class="rs-table-wrap">
+  <table class="rs-table" id="rs-table">
+    <thead>
+      <tr>
+        <th class="col-num">#</th>
+        <th class="col-sev">Severity</th>
+        <th class="col-cat">Category</th>
+        <th class="col-name">Rule</th>
+        <th class="col-path">Path</th>
+        <th class="col-status">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in ruleset.rules %}
+        {% set sev_class = 'is-' ~ r.severity if r.severity in ['critical','warning','info'] else 'is-other' %}
+        {% set search_blob = (r.rule_number ~ ' ' ~ r.name ~ ' ' ~ r.description ~ ' ' ~ r.category ~ ' ' ~ r.path ~ ' ' ~ r.severity)|lower %}
+        <tr class="rs-row{% if not r.enabled %} is-disabled{% endif %}"
+            data-severity="{{ r.severity }}" data-category="{{ r.category }}"
+            data-search="{{ search_blob }}"
+            data-target="rs-detail-{{ loop.index }}">
+          <td class="col-num">{{ r.rule_number }}</td>
+          <td class="col-sev"><span class="sev-pill {{ sev_class }}">{{ r.severity or '—' }}</span></td>
+          <td class="col-cat"><span class="cat-pill">{{ r.category or '—' }}</span></td>
+          <td class="col-name">
+            {{ r.name }}
+            {% if r.description and r.description != r.name %}<span class="desc">{{ r.description }}</span>{% endif %}
+          </td>
+          <td class="col-path" title="{{ r.path }}">{{ r.path or '—' }}</td>
+          <td class="col-status">
+            {% if r.enabled %}
+              <span class="status-pill is-on" title="Active in this ruleset + profile">
+                <span class="dot"></span>Enabled
+              </span>
+            {% elif r.disabled_by_profile %}
+              <span class="status-pill is-profile-off"
+                    title="Disabled by the active profile ({{ ruleset.profile or 'default' }}). Edit rules/rulesets/profiles/{{ ruleset.profile or '<profile>' }}.json to re-enable.">
+                <span class="dot"></span>Disabled in profile
+              </span>
+            {% else %}
+              <span class="status-pill" title="Disabled in the base ruleset">
+                <span class="dot"></span>Disabled
+              </span>
+            {% endif %}
+          </td>
+        </tr>
+        <tr class="rs-drawer-row" id="rs-detail-{{ loop.index }}" hidden>
+          <td colspan="6">
+            <div class="rs-drawer">
+              <div>
+                <h5>Description</h5>
+                <p>{{ r.description or 'No additional description.' }}</p>
+
+                <h5>Validation</h5>
+                <p class="kv">
+                  <code>{{ r.validation_type or '—' }}</code>
+                  &nbsp;
+                  {% if r.validation_summary %}
+                    {{ r.validation_summary }}
+                  {% else %}
+                    <span style="color: var(--text-4);">no validation block</span>
+                  {% endif %}
+                </p>
+
+                {% if r.messages %}
+                  <h5>Messages</h5>
+                  {% if r.messages.get('pass') %}
+                    <div class="rs-msg is-pass"><span class="label">Pass</span><span>{{ r.messages.get('pass') }}</span></div>
+                  {% endif %}
+                  {% if r.messages.get('fail') %}
+                    <div class="rs-msg is-fail"><span class="label">Fail</span><span>{{ r.messages.get('fail') }}</span></div>
+                  {% endif %}
+                {% endif %}
+              </div>
+
+              <div>
+                <h5>Path</h5>
+                <p class="kv"><code>{{ r.path or '—' }}</code></p>
+
+                {% if r.alt_path %}
+                  <h5>Alt path <span style="font-weight:400; text-transform:none; letter-spacing:0; color: var(--text-4); font-size: 10.5px; margin-left: 4px;">SSH fallback</span></h5>
+                  <p class="kv"><code>{{ r.alt_path }}</code></p>
+                {% endif %}
+
+                <h5>Tier</h5>
+                <p class="kv"><code>{{ r.tier|capitalize }}</code></p>
+
+                {% if r.updated_at %}
+                  <h5>Updated</h5>
+                  <p class="kv">{{ r.updated_at }}</p>
+                {% endif %}
+
+                <h5>ID</h5>
+                <p class="kv"><code>{{ r.rule_number }}</code></p>
+              </div>
+            </div>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div id="rs-empty" class="rs-empty" hidden>
+    <strong>No rules match</strong>
+    Try clearing your search or filter.
+  </div>
+</div>
+
+{% else %}
+<section class="card">
+  <div class="card-body" style="text-align:center; padding: 40px 16px;">
+    <strong style="font-size: 14px; color: var(--text);">No rules loaded</strong>
+    <p style="margin-top: 6px; font-size: 12px; color: var(--text-3);">Pick a ruleset above and click <strong>Activate</strong>.</p>
+  </div>
+</section>
+{% endif %}
+
+<script nonce="{{ csp_nonce }}">
+(function () {
+  'use strict';
+
+  var table = document.getElementById('rs-table');
+  if (!table) return;
+
+  var rows  = Array.from(table.querySelectorAll('tr.rs-row'));
+  var empty = document.getElementById('rs-empty');
+  var search = document.getElementById('rs-search');
+  // Severity/category filter buttons — scoped by [data-filter] so the
+  // separate .rs-density-btn group below isn't accidentally treated as a
+  // filter (clicking a density pill would otherwise mutate state under an
+  // undefined key and toggle is-active on every other filter button).
+  var filterButtons = document.querySelectorAll('.rs-filter-btn[data-filter]');
+  var densityButtons = document.querySelectorAll('.rs-density-btn');
+
+  var state = { severity: '', category: '', q: '' };
+
+  function applyFilters() {
+    var q = state.q.trim().toLowerCase();
+    var visible = 0;
+    rows.forEach(function (row) {
+      var sevOk = !state.severity || row.dataset.severity === state.severity;
+      var catOk = !state.category || row.dataset.category === state.category;
+      var qOk   = !q || row.dataset.search.indexOf(q) !== -1;
+      var show = sevOk && catOk && qOk;
+      row.hidden = !show;
+      // If the parent row is hidden, force-close any open drawer for it
+      if (!show) {
+        var drawer = document.getElementById(row.dataset.target);
+        if (drawer && !drawer.hidden) {
+          drawer.hidden = true;
+          row.classList.remove('is-open');
+        }
+      }
+      if (show) visible++;
+    });
+    if (empty) empty.hidden = visible !== 0;
+  }
+
+  // Filter buttons (severity/category) — toggle within their own group
+  filterButtons.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var group = btn.dataset.filter;
+      var value = btn.dataset.value;
+      state[group] = value;
+      filterButtons.forEach(function (b) {
+        if (b.dataset.filter === group) b.classList.toggle('is-active', b.dataset.value === value);
+      });
+      applyFilters();
+    });
+  });
+
+  // Search input
+  if (search) {
+    search.addEventListener('input', function () { state.q = search.value; applyFilters(); });
+  }
+
+  // Density toggle — persists across page loads. localStorage is the right
+  // store here (browser-local UI preference, no server round-trip needed).
+  var DENSITY_KEY = 'atlas:rs-density';
+  function applyDensity(mode) {
+    var compact = mode === 'compact';
+    table.classList.toggle('is-compact', compact);
+    densityButtons.forEach(function (b) {
+      b.classList.toggle('is-active', b.dataset.density === mode);
+    });
+    try { localStorage.setItem(DENSITY_KEY, mode); } catch (e) { /* private mode / quota */ }
+  }
+  var savedDensity = null;
+  try { savedDensity = localStorage.getItem(DENSITY_KEY); } catch (e) { /* ignore */ }
+  applyDensity(savedDensity === 'compact' ? 'compact' : 'cozy');
+  densityButtons.forEach(function (btn) {
+    btn.addEventListener('click', function () { applyDensity(btn.dataset.density); });
+  });
+
+  // Row click → toggle drawer
+  rows.forEach(function (row) {
+    row.addEventListener('click', function (e) {
+      // Ignore clicks on links / buttons that may live inside the row in the future
+      if (e.target.closest('a, button')) return;
+      var drawerId = row.dataset.target;
+      if (!drawerId) return;
+      var drawer = document.getElementById(drawerId);
+      if (!drawer) return;
+      var willOpen = drawer.hidden;
+      drawer.hidden = !willOpen;
+      row.classList.toggle('is-open', willOpen);
+    });
+  });
+
+}());
+</script>
+
+{% endblock %}

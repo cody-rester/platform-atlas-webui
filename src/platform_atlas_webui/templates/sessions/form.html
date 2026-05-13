@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}New session — Platform Atlas{% endblock %}
+{% block crumb %}<a href="/sessions" class="text-inherit hover:text-accent">Sessions</a> <span class="sep">›</span> New{% endblock %}
+{% block content %}
+{% set is_std = active_tier == 'standard' %}
+{% set has_rulesets = rulesets | length > 0 %}
+
+<header class="flex items-end justify-between gap-6 pb-5 border-b border-line mb-6 pl-6">
+  <div>
+    <div class="eyebrow"><span class="dot"></span> Create</div>
+    <h1 class="text-[36px] leading-[1.05] font-semibold tracking-[-0.038em] mt-2 mb-1.5">New session</h1>
+    <p class="text-[14px] text-text-2 max-w-[64ch]">
+      Sessions bind an environment, ruleset, profile, and tier at creation time — these cannot be changed after the session is created.
+    </p>
+  </div>
+  <div class="flex items-center gap-2">
+    <a class="btn" href="/sessions">Cancel</a>
+  </div>
+</header>
+
+{% if not has_rulesets %}
+<div class="ml-6 mb-[18px] px-4 py-3 bg-surface-2 border rounded-lg text-[13px] text-text-2"
+     style="border-color: oklch(60% 0.18 50 / 40%);">
+  No rulesets found. <a href="/rulesets" class="text-accent hover:text-accent-hover">Configure a ruleset</a> before creating a session.
+</div>
+{% endif %}
+
+<section class="card max-w-[560px] ml-6">
+  <div class="card-head"><h3>Session parameters</h3></div>
+  <div class="card-body">
+    <form class="form" method="post" action="/sessions" style="background:transparent; border:0; padding:0;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <fieldset>
+        <div class="field">
+          <label for="name">Session name</label>
+          <input id="name" name="name" type="text" required pattern="[a-zA-Z0-9_-]{3,64}" placeholder="acme-audit-2026-q2" autofocus value="{{ prefill.name if prefill else '' }}"
+                 hx-get="/sessions/validate-name"
+                 hx-trigger="keyup changed delay:300ms, change, load delay:100ms"
+                 hx-target="#session-name-check"
+                 hx-swap="innerHTML"
+                 {# Cancel any in-flight validation when the user types again
+                    so a slow earlier response can't overwrite the result for
+                    the current value (race-condition-prone otherwise). #}
+                 hx-sync="this:replace">
+          <span class="hint">3–64 characters: letters, digits, hyphen, underscore.</span>
+          {# Live availability check — populated by the hx-get above. #}
+          <div id="session-name-check" class="mt-1.5 min-h-[18px]"></div>
+        </div>
+        <div class="field">
+          <label for="description">Description <span class="text-text-4 font-normal">(optional)</span></label>
+          <input id="description" name="description" type="text" placeholder="Quarterly health check" value="{{ prefill.description if prefill else '' }}">
+        </div>
+
+        <div class="field">
+          <label for="ruleset_id">Ruleset</label>
+          {% if has_rulesets %}
+          <select id="ruleset_id" name="ruleset_id" required>
+            {% for r in rulesets %}
+            <option value="{{ r.id }}" {% if prefill and prefill.ruleset_id == r.id %}selected{% elif not prefill and r.is_active %}selected{% endif %}>
+              {{ r.id }}{% if r.version %} v{{ r.version }}{% endif %} — {{ r.rule_count }} rules
+            </option>
+            {% endfor %}
+          </select>
+          {% else %}
+          <select id="ruleset_id" name="ruleset_id" disabled>
+            <option value="">— no rulesets available —</option>
+          </select>
+          {% endif %}
+          <span class="hint">Bound at creation — locked for the life of this session.</span>
+        </div>
+
+        <div class="field">
+          <label for="ruleset_profile">Profile <span class="text-text-4 font-normal">(optional)</span></label>
+          <select id="ruleset_profile" name="ruleset_profile">
+            <option value="">— None —</option>
+            {% for p in profiles %}
+            <option value="{{ p.id }}" {% if prefill and prefill.ruleset_profile == p.id %}selected{% elif not prefill and p.is_active %}selected{% endif %}>
+              {{ p.id }}{% if p.description %} — {{ p.description }}{% endif %}
+            </option>
+            {% endfor %}
+          </select>
+          <span class="hint">Profiles enable or disable specific rules for targeted environments.</span>
+        </div>
+
+        <div class="field">
+          <label>Environment</label>
+          <div class="flex items-center gap-2.5 px-2.5 py-1.5 bg-surface-2 border border-line rounded-md">
+            {% if active_environment %}
+              <span class="w-2 h-2 rounded-full shrink-0" style="background:oklch(65% 0.18 145);"></span>
+              <span class="text-[13px] font-medium text-text">{{ active_environment }}</span>
+            {% else %}
+              <span class="w-2 h-2 rounded-full shrink-0 bg-text-4"></span>
+              <span class="text-[13px] text-text-3">No environment selected</span>
+            {% endif %}
+            <a href="/environments" class="ml-auto text-[11px] text-accent no-underline whitespace-nowrap hover:text-accent-hover">Change ↗</a>
+          </div>
+          <span class="hint">Bound at creation from your active environment — determines deployment topology and Kubernetes rules.</span>
+        </div>
+
+        <div class="field">
+          <label>Tier</label>
+          <div class="flex items-center gap-2.5 px-2.5 py-1.5 bg-surface-2 border border-line rounded-md">
+            {% if is_std %}
+              <span class="w-2 h-2 rounded-full shrink-0" style="background:oklch(60% 0.18 220);"></span>
+              <span class="text-[13px] font-medium" style="color:oklch(60% 0.18 220);">Standard</span>
+              <span class="text-[12px] text-text-3">— application audit (Platform OAuth + IAG4)</span>
+            {% else %}
+              <span class="w-2 h-2 rounded-full shrink-0" style="background:oklch(70% 0.18 30);"></span>
+              <span class="text-[13px] font-medium" style="color:oklch(70% 0.18 30);">Extended</span>
+              <span class="text-[12px] text-text-3">— full infrastructure (SSH / MongoDB / Redis)</span>
+            {% endif %}
+            <a href="/tier" class="ml-auto text-[11px] text-accent no-underline whitespace-nowrap hover:text-accent-hover">Change ↗</a>
+          </div>
+          <span class="hint">Inherited from your active configuration — cannot be overridden per session.</span>
+        </div>
+      </fieldset>
+      <div class="form-actions">
+        <button type="submit" class="btn primary" {% if not has_rulesets %}disabled title="Configure a ruleset first"{% endif %}>Create session</button>
+        <a class="btn" href="/sessions">Cancel</a>
+      </div>
+    </form>
+  </div>
+</section>
+
+{% endblock %}

@@ -1,0 +1,3447 @@
+/* ── Self-hosted fonts (Inter · JetBrains Mono · Instrument Serif) ── */
+/* latin-ext */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/static/fonts/inter-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/static/fonts/inter-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url('/static/fonts/jetbrains-mono-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url('/static/fonts/jetbrains-mono-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Instrument Serif';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/static/fonts/instrument-serif-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Instrument Serif';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/static/fonts/instrument-serif-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ───────────────────────────────────────────────────────────────
+   Platform Atlas — Aurora & Horizon design system.
+
+   Themes are switched by two attributes on <html>:
+     data-theme = aurora | horizon | obsidian | meadow |
+                  carbon | itential | dracula       (palette identity)
+     data-mode  = light  | dark                     (light/dark variant)
+
+   Each combination produces a coherent palette. Components reference
+   the V1 token names (--bg, --accent, --text, …) — those names are
+   kept as aliases so the existing 900+ lines of styles below need no
+   per-rule changes. Do not introduce new component CSS that hardcodes
+   hex values; always read from the tokens.
+
+   data-radius="pill" and data-sidebar="full" are FIXED — base.html
+   hard-codes those attributes; do not parameterize them.
+   ─────────────────────────────────────────────────────────────── */
+
+/* ── Base token aliases ────────────────────────────────────────────
+   A handful of templates reference --field-bg / --border / --text-1
+   via inline styles. Those names aren't part of the canonical token
+   grid (which is --surface-2 / --line-2 / --text), so without these
+   aliases the references silently fall back to `transparent` / no
+   border and the field becomes invisible against the page surface.
+   Declared at :root so every theme inherits them; the right-hand
+   tokens are theme-defined and resolve via the cascade per palette. */
+:root {
+  --field-bg: var(--surface-2);
+  --border: var(--line-2);
+  --text-1: var(--text);
+}
+
+/* ── Aurora — operations dashboard, electric blue ── */
+
+:root[data-theme="aurora"][data-mode="dark"],
+:root[data-theme="aurora"]:not([data-mode="light"]),
+:root:not([data-theme]):not([data-mode="light"]) {
+  /* Aurora Dark — also the default when no attributes set yet */
+  --bg: #0A1628; --bg-2: #0F1F35;
+  --surface: #152944; --surface-2: #1B3151; --surface-3: #234063;
+  --line: rgba(176, 196, 222, 0.14); --line-2: rgba(176, 196, 222, 0.28);
+  --text: #E8EEF5; --text-2: #9FB0C5; --text-3: #6B7B8E; --text-4: #4F5C6E;
+  --accent: #4D9FFF; --accent-ink: #051022; --accent-soft: rgba(77, 159, 255, 0.18);
+  --accent-hover: #6BB0FF; --accent-muted: #1E3A5F;
+  --ok: #4ADE80; --warn: #FBBF24; --bad: #F87171; --info: #4D9FFF;
+  --ok-soft:   rgba(74, 222, 128, 0.16);
+  --warn-soft: rgba(251, 191, 36, 0.16);
+  --bad-soft:  rgba(248, 113, 113, 0.16);
+}
+
+:root[data-theme="aurora"][data-mode="light"] {
+  --bg: #F4F2EC; --bg-2: #FAFAF6;
+  --surface: #FFFFFF; --surface-2: #ECEAE3; --surface-3: #E0DDD3;
+  --line: rgba(31, 41, 55, 0.14); --line-2: rgba(31, 41, 55, 0.28);
+  --text: #1F2937; --text-2: #4B5563; --text-3: #6B7480; --text-4: #9CA3AF;
+  --accent: #2563EB; --accent-ink: #FFFFFF; --accent-soft: rgba(37, 99, 235, 0.14);
+  --accent-hover: #1D4ED8; --accent-muted: #DBEAFE;
+  --ok: #16A34A; --warn: #D97706; --bad: #DC2626; --info: #2563EB;
+  --ok-soft:   rgba(22, 163, 74, 0.12);
+  --warn-soft: rgba(217, 119, 6, 0.12);
+  --bad-soft:  rgba(220, 38, 38, 0.10);
+}
+
+/* ── Horizon — editorial, terracotta ── */
+
+:root[data-theme="horizon"][data-mode="dark"],
+:root[data-theme="horizon"]:not([data-mode="light"]) {
+  --bg: #1A1815; --bg-2: #221F1B;
+  --surface: #2C2823; --surface-2: #36322C; --surface-3: #443E36;
+  --line: rgba(232, 222, 208, 0.14); --line-2: rgba(232, 222, 208, 0.28);
+  --text: #E8DED0; --text-2: #B5A98C; --text-3: #7E7560; --text-4: #5C5648;
+  --accent: #E07B52; --accent-ink: #1A0E08; --accent-soft: rgba(224, 123, 82, 0.18);
+  --accent-hover: #ED8E69; --accent-muted: #4A2818;
+  --ok: #8FAD7A; --warn: #D4A55A; --bad: #C77070; --info: #7B98AC;
+  --ok-soft:   rgba(143, 173, 122, 0.14);
+  --warn-soft: rgba(212, 165, 90, 0.14);
+  --bad-soft:  rgba(199, 112, 112, 0.14);
+}
+
+:root[data-theme="horizon"][data-mode="light"] {
+  --bg: #EDEAE3; --bg-2: #F4F1EB;
+  --surface: #FBF8F3; --surface-2: #E5E1D8; --surface-3: #DCD7CB;
+  --line: rgba(45, 40, 35, 0.16); --line-2: rgba(45, 40, 35, 0.30);
+  --text: #2D2825; --text-2: #6B6359; --text-3: #8A8175; --text-4: #9A9085;
+  --accent: #C25A3A; --accent-ink: #FFF7F2; --accent-soft: rgba(194, 90, 58, 0.14);
+  --accent-hover: #A84A2D; --accent-muted: #F5DDD3;
+  --ok: #5C7A4A; --warn: #B89968; --bad: #A04848; --info: #45627A;
+  --ok-soft:   rgba(92, 122, 74, 0.12);
+  --warn-soft: rgba(184, 153, 104, 0.12);
+  --bad-soft:  rgba(160, 72, 72, 0.12);
+}
+
+/* ── Obsidian — high-contrast OLED, violet accent ── */
+
+:root[data-theme="obsidian"][data-mode="dark"],
+:root[data-theme="obsidian"]:not([data-mode="light"]) {
+  --bg: #000000; --bg-2: #0A0A11;
+  --surface: #0F0F18; --surface-2: #161622; --surface-3: #1F1F2D;
+  --line: rgba(167, 139, 250, 0.12); --line-2: rgba(167, 139, 250, 0.24);
+  --text: #ECEAFF; --text-2: #A8A3C9; --text-3: #6F6A8A; --text-4: #504C66;
+  --accent: #A78BFA; --accent-ink: #0A0612; --accent-soft: rgba(167, 139, 250, 0.18);
+  --accent-hover: #BBA1FF; --accent-muted: #2D1F4F;
+  --ok: #4ADE80; --warn: #FBBF24; --bad: #F87171; --info: #A78BFA;
+  --ok-soft:   rgba(74, 222, 128, 0.16);
+  --warn-soft: rgba(251, 191, 36, 0.16);
+  --bad-soft:  rgba(248, 113, 113, 0.16);
+}
+
+:root[data-theme="obsidian"][data-mode="light"] {
+  --bg: #F7F6FB; --bg-2: #FBFAFE;
+  --surface: #FFFFFF; --surface-2: #ECEAF5; --surface-3: #DAD7E8;
+  --line: rgba(45, 31, 79, 0.14); --line-2: rgba(45, 31, 79, 0.28);
+  --text: #16162B; --text-2: #4A4366; --text-3: #6B6685; --text-4: #9C97B0;
+  --accent: #6D28D9; --accent-ink: #FFFFFF; --accent-soft: rgba(109, 40, 217, 0.14);
+  --accent-hover: #5B21B6; --accent-muted: #EDE5FB;
+  --ok: #16A34A; --warn: #D97706; --bad: #DC2626; --info: #6D28D9;
+  --ok-soft:   rgba(22, 163, 74, 0.12);
+  --warn-soft: rgba(217, 119, 6, 0.12);
+  --bad-soft:  rgba(220, 38, 38, 0.10);
+}
+
+/* ── Meadow — calming sage/forest green ── */
+
+:root[data-theme="meadow"][data-mode="dark"],
+:root[data-theme="meadow"]:not([data-mode="light"]) {
+  --bg: #0E1812; --bg-2: #14201A;
+  --surface: #1B2A22; --surface-2: #243528; --surface-3: #2E4233;
+  --line: rgba(155, 195, 165, 0.14); --line-2: rgba(155, 195, 165, 0.28);
+  --text: #DCE8DD; --text-2: #93AE99; --text-3: #6B8771; --text-4: #4F6855;
+  --accent: #84A98C; --accent-ink: #0E1812; --accent-soft: rgba(132, 169, 140, 0.18);
+  --accent-hover: #9BBFA1; --accent-muted: #2A4233;
+  --ok: #8FAD7A; --warn: #D4A55A; --bad: #C77070; --info: #7B98AC;
+  --ok-soft:   rgba(143, 173, 122, 0.14);
+  --warn-soft: rgba(212, 165, 90, 0.14);
+  --bad-soft:  rgba(199, 112, 112, 0.14);
+}
+
+:root[data-theme="meadow"][data-mode="light"] {
+  --bg: #EFF3EC; --bg-2: #F4F7F1;
+  --surface: #FBFCF8; --surface-2: #E2E7DA; --surface-3: #D5DDCC;
+  --line: rgba(36, 56, 40, 0.16); --line-2: rgba(36, 56, 40, 0.30);
+  --text: #1C281F; --text-2: #4A5C4F; --text-3: #6F806E; --text-4: #93A091;
+  --accent: #4A7A5A; --accent-ink: #FAFCF7; --accent-soft: rgba(74, 122, 90, 0.14);
+  --accent-hover: #3D6649; --accent-muted: #DCE8DD;
+  --ok: #5C7A4A; --warn: #B89968; --bad: #A04848; --info: #45627A;
+  --ok-soft:   rgba(92, 122, 74, 0.12);
+  --warn-soft: rgba(184, 153, 104, 0.12);
+  --bad-soft:  rgba(160, 72, 72, 0.12);
+}
+
+/* ── Carbon — true grayscale, no chromatic personality ── */
+
+:root[data-theme="carbon"][data-mode="dark"],
+:root[data-theme="carbon"]:not([data-mode="light"]) {
+  --bg: #0F0F0F; --bg-2: #171717;
+  --surface: #1F1F1F; --surface-2: #292929; --surface-3: #353535;
+  --line: rgba(255, 255, 255, 0.10); --line-2: rgba(255, 255, 255, 0.20);
+  --text: #F0F0F0; --text-2: #BABABA; --text-3: #888888; --text-4: #5C5C5C;
+  --accent: #E0E0E0; --accent-ink: #0F0F0F; --accent-soft: rgba(224, 224, 224, 0.14);
+  --accent-hover: #FFFFFF; --accent-muted: #2E2E2E;
+  --ok: #7DBE85; --warn: #DAA84B; --bad: #D17070; --info: #9AB3C2;
+  --ok-soft:   rgba(125, 190, 133, 0.14);
+  --warn-soft: rgba(218, 168, 75, 0.14);
+  --bad-soft:  rgba(209, 112, 112, 0.14);
+}
+
+:root[data-theme="carbon"][data-mode="light"] {
+  --bg: #F5F5F5; --bg-2: #FAFAFA;
+  --surface: #FFFFFF; --surface-2: #EAEAEA; --surface-3: #D8D8D8;
+  --line: rgba(0, 0, 0, 0.12); --line-2: rgba(0, 0, 0, 0.24);
+  --text: #181818; --text-2: #4A4A4A; --text-3: #737373; --text-4: #A0A0A0;
+  --accent: #2A2A2A; --accent-ink: #FFFFFF; --accent-soft: rgba(42, 42, 42, 0.10);
+  --accent-hover: #000000; --accent-muted: #DEDEDE;
+  --ok: #2F7A3D; --warn: #B0801E; --bad: #B83D3D; --info: #3D6E8E;
+  --ok-soft:   rgba(47, 122, 61, 0.10);
+  --warn-soft: rgba(176, 128, 30, 0.10);
+  --bad-soft:  rgba(184, 61, 61, 0.10);
+}
+
+/* ── Itential — brand-true: navy sidebar, white content, Itential blue.
+   This palette is brand identity, not a dark/light pair — both data-mode
+   values render the same navy-sidebar/white-content split. The mode
+   toggle is therefore a no-op for this theme; users pick a different
+   theme if they want a true dark variant. ── */
+
+:root[data-theme="itential"][data-mode="dark"],
+:root[data-theme="itential"][data-mode="light"],
+:root[data-theme="itential"]:not([data-mode="light"]):not([data-mode="dark"]) {
+  --bg: #FFFFFF; --bg-2: #F5F7FA;
+  --surface: #FFFFFF; --surface-2: #EEF2F6; --surface-3: #DCE3EB;
+  --line: rgba(16, 22, 37, 0.10); --line-2: rgba(16, 22, 37, 0.20);
+  --text: #101625; --text-2: #3A4254; --text-3: #6B7280; --text-4: #9CA3AF;
+  --accent: #1B93D2; --accent-ink: #FFFFFF; --accent-soft: rgba(27, 147, 210, 0.12);
+  --accent-hover: #1782BC; --accent-muted: #D7E9F4;
+  --ok: #6FA22C; --warn: #E55A2A; --bad: #C0392B; --info: #1B93D2;
+  --ok-soft:   rgba(111, 162, 44, 0.12);
+  --warn-soft: rgba(229, 90, 42, 0.12);
+  --bad-soft:  rgba(192, 57, 43, 0.10);
+}
+
+/* Re-declare token values inside .side and .brand-cell so those regions
+   render navy while the rest of the app stays white. Component CSS is
+   unchanged — it keeps reading from the same tokens, which resolve to
+   dark values inside this scope via CSS custom-property cascading.
+   ``color`` is also re-applied here so descendants like .brand (which
+   inherits color from body, not its parent's tokens) pick up the local
+   --text value and stay legible on the navy background. */
+:root[data-theme="itential"] .side,
+:root[data-theme="itential"] .brand-cell {
+  --bg-2: #101625;
+  --surface: #1A2438;
+  --surface-2: #243049;
+  --surface-3: #2E3A55;
+  --line: rgba(255, 255, 255, 0.10);
+  --line-2: rgba(255, 255, 255, 0.20);
+  --text: #FFFFFF;
+  --text-2: #BFCBDD;
+  --text-3: #8595AC;
+  --text-4: #5E6E85;
+  color: var(--text);
+}
+
+/* Brand-cell is navy in Itential, so keep the dark-bg logo regardless
+   of the global light/dark logo swap. The [data-mode] qualifier bumps
+   specificity above the global :root[data-mode="light"] .brand-mark
+   rule defined later in the file. */
+:root[data-theme="itential"][data-mode] .brand-mark {
+  background-image: url("/static/img/itential-logo-dark.png");
+}
+
+/* Sidebar section headers: solid Itential blue band, edge-to-edge.
+   Negative margins bleed past .side's 12px horizontal padding;
+   compensating padding keeps text at the same 10px indent. */
+:root[data-theme="itential"] .nav-label {
+  background: #1B93D2;
+  color: #ffffff;
+  margin: 0 -12px;
+  padding: 7px 22px;
+  border-radius: 0;
+}
+
+/* Form fields — text inputs, textareas, and selects.
+   The Itential base palette is white-on-white with a 10%-opacity navy
+   line, which leaves form fields nearly invisible on the page. Give
+   them a softly tinted recessed surface, a more pronounced border,
+   and a subtle inset shadow so they read as inputs at a glance. The
+   field "lights up" to plain white on focus so the typing surface is
+   crisp.  Scoped to the [data-theme="itential"] root and reset inside
+   .side / .brand-cell so the navy sidebar keeps its dark-on-dark
+   chrome. */
+:root[data-theme="itential"] input[type="text"],
+:root[data-theme="itential"] input[type="password"],
+:root[data-theme="itential"] input[type="url"],
+:root[data-theme="itential"] input[type="email"],
+:root[data-theme="itential"] input[type="number"],
+:root[data-theme="itential"] input[type="search"],
+:root[data-theme="itential"] input[type="tel"],
+:root[data-theme="itential"] input[type="date"],
+:root[data-theme="itential"] input[type="time"],
+:root[data-theme="itential"] input:not([type]),
+:root[data-theme="itential"] textarea,
+:root[data-theme="itential"] select {
+  background: #F4F7FB;
+  border-color: rgba(16, 22, 37, 0.22);
+  box-shadow: inset 0 1px 1px rgba(16, 22, 37, 0.04);
+  transition: background var(--dur-fast, .12s) var(--ease-standard, ease),
+              border-color var(--dur-fast, .12s) var(--ease-standard, ease),
+              box-shadow var(--dur-fast, .12s) var(--ease-standard, ease);
+}
+
+:root[data-theme="itential"] input[type="text"]:hover:not(:focus),
+:root[data-theme="itential"] input[type="password"]:hover:not(:focus),
+:root[data-theme="itential"] input[type="url"]:hover:not(:focus),
+:root[data-theme="itential"] input[type="email"]:hover:not(:focus),
+:root[data-theme="itential"] input[type="number"]:hover:not(:focus),
+:root[data-theme="itential"] input[type="search"]:hover:not(:focus),
+:root[data-theme="itential"] input[type="tel"]:hover:not(:focus),
+:root[data-theme="itential"] input[type="date"]:hover:not(:focus),
+:root[data-theme="itential"] input[type="time"]:hover:not(:focus),
+:root[data-theme="itential"] input:not([type]):hover:not(:focus),
+:root[data-theme="itential"] textarea:hover:not(:focus),
+:root[data-theme="itential"] select:hover:not(:focus) {
+  border-color: rgba(16, 22, 37, 0.34);
+}
+
+:root[data-theme="itential"] input[type="text"]:focus,
+:root[data-theme="itential"] input[type="password"]:focus,
+:root[data-theme="itential"] input[type="url"]:focus,
+:root[data-theme="itential"] input[type="email"]:focus,
+:root[data-theme="itential"] input[type="number"]:focus,
+:root[data-theme="itential"] input[type="search"]:focus,
+:root[data-theme="itential"] input[type="tel"]:focus,
+:root[data-theme="itential"] input[type="date"]:focus,
+:root[data-theme="itential"] input[type="time"]:focus,
+:root[data-theme="itential"] input:not([type]):focus,
+:root[data-theme="itential"] textarea:focus,
+:root[data-theme="itential"] select:focus {
+  background: #FFFFFF;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(27, 147, 210, 0.18);
+}
+
+:root[data-theme="itential"] input::placeholder,
+:root[data-theme="itential"] textarea::placeholder {
+  color: var(--text-4);
+  opacity: 1;
+}
+
+/* Sidebar fields keep the navy chrome — revert the white-content
+   tokens so contrast stays correct on the dark surface. */
+:root[data-theme="itential"] .side input[type="text"],
+:root[data-theme="itential"] .side input[type="password"],
+:root[data-theme="itential"] .side input[type="search"],
+:root[data-theme="itential"] .side input:not([type]),
+:root[data-theme="itential"] .side textarea,
+:root[data-theme="itential"] .side select,
+:root[data-theme="itential"] .brand-cell input,
+:root[data-theme="itential"] .brand-cell textarea,
+:root[data-theme="itential"] .brand-cell select {
+  background: var(--surface-2);
+  border-color: var(--line-2);
+  box-shadow: none;
+}
+:root[data-theme="itential"] .side input:focus,
+:root[data-theme="itential"] .side textarea:focus,
+:root[data-theme="itential"] .side select:focus,
+:root[data-theme="itential"] .brand-cell input:focus,
+:root[data-theme="itential"] .brand-cell textarea:focus,
+:root[data-theme="itential"] .brand-cell select:focus {
+  background: var(--surface);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+/* ── Dracula — official Dracula theme (https://draculatheme.com/spec) ── */
+
+:root[data-theme="dracula"][data-mode="dark"],
+:root[data-theme="dracula"]:not([data-mode="light"]) {
+  --bg: #1E1F29; --bg-2: #232430;
+  --surface: #282A36; --surface-2: #343746; --surface-3: #44475A;
+  --line: rgba(248, 248, 242, 0.10); --line-2: rgba(248, 248, 242, 0.22);
+  --text: #F8F8F2; --text-2: #C9C7D1; --text-3: #6272A4; --text-4: #4A537A;
+  --accent: #FF79C6; --accent-ink: #1E1F29; --accent-soft: rgba(255, 121, 198, 0.18);
+  --accent-hover: #FF8FCF; --accent-muted: #4A1E3A;
+  --ok: #50FA7B; --warn: #FFB86C; --bad: #FF5555; --info: #8BE9FD;
+  --ok-soft:   rgba(80, 250, 123, 0.16);
+  --warn-soft: rgba(255, 184, 108, 0.16);
+  --bad-soft:  rgba(255, 85, 85, 0.16);
+}
+
+:root[data-theme="dracula"][data-mode="light"] {
+  /* Alucard — official Dracula light variant */
+  --bg: #FAF6DA; --bg-2: #FDFAE5;
+  --surface: #FFFBEB; --surface-2: #EDE9D2; --surface-3: #CFCFDE;
+  --line: rgba(31, 31, 31, 0.14); --line-2: rgba(31, 31, 31, 0.28);
+  --text: #1F1F1F; --text-2: #44434B; --text-3: #6C664B; --text-4: #8E8770;
+  --accent: #A3144D; --accent-ink: #FFFBEB; --accent-soft: rgba(163, 20, 77, 0.12);
+  --accent-hover: #8B0F40; --accent-muted: #F5DCE5;
+  --ok: #14710A; --warn: #A34D14; --bad: #CB3A2A; --info: #036A96;
+  --ok-soft:   rgba(20, 113, 10, 0.10);
+  --warn-soft: rgba(163, 77, 20, 0.10);
+  --bad-soft:  rgba(203, 58, 42, 0.10);
+}
+
+/* ── Legacy data-theme="light"|"dark" — bridge for any cached cookie/cache.
+   These resolve to Aurora in the matching mode so stale clients still render.
+   New writes always use a named palette (aurora|horizon|obsidian|meadow|
+   carbon|itential|dracula) plus data-mode. ── */
+
+:root[data-theme="dark"] {
+  --bg: #0A1628; --bg-2: #0F1F35;
+  --surface: #152944; --surface-2: #1B3151; --surface-3: #234063;
+  --line: rgba(176, 196, 222, 0.14); --line-2: rgba(176, 196, 222, 0.28);
+  --text: #E8EEF5; --text-2: #9FB0C5; --text-3: #6B7B8E; --text-4: #4F5C6E;
+  --accent: #4D9FFF; --accent-ink: #051022; --accent-soft: rgba(77, 159, 255, 0.18);
+  --ok: #4ADE80; --warn: #FBBF24; --bad: #F87171; --info: #4D9FFF;
+}
+:root[data-theme="light"] {
+  --bg: #F4F2EC; --bg-2: #FAFAF6;
+  --surface: #FFFFFF; --surface-2: #ECEAE3; --surface-3: #E0DDD3;
+  --line: rgba(31, 41, 55, 0.14); --line-2: rgba(31, 41, 55, 0.28);
+  --text: #1F2937; --text-2: #4B5563; --text-3: #6B7480; --text-4: #9CA3AF;
+  --accent: #2563EB; --accent-ink: #FFFFFF; --accent-soft: rgba(37, 99, 235, 0.14);
+  --ok: #16A34A; --warn: #D97706; --bad: #DC2626; --info: #2563EB;
+}
+
+/* Legacy data-accent — silently no-op now that Aurora/Horizon define the
+   accent per theme. Old configs migrate at read time in services/config.py. */
+
+/* Radius — pill is the only shipped variant */
+:root[data-radius="pill"] { --r-sm: 8px; --r-md: 999px; --r-lg: 18px; --r-xl: 22px; }
+:root[data-radius="soft"] { --r-sm: 6px; --r-md: 8px; --r-lg: 12px; --r-xl: 16px; }
+
+:root {
+  --ui: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --mono: 'JetBrains Mono', 'SF Mono', ui-monospace, Consolas, monospace;
+  --sidebar-w: 248px;
+
+  /* Motion tokens — reach for these instead of magic numbers. ``standard``
+     is the workhorse for hover/focus and small state changes; ``emphasized``
+     fits page-enter / modal-open where you want a touch of overshoot. */
+  --ease-standard:   cubic-bezier(.2, 0, 0, 1);
+  --ease-emphasized: cubic-bezier(.2, 0, 0, 1.2);
+  --ease-decel:      cubic-bezier(0, 0, .2, 1);
+  --dur-fast:  120ms;
+  --dur-base:  180ms;
+  --dur-slow:  240ms;
+}
+
+/* prefers-reduced-motion: collapse all transitions to a near-instant value
+   so users with the OS toggle on don't get distracted by movement. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 1ms;
+    --dur-base: 1ms;
+    --dur-slow: 1ms;
+  }
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+html { color-scheme: dark; }
+html[data-mode="light"] { color-scheme: light; }
+html[data-theme="light"] { color-scheme: light; }   /* legacy bridge */
+
+/* Universal: HTML hidden attribute always wins. */
+[hidden] { display: none !important; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--ui);
+  font-size: 13px;
+  line-height: 1.5;
+  font-feature-settings: 'cv11' 1, 'ss01' 1, 'ss03' 1;
+  font-optical-sizing: auto;
+  letter-spacing: -0.011em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+.mono, code, pre, kbd, samp {
+  font-family: var(--mono);
+  font-feature-settings: 'zero' 1, 'ss02' 1;
+  letter-spacing: 0;
+}
+
+/* Headline tracking — Inter looks intentional with tighter spacing at size. */
+h1 {
+  letter-spacing: -0.038em;
+  font-feature-settings: 'cv11' 1, 'ss01' 1, 'ss03' 1, 'cpsp' 1;
+  text-wrap: balance;
+}
+h2 { letter-spacing: -0.020em; }
+h3 { letter-spacing: -0.015em; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+a { color: inherit; text-decoration: none; }
+::selection { background: var(--accent); color: var(--accent-ink); }
+
+/* ── Shell ──────────────────────────────────────────────────────
+   .app, .brand-cell, .brand, .brand-ver, .topbar, .crumbs, .side, .main —
+   DELETED. base.html now expresses the shell layout with Tailwind utilities
+   directly on <body> (CSS grid with grid-template-areas) and on each shell
+   child (<aside>, <main>, the brand wrapper, the topbar). The classes
+   .brand-mark + theme-conditional rules below are KEPT — they swap a
+   background image based on [data-mode="light"], which is exactly the
+   theme-aware-CSS-only pattern Tailwind utilities can't express cleanly. */
+.brand-mark {
+  width: 28px; height: 28px;
+  border-radius: var(--r-sm);
+  background: url("/static/img/itential-logo-dark.png") center / contain no-repeat;
+  flex-shrink: 0;
+}
+:root[data-mode="light"] .brand-mark,
+:root[data-theme="light"] .brand-mark {
+  background-image: url("/static/img/itential-logo-light.png");
+}
+
+/* ── Topbar pills + buttons ───────────────────────────────────── */
+.pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 30px; padding: 0 10px;
+  border: 1px solid var(--line); background: var(--surface);
+  border-radius: var(--r-md);
+  font-size: 12px; color: var(--text-2);
+}
+.pill:hover { border-color: var(--line-2); }
+.pill .label { color: var(--text-4); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+.pill .val { color: var(--text); font-weight: 500; }
+.pill .dot { width: 6px; height: 6px; border-radius: 999px; background: var(--ok); box-shadow: 0 0 0 3px oklch(80% .14 155 / .15); }
+
+.kbd {
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 30px; padding: 0 10px;
+  border: 1px solid var(--line); background: var(--surface);
+  border-radius: var(--r-md);
+  color: var(--text-3); font-size: 12px; min-width: 200px;
+}
+.kbd .ph { flex: 1; }
+.kbd .keys span {
+  font-family: var(--mono); font-size: 10px;
+  padding: 1px 5px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg-2);
+}
+
+.icon-btn {
+  width: 30px; height: 30px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line); background: var(--surface);
+  border-radius: var(--r-md);
+  color: var(--text-2);
+}
+.icon-btn:hover { color: var(--text); border-color: var(--line-2); }
+
+.tier-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 30px; padding: 0 10px;
+  background: var(--accent); color: var(--accent-ink);
+  border-radius: var(--r-md);
+  font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+}
+.avatar {
+  width: 30px; height: 30px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, oklch(70% .10 280), oklch(60% .12 200));
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 11px; font-weight: 600;
+}
+
+/* Theme toggle + accent swatches in the topbar */
+.appearance-cluster { display: inline-flex; align-items: center; gap: 6px; }
+
+.theme-toggle {
+  width: 30px; height: 30px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line); background: var(--surface);
+  border-radius: var(--r-md); color: var(--text-2);
+}
+.theme-toggle:hover { color: var(--text); border-color: var(--line-2); }
+.theme-toggle svg { width: 14px; height: 14px; }
+.theme-toggle .icon-sun { display: none; }
+:root[data-mode="light"] .theme-toggle .icon-sun,
+:root[data-theme="light"] .theme-toggle .icon-sun { display: block; }
+:root[data-mode="light"] .theme-toggle .icon-moon,
+:root[data-theme="light"] .theme-toggle .icon-moon { display: none; }
+
+/* ── Nav — DELETED. base.html builds nav with Tailwind utilities + a
+   Jinja macro for the section label. The active-state accent indicator
+   (was .nav-item.active::before) is now a Tailwind `before:` variant. */
+.upgrade {
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, oklch(82% .13 75 / .06), transparent), var(--surface);
+  border-radius: var(--r-lg);
+  padding: 12px;
+}
+.upgrade-title { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; }
+.upgrade-title .dot { width: 6px; height: 6px; border-radius: 999px; background: var(--warn); box-shadow: 0 0 0 3px oklch(82% .13 75 / .15); }
+.upgrade-body { color: var(--text-3); font-size: 11px; line-height: 1.45; margin: 6px 0 10px; }
+.upgrade-cta {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; height: 28px; padding: 0 10px;
+  border-radius: var(--r-sm);
+  background: var(--text); color: var(--bg);
+  font-size: 11px; font-weight: 600;
+}
+
+/* ── Hero ─────────────────────────────────────────────────────── */
+.eyebrow {
+  font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--text-4);
+  font-feature-settings: 'cpsp' 1, 'ss01' 1;
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.eyebrow .dot { width: 6px; height: 6px; border-radius: 999px; background: var(--accent); }
+/* .hero / .hero h1 / .hero h1 em / .hero .lede / .hero-side — DELETED.
+   Every page now uses Tailwind utilities for the hero layout (see e.g.
+   dashboard.html, sessions/list.html). The .page-header h1 em rule was
+   only ever paired with .hero h1 em and isn't used standalone, so it
+   went too. If a future page needs the same look, copy the utility
+   string from dashboard.html. */
+
+/* ── Buttons ──────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 34px; padding: 0 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line); background: var(--surface);
+  color: var(--text); font-size: 13px; font-weight: 500;
+  white-space: nowrap;
+}
+.btn:hover { border-color: var(--line-2); background: var(--surface-2); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.btn.primary:hover { filter: brightness(0.96); }
+.btn.danger { background: var(--bad); color: oklch(98% 0 0); border-color: transparent; }
+.btn.sm { height: 28px; padding: 0 10px; font-size: 12px; }
+.btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+.kshort {
+  font-family: var(--mono); font-size: 10px;
+  padding: 1px 5px; border-radius: 4px;
+  background: var(--bg-2); color: var(--text-3); border: 1px solid var(--line);
+}
+.btn.primary .kshort {
+  background: oklch(0% 0 0 / .15);
+  color: oklch(0% 0 0 / .65);
+  border-color: transparent;
+}
+
+/* ── Metrics tiles ────────────────────────────────────────────── */
+.metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+/* KPI cascade — staggered fade-up on first paint. Communicates structure
+   (these are siblings, read left-to-right) and gives the dashboard a
+   curated entrance instead of snapping in. ~600ms total, ~80ms apart. */
+.metrics .tile-wrap {
+  opacity: 0;
+  transform: translateY(14px);
+  animation: kpi-cascade .6s cubic-bezier(.2, .7, .2, 1) forwards;
+}
+.metrics .tile-wrap:nth-child(1) { animation-delay:   0ms; }
+.metrics .tile-wrap:nth-child(2) { animation-delay:  80ms; }
+.metrics .tile-wrap:nth-child(3) { animation-delay: 160ms; }
+.metrics .tile-wrap:nth-child(4) { animation-delay: 240ms; }
+.metrics .tile-wrap:nth-child(5) { animation-delay: 320ms; }
+.metrics .tile-wrap:nth-child(6) { animation-delay: 400ms; }
+@keyframes kpi-cascade {
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .metrics .tile-wrap {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+.tile {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 14px;
+  position: relative; overflow: hidden;
+  cursor: pointer;
+  /* Stretch every tile to the tallest row sibling; helper lines on
+     zero-state tiles must not break row alignment. */
+  display: flex; flex-direction: column;
+  height: 100%;
+}
+.tile:hover { border-color: var(--line-2); }
+/* Pin the footer to the bottom regardless of helper-line presence. */
+.tile-foot { margin-top: auto; }
+.tile-head {
+  display: flex; justify-content: space-between;
+  color: var(--text-3); font-size: 10.5px;
+  letter-spacing: .1em; text-transform: uppercase; font-weight: 500;
+}
+.tile-head .ico {
+  width: 22px; height: 22px;
+  border-radius: var(--r-sm);
+  background: var(--surface-2); border: 1px solid var(--line);
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--text-2);
+}
+.tile-value { display: flex; align-items: baseline; gap: 8px; margin: 14px 0 6px; }
+.tile-value .num { font-size: 34px; line-height: 1; font-weight: 500; letter-spacing: -0.03em; font-feature-settings: 'tnum'; }
+.tile-value .delta { font-family: var(--mono); font-size: 11px; color: var(--text-3); }
+.tile-value .delta.up { color: var(--ok); }
+.tile-value .delta.dn { color: var(--bad); }
+.tile-foot { display: flex; justify-content: space-between; color: var(--text-3); font-size: 11.5px; }
+.tile-foot a { color: var(--text); border-bottom: 1px solid var(--line-2); padding-bottom: 1px; }
+.spark { position: absolute; right: 14px; bottom: 30px; width: 88px; height: 24px; color: var(--accent); opacity: .6; }
+
+.tile-wrap { position: relative; display: flex; }
+.tile-wrap > .tile { flex: 1; }
+.pop {
+  position: absolute; left: 0; right: 0; top: 100%;
+  margin-top: 6px;
+  background: var(--surface); border: 1px solid var(--line-2);
+  border-radius: var(--r-lg); padding: 12px;
+  z-index: 10;
+  box-shadow: 0 12px 40px oklch(0% 0 0 / .35);
+  opacity: 0; transform: translateY(-4px); pointer-events: none;
+  transition: all .15s;
+}
+.tile-wrap:hover .pop { opacity: 1; transform: none; pointer-events: auto; }
+.pop-row { display: flex; justify-content: space-between; font-size: 11.5px; padding: 3px 0; }
+.pop-row .k { color: var(--text-3); }
+.pop-row .v { font-family: var(--mono); color: var(--text); }
+.pop h6 { margin: 0 0 8px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); font-weight: 600; }
+
+/* ── Cards + grid ─────────────────────────────────────────────── */
+.grid-2 { display: grid; grid-template-columns: 1.6fr 1fr; gap: 12px; margin-bottom: 12px; }
+/* .grid-3 — DELETED. Use Tailwind grid grid-cols-3 instead. */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+.card-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; border-bottom: 1px solid var(--line);
+}
+.card-head h3 { margin: 0; font-size: 13px; font-weight: 600; }
+.card-head .sub { color: var(--text-3); font-size: 12px; margin-left: 6px; }
+.card-head .right { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; }
+.card-body { padding: 14px 16px; }
+
+/* ── Chips ────────────────────────────────────────────────────── */
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--text-2); background: var(--bg-2);
+}
+.chip .dot { width: 5px; height: 5px; border-radius: 999px; background: var(--text-3); }
+.chip.ok   { color: var(--ok);     border-color: oklch(80% .14 155 / .35); background: oklch(80% .14 155 / .08); }
+.chip.ok   .dot { background: var(--ok); }
+.chip.run  { color: var(--accent); border-color: var(--accent-soft); background: var(--accent-soft); }
+.chip.run  .dot { background: var(--accent); animation: pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .4; } }
+.chip.warn { color: var(--warn);   border-color: oklch(82% .13 75 / .35);  background: oklch(82% .13 75 / .08); }
+.chip.warn .dot { background: var(--warn); }
+.chip.bad  { color: var(--bad);    border-color: oklch(72% .16 25 / .35);  background: oklch(72% .16 25 / .08); }
+.chip.bad  .dot { background: var(--bad); }
+
+/* .active-session and .as-* — DELETED. Dashboard's active session card
+   is now built from Tailwind utilities. Other pages don't use these.
+   The @keyframes rotate is preserved below because dashboard.html still
+   references it via inline `style="animation: rotate ..."` for the
+   active-session icon's dashed ring, AND atlas.css line ~2390 uses it
+   on something else. */
+@keyframes rotate { to { transform: rotate(360deg); } }
+
+.progress {
+  height: 4px;
+  background: var(--surface-2);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 10px;
+  border: 1px solid var(--line);
+}
+.progress > i { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+
+/* ── Activity calendar ────────────────────────────────────────── */
+.activity {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.activity-head { display: flex; justify-content: space-between; margin-bottom: 12px; align-items: center; }
+.activity-head h3 { margin: 0; font-size: 13px; font-weight: 600; }
+.activity-head .legend { display: flex; gap: 6px; align-items: center; color: var(--text-3); font-size: 11px; flex-wrap: wrap; }
+
+.calendar { padding: 4px 0 0; }
+.calendar-grid {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 6px;
+}
+.calendar-months {
+  grid-column: 2;
+  display: grid;
+  grid-template-columns: repeat(53, 1fr);
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-3);
+  margin-bottom: 4px;
+}
+.calendar-months span:nth-child(odd)  { grid-column: span 4; }
+.calendar-months span:nth-child(even) { grid-column: span 5; }
+.calendar-days {
+  display: grid;
+  grid-template-rows: repeat(7, 1fr);
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text-3);
+  align-items: center;
+}
+.calendar-cells {
+  display: grid;
+  grid-template-columns: repeat(53, 1fr);
+  grid-template-rows: repeat(7, 1fr);
+  grid-auto-flow: column;
+  gap: 3px;
+}
+.calendar-cells > .cell {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: transform .12s var(--ease-standard, ease-out), outline .12s ease-out;
+}
+.calendar-cells > .cell.l1 { background: oklch(from var(--accent) l c h / .18); border-color: transparent; }
+.calendar-cells > .cell.l2 { background: oklch(from var(--accent) l c h / .42); border-color: transparent; }
+.calendar-cells > .cell.l3 { background: oklch(from var(--accent) l c h / .65); border-color: transparent; }
+.calendar-cells > .cell.l4 { background: var(--accent); border-color: transparent; }
+.calendar-cells > .cell.fail {
+  background: var(--bad);
+  border-color: transparent;
+  box-shadow: 0 0 4px color-mix(in oklch, var(--bad) 50%, transparent);
+}
+.calendar-cells > .cell.future {
+  background: transparent;
+  border-style: dashed;
+  cursor: default;
+  opacity: .35;
+}
+.calendar-cells > .cell:not(.future):hover {
+  transform: scale(1.4);
+  outline: 1px solid var(--text-2);
+  z-index: 2;
+  position: relative;
+}
+.calendar-stats {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-3);
+}
+.calendar-stat b {
+  font-family: var(--font-display, var(--mono));
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--text);
+  display: block;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 2px;
+}
+.calendar-stat b.bad { color: var(--bad); }
+
+/* ── Rows + tables ────────────────────────────────────────────── */
+.row {
+  display: grid;
+  grid-template-columns: 18px 1fr auto auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.row:last-child { border-bottom: 0; }
+.row:hover { background: var(--surface-2); }
+.row .status-dot { width: 7px; height: 7px; border-radius: 999px; }
+.row .status-dot.ok   { background: var(--ok);     box-shadow: 0 0 0 3px oklch(80% .14 155 / .15); }
+.row .status-dot.run  { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); animation: pulse 1.4s ease-in-out infinite; }
+.row .status-dot.fail { background: var(--bad); }
+.row .status-dot.idle { background: var(--text-4); }
+.row .name { font-size: 13px; font-weight: 500; }
+.row .meta { font-family: var(--mono); font-size: 11px; color: var(--text-3); }
+.row .when { font-family: var(--mono); font-size: 11px; color: var(--text-3); }
+.row .dur  { font-family: var(--mono); font-size: 11px; color: var(--text-2); }
+
+.row-head {
+  display: grid; gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--line);
+  font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--text-4); font-weight: 500;
+}
+
+/* .env-card / .env-name / .env-url / .env-meta — DELETED. Dashboard's
+   active-environment block is now Tailwind utilities. */
+
+/* ── Rule list ────────────────────────────────────────────────── */
+.rule {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.rule:last-child { border-bottom: 0; }
+.rule .sev { width: 22px; height: 22px; border-radius: var(--r-sm); display: grid; place-items: center; font-family: var(--mono); font-size: 10px; font-weight: 600; }
+.rule .sev.s1 { background: oklch(72% .16 25 / .12); color: var(--bad); }
+.rule .sev.s2 { background: oklch(82% .13 75 / .12); color: var(--warn); }
+.rule .sev.s3 { background: var(--accent-soft); color: var(--accent); }
+.rule .name { font-size: 13px; font-weight: 500; }
+.rule .desc { color: var(--text-3); font-size: 11.5px; font-weight: 400; margin-left: 6px; }
+
+.toggle {
+  width: 30px; height: 18px;
+  border-radius: 999px;
+  background: var(--surface-3); border: 1px solid var(--line);
+  position: relative; cursor: pointer;
+}
+.toggle.on { background: var(--accent-soft); border-color: transparent; }
+.toggle::after {
+  content: '';
+  position: absolute; top: 1px; left: 1px;
+  width: 14px; height: 14px;
+  border-radius: 999px;
+  background: var(--text-3);
+  transition: .15s;
+}
+.toggle.on::after { background: var(--accent); transform: translateX(12px); }
+
+/* ── Tip cards ────────────────────────────────────────────────── */
+.tip {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 16px;
+}
+.tip-h {
+  display: flex; gap: 8px;
+  color: var(--text-3); font-size: 10.5px;
+  letter-spacing: .1em; text-transform: uppercase;
+  margin-bottom: 8px; align-items: center;
+}
+.tip h4 { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
+.tip p { margin: 0 0 10px; color: var(--text-2); font-size: 12px; line-height: 1.5; }
+.tip code {
+  font-family: var(--mono); font-size: 11px;
+  padding: 1px 6px; border-radius: 4px;
+  background: var(--bg-2); border: 1px solid var(--line); color: var(--text);
+}
+.tip-cmd {
+  display: flex; gap: 8px;
+  background: var(--bg); border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 8px 10px;
+  font-family: var(--mono); font-size: 12px; color: var(--text-2);
+}
+.tip-cmd .prompt { color: var(--accent); }
+.tip-cmd .cmd { color: var(--text); }
+
+.footnote { color: var(--text-4); font-size: 11px; font-family: var(--mono); margin-top: 24px; }
+
+/* ── Forms ────────────────────────────────────────────────────── */
+.form {
+  display: flex; flex-direction: column; gap: 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 20px 22px;
+}
+.form fieldset { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; }
+.form legend {
+  font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--accent); font-weight: 600;
+  margin-bottom: 4px; padding: 0;
+}
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 12.5px; font-weight: 500; color: var(--text); }
+.field .hint { font-size: 11.5px; color: var(--text-3); margin-top: -2px; }
+.field input[type="text"],
+.field input[type="password"],
+.field input[type="url"],
+.field input[type="email"],
+.field input[type="number"],
+.field select,
+.field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 9px 12px;
+  font: inherit; font-size: 13.5px;
+  outline: none;
+  transition: border-color .12s;
+}
+.field input:focus,
+.field select:focus,
+.field textarea:focus { border-color: var(--accent); }
+.field--row { flex-direction: row; align-items: center; gap: 10px; }
+.form-actions {
+  display: flex; gap: 10px; align-items: center;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+  margin-top: 4px;
+}
+
+/* ── Filter tabs (sessions toolbar style) ─────────────────────── */
+.filter-tab {
+  height: 28px; padding: 0 12px;
+  border-radius: var(--r-sm);
+  font-size: 12px; color: var(--text-2);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.filter-tab.active { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+.filter-tab:hover { border-color: var(--line-2); }
+
+.search-input {
+  height: 30px; flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 0 10px;
+  color: var(--text); font-family: var(--ui); font-size: 12.5px; outline: none;
+}
+.search-input:focus { border-color: var(--accent); }
+
+.toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+
+/* ── Flash messages ───────────────────────────────────────────── */
+.flash {
+  padding: 12px 14px;
+  border-radius: 10px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+}
+.flash--success { color: var(--ok);  border-color: oklch(80% .14 155 / .35); background: oklch(80% .14 155 / .08); }
+.flash--error   { color: var(--bad); border-color: oklch(72% .16 25 / .35);  background: oklch(72% .16 25 / .08); }
+.flash--info    { color: var(--accent); border-color: var(--accent-soft);  background: var(--accent-soft); }
+
+/* ── Toasts ──────────────────────────────────────────────────────
+   Driven by the atlas:toast custom event (HX-Trigger from the
+   server, or window.dispatchEvent locally). One toaster region
+   per page; the Alpine component re-renders the list on every
+   add/dismiss. Pointer-events:none on the container so toasts
+   never block clicks on content underneath; pointer-events:auto
+   reinstates them on each toast for the close button + hover. */
+.atlas-toaster {
+  position: fixed;
+  top: 64px; right: 16px;
+  z-index: 60;
+  display: flex; flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+  max-width: calc(100vw - 32px);
+}
+.toast {
+  position: relative;
+  pointer-events: auto;
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  padding: 10px 36px 10px 14px;
+  font-size: 13px; line-height: 1.45;
+  color: var(--text);
+  box-shadow: 0 8px 24px oklch(0% 0 0 / 0.25);
+  min-width: 260px; max-width: 380px;
+}
+.toast--success { border-left-color: var(--ok); }
+.toast--error   { border-left-color: var(--bad); }
+.toast--warning { border-left-color: var(--warn); }
+.toast--info    { border-left-color: var(--accent); }
+.toast-close {
+  position: absolute;
+  top: 6px; right: 6px;
+  background: transparent; border: 0;
+  color: var(--text-3);
+  cursor: pointer;
+  font-size: 18px; line-height: 1;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.toast-close:hover { color: var(--text); background: var(--surface-2); }
+
+/* ── Command palette (⌘K) ────────────────────────────────────────
+   Modal overlay. The .palette wrapper handles the backdrop +
+   centering; .palette-box is the input + result list card.
+   Built dynamically by static/js/palette.js — no template markup. */
+.palette {
+  position: fixed; inset: 0;
+  z-index: 70;
+  display: none;
+  align-items: flex-start; justify-content: center;
+  padding-top: 12vh;
+  background: oklch(0% 0 0 / 0.50);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.palette[data-open="true"] { display: flex; }
+.palette-box {
+  width: 560px; max-width: calc(100vw - 32px);
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  box-shadow: 0 24px 80px oklch(0% 0 0 / 0.55);
+  overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.palette-input {
+  background: transparent; border: 0;
+  padding: 14px 18px;
+  font-size: 15px; color: var(--text);
+  outline: none;
+  border-bottom: 1px solid var(--line);
+  font-family: inherit;
+}
+.palette-input::placeholder { color: var(--text-3); }
+.palette-list {
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 6px 0;
+}
+.palette-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 18px;
+  cursor: pointer;
+  color: var(--text-2);
+  font-size: 13px;
+}
+.palette-item[aria-selected="true"] {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+.palette-item .palette-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.palette-item .palette-sub {
+  font-size: 11px; color: var(--text-3);
+  font-family: var(--mono);
+  max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.palette-item .palette-kind {
+  font-size: 10px;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--surface-2);
+}
+.palette-empty {
+  padding: 26px 18px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-3);
+}
+.palette-footer {
+  display: flex; gap: 16px;
+  padding: 8px 18px;
+  border-top: 1px solid var(--line);
+  background: var(--surface-2);
+  font-size: 11px; color: var(--text-3);
+}
+.palette-footer kbd {
+  font-family: var(--mono);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  color: var(--text-2);
+  margin-right: 2px;
+}
+
+/* ── Job stream ───────────────────────────────────────────────── */
+.job-stream {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 14px 16px;
+  font-family: var(--mono); font-size: 12.5px;
+  line-height: 1.55;
+  max-height: 60vh; overflow-y: auto;
+  color: var(--text-2);
+  position: relative;
+}
+/* Continuous timeline rail behind every event row, masked at top/bottom
+   by the gradient so it doesn't visually butt against the card edge. */
+.job-stream::before {
+  content: "";
+  position: absolute;
+  top: 16px; bottom: 16px;
+  left: 19px;
+  width: 1px;
+  background: linear-gradient(180deg,
+    transparent 0%, var(--line-2) 8%, var(--line-2) 92%, transparent 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+.job-line, .check-row { position: relative; z-index: 1; }
+
+.job-line {
+  padding: 2px 0 2px 18px;
+  animation: stream-in .42s cubic-bezier(.2, .7, .2, 1) both;
+}
+/* Per-event dot — sits on the rail, color-coded by kind, pops in just
+   after the row slides in so the eye registers the kind half a beat
+   later. Box-shadow ring blends the dot into the rail visually. */
+.job-line::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 50%;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--text-4);
+  transform: translateY(-50%) scale(0);
+  animation: dot-pop .35s cubic-bezier(.34, 1.56, .64, 1) .12s both;
+  z-index: 2;
+}
+.job-line--info::before    { background: var(--accent);   box-shadow: 0 0 0 2px var(--accent-soft); }
+.job-line--success::before { background: var(--ok);       box-shadow: 0 0 0 2px rgba(153,202,60,.18); }
+.job-line--warning::before { background: var(--warn);     box-shadow: 0 0 0 2px rgba(255,138,61,.20); }
+.job-line--error::before   { background: var(--bad);      box-shadow: 0 0 0 2px rgba(231,76,60,.22); }
+
+@keyframes stream-in {
+  /* Dropped the filter:blur() pair — it's GPU-expensive and ran on
+     every appended .job-line. Live job streams can emit hundreds of
+     events; the opacity+translate combo reads as a clean entrance
+     without the blur cost. */
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes dot-pop {
+  from { transform: translateY(-50%) scale(0); }
+  to   { transform: translateY(-50%) scale(1); }
+}
+
+.job-line--info { color: var(--text); }
+.job-line--success { color: var(--ok); font-weight: 500; }
+.job-line--warning { color: var(--warn); }
+.job-line--error   { color: var(--bad); }
+
+/* Debug rows are raw Python LogRecord forwards from JobLogHandler. They're
+   visually subordinate to curated jlogger events (dimmer, smaller, italic)
+   so when raw mode is on the eye still snaps to the human narrative first.
+   Hidden entirely in human mode — see .job-stream.mode-human rule below. */
+.job-line--debug {
+  color: var(--text-3);
+  font-size: 11.5px;
+  font-style: italic;
+  opacity: .85;
+}
+.job-line--debug::before {
+  background: var(--text-4);
+  box-shadow: 0 0 0 2px var(--surface-2);
+}
+.job-stream.mode-human .job-line--debug { display: none; }
+
+/* Phase rows are the load-bearing "Capture / Validate / Report" headers.
+   They get an extra-emphatic entrance: bigger leading dot with a glowing
+   ring, and a one-shot accent-colored sweep across the row that fades
+   out within ~900ms.  Reads as a chapter break in the timeline. */
+.job-line--phase {
+  color: var(--accent-2);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: .01em;
+  margin-top: 14px;
+  padding: 10px 4px 8px 22px;
+  border-top: 1px solid var(--line);
+  overflow: hidden;
+}
+.job-line--phase::before {
+  width: 8px; height: 8px;
+  background: var(--accent-2);
+  box-shadow: 0 0 0 3px var(--accent-soft), 0 0 12px rgba(91,183,232,.4);
+  animation: dot-pop-phase .55s cubic-bezier(.34, 1.56, .64, 1) both;
+}
+.job-line--phase::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg,
+    var(--accent-soft) 0%,
+    rgba(91,183,232,.08) 30%,
+    transparent 65%);
+  pointer-events: none;
+  z-index: 0;
+  animation: phase-sweep .9s cubic-bezier(.2, .7, .2, 1) both;
+}
+@keyframes dot-pop-phase {
+  0%   { transform: translateY(-50%) scale(0); }
+  60%  { transform: translateY(-50%) scale(1.6); }
+  100% { transform: translateY(-50%) scale(1); }
+}
+@keyframes phase-sweep {
+  from { opacity: 1;  transform: translateX(-100%); }
+  to   { opacity: 0;  transform: translateX(0); }
+}
+
+/* ── Preflight check rows (inside job stream) ─────────────────── */
+.check-row {
+  display: flex; align-items: center; gap: 9px;
+  padding: 4px 0 4px 18px;
+  animation: stream-in .42s cubic-bezier(.2, .7, .2, 1) both;
+}
+/* Pop the leading status dot in just after the row slides — the existing
+   .check-dot is the first flex child, so this keeps the rail alignment
+   without a redundant pseudo-element. */
+.check-row .check-dot {
+  margin-left: -14px;
+  animation: check-dot-pop .4s cubic-bezier(.34, 1.56, .64, 1) .12s both;
+  transform-origin: center;
+  position: relative; z-index: 2;
+}
+@keyframes check-dot-pop {
+  from { transform: scale(0); }
+  to   { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .job-line, .check-row { animation: none !important; transform: none !important; filter: none !important; opacity: 1 !important; }
+  .job-line::before, .check-row .check-dot { animation: none !important; transform: translateY(-50%) scale(1) !important; }
+  .job-line--phase::after { animation: none !important; }
+}
+.check-dot {
+  width: 7px; height: 7px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.check-dot--pass { background: var(--ok);     box-shadow: 0 0 0 2px oklch(80% .14 155 / .2); }
+.check-dot--fail { background: var(--bad);    box-shadow: 0 0 0 2px oklch(72% .16 25 / .2); }
+.check-dot--skip { background: var(--text-4); }
+.check-dot--warn { background: var(--warn);   box-shadow: 0 0 0 2px oklch(82% .13 75 / .2); }
+
+/* ── Preflight target cards (live status) ────────────────────────
+   Each .target-card carries data-pf-state. While a check is in flight on
+   it, a marching-ants border traces the perimeter; on completion the card
+   tints green / red / amber from the result. The verbose event stream
+   stays one click away on /jobs/<id>. */
+.target-card {
+  position: relative;
+  transition: border-color 0.4s var(--ease-soft, ease), background 0.4s var(--ease-soft, ease);
+}
+.pf-status-badge {
+  margin-left: auto;
+  font-size: 9.5px; font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid;
+  font-family: var(--ui);
+  flex-shrink: 0;
+}
+.target-card[data-pf-state="checking"]::before {
+  content: "";
+  position: absolute; inset: -1px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--accent) 0 6px,
+    transparent 6px 12px
+  );
+  background-size: 200% 200%;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  animation: pf-march-card 1.6s linear infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+@keyframes pf-march-card { to { background-position: 32px 0; } }
+.target-card[data-pf-state="checking"] {
+  border-color: var(--accent);
+}
+.target-card[data-pf-state="pass"] {
+  border-color: oklch(80% .14 155 / .55);
+  background: oklch(80% .14 155 / .06);
+}
+.target-card[data-pf-state="pass"] .pf-status-badge {
+  color: var(--ok);
+  border-color: oklch(80% .14 155 / .35);
+  background: oklch(80% .14 155 / .12);
+}
+.target-card[data-pf-state="fail"] {
+  border-color: oklch(72% .16 25 / .55);
+  background: oklch(72% .16 25 / .06);
+}
+.target-card[data-pf-state="fail"] .pf-status-badge {
+  color: var(--bad);
+  border-color: oklch(72% .16 25 / .35);
+  background: oklch(72% .16 25 / .12);
+}
+.target-card[data-pf-state="warn"] {
+  border-color: oklch(82% .13 75 / .55);
+  background: oklch(82% .13 75 / .06);
+}
+.target-card[data-pf-state="warn"] .pf-status-badge {
+  color: var(--warn);
+  border-color: oklch(82% .13 75 / .35);
+  background: oklch(82% .13 75 / .12);
+}
+.target-card[data-pf-state="skip"] {
+  opacity: 0.55;
+}
+.target-card[data-pf-state="skip"] .pf-status-badge {
+  color: var(--text-3);
+  border-color: var(--line-2);
+  background: var(--surface-2);
+}
+@media (prefers-reduced-motion: reduce) {
+  .target-card[data-pf-state="checking"]::before { animation: none !important; }
+}
+
+/* ── Preflight checks panel ───────────────────────────────────────
+   Default-on view for preflight jobs. Phase headers + completed-check
+   rows accumulate vertically; a single "currently checking" row at the
+   bottom shows live activity with a marching-ants border. Verbose event
+   stream is hidden behind the "Show full output logs" toggle. */
+.preflight-checks {
+  padding: 20px 24px 22px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.preflight-checks h4 {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+  margin: 0 0 14px;
+}
+.pf-phase {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 16px 0 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.pf-phase:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
+.pf-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+  animation: pf-row-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes pf-row-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+.pf-row .pf-dot {
+  width: 7px; height: 7px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.pf-row.pass .pf-dot { background: var(--ok); }
+.pf-row.fail .pf-dot { background: var(--bad); }
+.pf-row.skip .pf-dot { background: var(--text-4); }
+.pf-row.warn .pf-dot { background: var(--warn); }
+.pf-row .pf-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.pf-row .pf-badge {
+  margin-left: auto;
+  font-family: var(--ui);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.pf-row.pass .pf-badge { color: var(--ok);  border-color: oklch(80% .14 155 / .35); background: oklch(80% .14 155 / .12); }
+.pf-row.fail .pf-badge { color: var(--bad); border-color: oklch(72% .16 25 / .35); background: oklch(72% .16 25 / .12); }
+.pf-row.skip .pf-badge { color: var(--text-3); border-color: var(--line-2); background: var(--surface-2); }
+.pf-row.warn .pf-badge { color: var(--warn); border-color: oklch(82% .13 75 / .35); background: oklch(82% .13 75 / .12); }
+.pf-row .pf-msg {
+  color: var(--text-3); font-size: 11px;
+  margin-left: 4px;
+  font-family: var(--ui);
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pf-current {
+  position: relative;
+  margin-top: 14px;
+  padding: 14px 18px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-family: var(--ui);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent);
+  letter-spacing: 0.02em;
+  display: flex; align-items: center; gap: 10px;
+  transition: opacity 0.3s;
+}
+.pf-current[hidden] { display: none; }
+.pf-current::before {
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--accent) 0 6px,
+    transparent 6px 12px
+  );
+  background-size: 200% 200%;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  animation: pf-march 1.6s linear infinite;
+  pointer-events: none;
+}
+@keyframes pf-march { to { background-position: 32px 0; } }
+.pf-current .pf-current-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--accent);
+  opacity: 0.75;
+  flex-shrink: 0;
+}
+.pf-toggle-logs {
+  display: block;
+  margin: 16px auto 0;
+  font-family: var(--ui);
+  font-size: 11px; font-weight: 500;
+  color: var(--text-3);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 14px;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
+.pf-toggle-logs:hover { color: var(--text-2); border-color: var(--line-2); background: var(--surface-2); }
+
+/* When the preflight panel is shown, hide the verbose stream + its mode
+   toggle until the user explicitly opts in via the toggle button. */
+[data-pf-logs="hidden"] .stream-mode,
+[data-pf-logs="hidden"] .job-stream { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-current::before { animation: none !important; }
+  .pf-row { animation: none !important; }
+}
+
+/* ── Cascade reveal (Dashboard, Fleet) ────────────────────────────
+   Direct children of [data-cascade] fade up with a small spring. JS
+   stamps --i on each child; CSS does the rest. Limited to surfaces
+   where it adds polish (the metric tile grids), not used globally. */
+[data-cascade] > * {
+  opacity: 0;
+  transform: translateY(12px) scale(0.985);
+  animation: cascade-rise 0.55s cubic-bezier(0.34, 1.30, 0.64, 1)
+             calc(var(--i, 0) * 60ms + 80ms) forwards;
+}
+@keyframes cascade-rise {
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-cascade] > * { animation: none !important; opacity: 1 !important; transform: none !important; }
+}
+
+/* ── Pipeline progress bar (Run full pipeline) ───────────────────
+   Three stops representing stage completion: Capture · Validate · Report.
+   Modern flat treatment — solid accent fill, simple dots, scale-only
+   pulse on the active stop. No glows or blurs by design. */
+.pipeline-progress {
+  padding: 22px 28px 30px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.pp-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 18px;
+}
+.pp-title {
+  font-size: 11px; font-weight: 600;
+  color: var(--text-2);
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+}
+.pp-status {
+  font-size: 11.5px;
+  color: var(--text-3);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+.pp-status b { color: var(--text); font-weight: 600; }
+.pp-track {
+  position: relative;
+  height: 5px;
+  background: var(--line);
+  border-radius: 999px;
+}
+.pp-fill {
+  position: absolute; top: 0; left: 0; bottom: 0;
+  width: 100%;
+  background: var(--accent);
+  border-radius: inherit;
+  /* scaleX from the left edge instead of animating width — width
+     transitions force layout on every frame; transforms are composited. */
+  transform-origin: left center;
+  transform: scaleX(calc(var(--pp-pct, 0%) / 100%));
+  transition: transform 0.65s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.pp-stop {
+  position: absolute; top: 50%;
+  transform: translate(-50%, -50%);
+}
+.pp-dot {
+  display: block;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--line-2);
+  transition: background 0.4s, border-color 0.4s, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.pp-stop.is-active .pp-dot {
+  border-color: var(--accent);
+  animation: pp-pulse 1.6s ease-in-out infinite;
+}
+.pp-stop.is-done .pp-dot {
+  background: var(--accent);
+  border-color: var(--accent);
+  animation: none;
+}
+.pp-label {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  transition: color 0.3s;
+}
+.pp-stop.is-active .pp-label { color: var(--accent); }
+.pp-stop.is-done .pp-label { color: var(--text-2); }
+
+/* ── Verified pass / fail per stage ───────────────────────────────
+   The "is-done" class above is the neutral "advanced past this point"
+   marker. Pass / fail layer additional confidence on top: an explicit
+   green check or red X inside the dot, plus label colorization. JS sets
+   .is-pass when a stage emits a success and .is-fail when it emits an
+   error — so the user has visual proof every step actually completed. */
+.pp-dot {
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; line-height: 1; color: transparent;
+  font-family: var(--mono); font-weight: 700;
+}
+.pp-stop.is-pass .pp-dot {
+  background: var(--ok); border-color: var(--ok); color: var(--surface);
+  animation: none;
+}
+.pp-stop.is-pass .pp-dot::before { content: "✓"; }
+.pp-stop.is-pass .pp-label { color: var(--ok); }
+.pp-stop.is-fail .pp-dot {
+  background: var(--bad); border-color: var(--bad); color: oklch(98% 0 0);
+  animation: pp-shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+}
+.pp-stop.is-fail .pp-dot::before { content: "✗"; }
+.pp-stop.is-fail .pp-label { color: var(--bad); }
+.pp-fill.is-fail { background: var(--bad); }
+
+@keyframes pp-pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.20); }
+}
+@keyframes pp-shake {
+  10%, 90% { transform: translate(-50%, -50%) translateX(-1.5px); }
+  20%, 80% { transform: translate(-50%, -50%) translateX(2px);    }
+  30%, 50%, 70% { transform: translate(-50%, -50%) translateX(-3px); }
+  40%, 60% { transform: translate(-50%, -50%) translateX(3px);    }
+}
+
+/* ── Pipeline mini-report (post-success summary) ──────────────────
+   Appears below the progress bar once Capture + Validate + Report all
+   succeed. Magazine-cover treatment: huge score badge, chip cloud of
+   findings, prominent CTAs. Hidden by default; JS reveals + animates. */
+.pipeline-mini-report {
+  padding: 32px 28px 28px;
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  text-align: center;
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%);
+  border-bottom: 1px solid var(--line);
+}
+.pmr-eyebrow {
+  font-family: var(--mono);
+  font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--ok); font-weight: 700;
+}
+.pmr-title {
+  font-size: 28px; font-weight: 600; letter-spacing: -0.02em;
+  margin: 0; line-height: 1.15;
+}
+.pmr-sub {
+  font-family: var(--mono);
+  font-size: 12px; color: var(--text-3);
+}
+.pmr-badge {
+  position: relative;
+  width: 240px; height: 240px;
+  margin: 6px 0 4px;
+}
+.pmr-badge svg { transform: rotate(-90deg); width: 100%; height: 100%; }
+.pmr-badge .num {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.pmr-badge .num b {
+  font-size: 72px; font-weight: 700; letter-spacing: -0.04em;
+  line-height: 1;
+}
+.pmr-badge .num span {
+  font-family: var(--mono);
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.18em;
+  color: var(--text-3); margin-top: 6px;
+}
+.pmr-counts {
+  display: flex; gap: 18px;
+  font-family: var(--mono); font-size: 13px; color: var(--text-3);
+}
+.pmr-counts b { font-weight: 700; font-family: 'Inter', sans-serif; }
+.pmr-pills {
+  display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
+  max-width: 760px; margin-top: 4px;
+}
+.pmr-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 500;
+  padding: 4px 10px; border-radius: 999px;
+  border: 1px solid var(--line-2); background: var(--surface);
+  font-family: var(--mono);
+  opacity: 0; transform: translateY(8px);
+}
+.pmr-pill.bad  { color: var(--bad);  border-color: oklch(72% .16 25 / .35); background: oklch(72% .16 25 / .08); }
+.pmr-pill.warn { color: var(--warn); border-color: oklch(82% .13 75 / .35); background: oklch(82% .13 75 / .08); }
+.pmr-pill code { font-family: var(--mono); color: inherit; opacity: 0.85; }
+.pmr-actions {
+  display: flex; gap: 8px; margin-top: 12px;
+}
+
+/* Failed-pipeline variant: red eyebrow, "open session" instead of "open report" */
+.pipeline-mini-report.is-failure { background: linear-gradient(180deg, var(--surface) 0%, oklch(72% .16 25 / .08) 100%); }
+.pipeline-mini-report.is-failure .pmr-eyebrow { color: var(--bad); }
+.pipeline-mini-report.is-failure .pmr-badge .num b { color: var(--bad); }
+
+/* Collapsible logs wrapper — pipelines only. Default-collapsed so the
+   mini-report has the screen real estate; users can pop it open if they
+   want to dig through the live output / debug log. */
+.pipeline-logs-toggle {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%;
+  padding: 12px 18px;
+  background: var(--surface-2);
+  border: none; border-bottom: 1px solid var(--line);
+  color: var(--text-2);
+  font: inherit; font-size: 12px; font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.16s;
+}
+.pipeline-logs-toggle:hover { background: var(--surface-3); color: var(--text); }
+.pipeline-logs-toggle .chevron {
+  width: 11px; height: 11px;
+  transition: transform 0.2s;
+}
+.pipeline-logs-toggle[aria-expanded="true"] .chevron { transform: rotate(180deg); }
+.pipeline-logs-toggle .label { flex: 1; }
+.pipeline-logs-toggle .hint {
+  font-family: var(--mono); font-size: 11px; color: var(--text-3); font-weight: 400;
+}
+.pipeline-logs-body[hidden] { display: none; }
+
+/* ── Diff page mini-diff (#09 from anime-3 mockup) ─────────────────
+   Inline preview that surfaces compliance numbers + a delta as soon as
+   the user has picked both sessions. The full diff button remains the
+   real CTA — this just lets them sanity-check the comparison before
+   spending the full render. */
+.mini-diff[hidden] { display: none; }
+.mini-diff .md-grid {
+  display: grid;
+  grid-template-columns: 1fr 100px 1fr;
+  gap: 14px;
+  align-items: stretch;
+}
+.mini-diff .md-col {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px 20px;
+}
+.mini-diff .md-col.current {
+  border-color: var(--ok);
+  background: linear-gradient(180deg, oklch(80% .14 155 / .06), var(--surface-2));
+}
+.mini-diff .md-col h5 {
+  margin: 0 0 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-3);
+  font-weight: 600;
+  font-family: var(--mono);
+}
+.mini-diff .md-col h5 span {
+  font-family: var(--mono);
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text);
+  font-weight: 500;
+}
+.mini-diff .md-big {
+  font-family: 'Montserrat', 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 48px;
+  letter-spacing: -0.025em;
+  line-height: 1;
+  margin: 6px 0 8px;
+  font-variant-numeric: tabular-nums;
+}
+.mini-diff .md-col.current .md-big { color: var(--ok); }
+.mini-diff .md-meta {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-3);
+  margin-bottom: 12px;
+}
+.mini-diff .md-rows {
+  display: flex; flex-direction: column; gap: 4px;
+  font-family: var(--mono);
+  font-size: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+.mini-diff .md-row {
+  display: flex; justify-content: space-between; gap: 12px;
+  color: var(--text-3);
+}
+.mini-diff .md-row > span:last-child {
+  color: var(--text-2);
+  text-align: right;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 60%;
+}
+.mini-diff .md-arrow {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  text-align: center;
+}
+.mini-diff .md-delta {
+  font-family: 'Montserrat', 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 30px;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.mini-diff .md-delta-lab {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-3);
+  margin-top: 4px;
+}
+.mini-diff #md-delta-arrow { transition: transform 0.4s, stroke 0.3s; }
+.mini-diff .md-banner {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid oklch(82% .13 75 / .35);
+  background: oklch(82% .13 75 / .08);
+  color: var(--warn);
+  border-radius: 8px;
+  font-size: 12px;
+  font-family: var(--mono);
+}
+.mini-diff .md-actions {
+  display: flex; align-items: center; gap: 12px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.mini-diff .md-hint {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+@media (max-width: 720px) {
+  .mini-diff .md-grid { grid-template-columns: 1fr; }
+  .mini-diff .md-arrow { flex-direction: row; gap: 12px; }
+  .mini-diff .md-arrow svg { transform: rotate(90deg) !important; }
+}
+
+/* ── Stream mode toggle (Human / Raw) ─────────────────────────────
+   Sits above the job-stream and switches the verbosity of the live output.
+   Per-job choice is stored in localStorage so a reload doesn't lose it. */
+.stream-mode {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+  font-size: 12px;
+}
+.stream-mode-label {
+  color: var(--text-3);
+  font-weight: 500;
+  letter-spacing: .02em;
+  white-space: nowrap;
+}
+.stream-mode-pills {
+  display: inline-flex;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px;
+}
+.stream-mode-pill {
+  background: transparent;
+  border: 0;
+  padding: 5px 12px;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-3);
+  cursor: pointer;
+  border-radius: 999px;
+  transition:
+    background var(--dur-base) var(--ease-emphasized),
+    color      var(--dur-base) var(--ease-emphasized);
+}
+.stream-mode-pill:hover { color: var(--text); }
+.stream-mode-pill.is-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+.stream-mode-hint {
+  margin-left: auto;
+  color: var(--text-4);
+  font-size: 11px;
+  font-style: italic;
+}
+
+.check-name {
+  flex: 1; min-width: 0;
+  font-family: var(--mono); font-size: 12.5px;
+  color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.check-badge {
+  display: inline-flex; align-items: center;
+  padding: 1px 7px; border-radius: 999px;
+  font-family: var(--mono); font-size: 10px; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase;
+  flex-shrink: 0;
+}
+.check-badge--pass { background: oklch(80% .14 155 / .12); color: var(--ok);  border: 1px solid oklch(80% .14 155 / .25); }
+.check-badge--fail { background: oklch(72% .16 25 / .12);  color: var(--bad); border: 1px solid oklch(72% .16 25 / .25); }
+.check-badge--skip { background: var(--surface-3);          color: var(--text-3); border: 1px solid var(--line); }
+.check-badge--warn { background: oklch(82% .13 75 / .12);  color: var(--warn); border: 1px solid oklch(82% .13 75 / .25); }
+
+.check-msg {
+  font-family: var(--mono); font-size: 11.5px;
+  color: var(--text-3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 36ch;
+}
+.check-detail {
+  font-family: var(--mono); font-size: 10.5px;
+  color: var(--text-4);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 28ch;
+  cursor: help;
+}
+.job-status {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 4px 10px; border-radius: 999px;
+  font-size: 11px; font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase;
+}
+.job-status--queued    { background: var(--surface-2); color: var(--text-3); }
+.job-status--running   { background: var(--accent-soft); color: var(--accent); }
+.job-status--succeeded { background: oklch(80% .14 155 / .12); color: var(--ok); }
+.job-status--failed    { background: oklch(72% .16 25 / .12); color: var(--bad); }
+
+.empty {
+  text-align: center;
+  padding: 52px 24px;
+  border: 1px dashed var(--line);
+  border-radius: var(--r-lg);
+  color: var(--text-3);
+  background: var(--surface);
+}
+.empty strong { color: var(--text); display: block; margin-bottom: 6px; font-size: 16px; }
+
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.kpi {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 14px 16px;
+}
+.kpi-label { color: var(--text-3); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; font-weight: 500; margin-bottom: 6px; }
+.kpi-value { font-size: 26px; font-weight: 500; letter-spacing: -0.025em; color: var(--text); }
+.kpi-sub { color: var(--text-3); font-size: 11.5px; margin-top: 4px; }
+
+/* ── Appearance settings (segmented + swatches) ───────────────── */
+.seg {
+  display: inline-flex; gap: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 3px;
+  overflow: hidden;
+}
+.seg label {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 26px; padding: 0 14px;
+  border-radius: var(--r-sm);
+  font-size: 12px; color: var(--text-2);
+  cursor: pointer;
+}
+.seg label input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label:has(input:checked) { background: var(--accent); color: var(--accent-ink); }
+
+.swatches { display: flex; gap: 10px; flex-wrap: wrap; padding: 0; border: 0; margin: 0; }
+.swatch { display: inline-flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; }
+.swatch input { position: absolute; opacity: 0; pointer-events: none; }
+.swatch-dot {
+  width: 30px; height: 30px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  box-shadow: 0 0 0 2px transparent;
+  transition: box-shadow .12s, transform .12s;
+}
+.swatch[data-accent-preview="cyan"]   .swatch-dot { background: oklch(78% 0.14 195); }
+.swatch[data-accent-preview="amber"]  .swatch-dot { background: oklch(82% 0.14 75); }
+.swatch[data-accent-preview="violet"] .swatch-dot { background: oklch(72% 0.17 295); }
+.swatch[data-accent-preview="lime"]   .swatch-dot { background: oklch(86% 0.18 130); }
+.swatch[data-accent-preview="mono"]   .swatch-dot { background: linear-gradient(135deg, oklch(98% 0 0) 0 50%, oklch(40% 0 0) 50%); }
+.swatch:has(input:checked) .swatch-dot { box-shadow: 0 0 0 2px var(--bg-2), 0 0 0 4px var(--accent); transform: scale(1.05); }
+.swatch-label { font-size: 11px; color: var(--text-3); }
+.swatch:has(input:checked) .swatch-label { color: var(--text); font-weight: 500; }
+
+/* ── Theme picker (Aurora · Horizon) ───────────────────────────── */
+.theme-pick-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-rows: auto auto;
+  grid-template-areas: "swatches name name" "swatches hint hint";
+  align-items: center;
+  column-gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  cursor: pointer;
+  transition: border-color .12s, background .12s, box-shadow .12s;
+}
+.theme-pick-card:hover { border-color: var(--line-2); }
+.theme-pick-card.is-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+  background: var(--accent-soft);
+}
+.theme-pick-card input { position: absolute; opacity: 0; pointer-events: none; }
+.theme-pick-swatches {
+  grid-area: swatches;
+  display: inline-flex;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+.theme-pick-swatches .sw { width: 14px; height: 28px; display: block; }
+.theme-pick-name { grid-area: name; font-size: 13px; font-weight: 600; color: var(--text); }
+.theme-pick-hint { grid-area: hint; font-size: 11.5px; color: var(--text-3); }
+
+/* Section legend with right-aligned scope helper. The legend is a flex
+   container so the small mono "scope" label sits opposite the title. */
+fieldset > legend {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+fieldset > legend .legend-scope {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .04em;
+  color: var(--text-3);
+  font-weight: 400;
+  text-transform: none;
+}
+fieldset > legend .legend-scope code {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: var(--text-2);
+}
+
+/* ── Sidebar Upgrade panel — dismiss + softened weight ─────────── */
+.upgrade { position: relative; }
+.upgrade-dismiss {
+  position: absolute; top: 6px; right: 6px;
+  width: 22px; height: 22px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--r-sm);
+  color: var(--text-3);
+  background: transparent; border: 0;
+  font-size: 14px; line-height: 1;
+  cursor: pointer;
+}
+.upgrade-dismiss:hover { color: var(--text); background: var(--surface-2); }
+.upgrade-cta--ghost {
+  background: transparent;
+  color: var(--text-2);
+  border: 1px solid var(--line);
+}
+.upgrade-cta--ghost:hover { color: var(--text); border-color: var(--line-2); }
+
+/* .tile-helper — DELETED. Dashboard now writes the helper line as
+   Tailwind utilities directly (text-[11.5px] text-text-3 leading-snug). */
+
+/* ── Empty activity collapse ──────────────────────────────────── */
+.activity-empty {
+  padding: 10px 14px;
+  border-top: 1px dashed var(--line);
+  margin-top: 8px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+.activity-empty a { color: var(--accent); border-bottom: 1px solid var(--accent-soft); }
+
+/* ── Tier card active state (Tier page) ───────────────────────── */
+.tier-card { border: 1px solid var(--line); }
+.tier-card.is-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+  background: linear-gradient(180deg, var(--accent-soft) 0%, transparent 60%), var(--surface);
+}
+.tier-card .tier-card-status {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--mono); font-size: 10px;
+  letter-spacing: .08em; text-transform: uppercase;
+  padding: 3px 10px; border-radius: 999px;
+  color: var(--text-3);
+  border: 1px solid var(--line);
+}
+.tier-card.is-active .tier-card-status {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: transparent;
+  font-weight: 600;
+}
+
+/* Tabular numerals — applied to any element that displays counters,
+   timestamps, percentages, or other digit-heavy content. Lining figures
+   align baselines to letters, tabular figures keep digits the same width
+   so columns of numbers don't shift when values change. */
+.num, .stat-number, .timestamp, .metric-value,
+.tile-value .num, .pop-row .v, .as-headline .id,
+.tile-value .delta, .tile-value .delta.up, .tile-value .delta.down,
+.row .when, .row .dur, .row .meta,
+.kpi-num, .kpi-value, .live-meta .v, .ring-num, .bars-foot,
+.brand-ver, .pill .val.mono,
+table.data td.num, td.numeric, .num-cell,
+code, pre, kbd {
+  font-feature-settings: 'tnum' 1, 'lnum' 1, 'ss01' 1, 'ss03' 1, 'cv11' 1;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* Variable-axis weight bumps: half-step heavier KPI counters without
+   crossing into 600 (which reads as bold). Inter Variable supports any
+   weight 100–900, so 580 / 560 land between the named stops. */
+.kpi-num { font-weight: 580; }
+.live-h { font-weight: 560; }
+
+/* ── Page layout helpers ──────────────────────────────────────── */
+.page-header { margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+.page-header h1 {
+  font-family: var(--ui);
+  font-size: 28px; font-weight: 600;
+  letter-spacing: -0.038em;
+  margin: 8px 0 6px;
+  color: var(--text);
+}
+.page-header p { margin: 0; color: var(--text-2); font-size: 14px; max-width: 64ch; }
+
+hr.rule-line { border: 0; border-top: 1px solid var(--line); margin: 18px 0; }
+
+/* ── Micro-animations & transitions ──────────────────────────── */
+
+/* Page load fade-in */
+.main {
+  animation: page-in .22s ease-out both;
+}
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Nav item smooth transitions */
+.nav-item {
+  transition: background .12s, color .12s;
+}
+.nav-item svg {
+  transition: color .12s;
+}
+.nav-item.active::before {
+  transition: opacity .15s;
+}
+
+/* Card & tile hover lift */
+.card {
+  transition: border-color .15s, box-shadow .15s;
+}
+.card:hover {
+  border-color: var(--line-2);
+  box-shadow: 0 4px 18px oklch(0% 0 0 / .12);
+}
+.tile {
+  transition: border-color .15s, box-shadow .15s, transform .15s;
+}
+.tile:hover {
+  border-color: var(--line-2);
+  box-shadow: 0 4px 18px oklch(0% 0 0 / .12);
+  transform: translateY(-1px);
+}
+.kpi {
+  transition: border-color .15s, box-shadow .15s;
+}
+.kpi:hover {
+  border-color: var(--line-2);
+  box-shadow: 0 2px 12px oklch(0% 0 0 / .1);
+}
+
+/* Button hover transitions */
+.btn {
+  transition: background .12s, border-color .12s, filter .12s, box-shadow .12s;
+}
+.btn:hover:not([disabled]) {
+  box-shadow: 0 2px 8px oklch(0% 0 0 / .1);
+}
+.btn.primary:hover:not([disabled]) {
+  box-shadow: 0 2px 10px oklch(from var(--accent) l c h / .35);
+}
+
+/* Pill hover transition */
+.pill {
+  transition: border-color .12s, background .12s;
+}
+
+/* Theme toggle */
+.theme-toggle {
+  transition: background .12s, color .12s, border-color .12s;
+}
+
+/* Toggle switch — transform instead of left so the knob slide is
+   composited rather than relayouted on every animation frame. */
+.toggle::after {
+  transition: transform .15s, background .15s;
+}
+
+/* Row hover */
+.row {
+  transition: background .1s;
+}
+
+/* Filter tab transitions */
+.filter-tab {
+  transition: background .12s, color .12s, border-color .12s;
+}
+
+/* Flash fade-in */
+.flash {
+  animation: flash-in .2s ease-out both;
+}
+@keyframes flash-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Upgrade card CTA */
+.upgrade-cta {
+  transition: opacity .12s;
+}
+.upgrade-cta:hover { opacity: .85; }
+
+/* Status dots — smooth pulse already in .chip.run / .row .status-dot.run */
+/* Add a subtle fade transition on status dot color changes */
+.status-dot {
+  transition: background .2s, box-shadow .2s;
+}
+
+/* Search input focus ring */
+.search-input {
+  transition: border-color .12s, box-shadow .12s;
+}
+.search-input:focus {
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+/* Form input focus ring */
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+/* Swatch transitions already defined; add label */
+.swatch-label {
+  transition: color .12s;
+}
+
+/* Job status badge transition */
+.job-status {
+  transition: background var(--dur-base) var(--ease-standard),
+              color var(--dur-base) var(--ease-standard);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   Component additions for Fleet, Notifications, and the polish pass
+   on Continuous Audit + Alerts. Every color reads from theme tokens
+   so palette/mode swaps stay coherent.
+   ──────────────────────────────────────────────────────────────── */
+
+/* ── Pill: continuous-audit topbar state ──────────────────────── */
+.pill--continuous {
+  text-decoration: none;
+  color: inherit;
+  transition:
+    border-color var(--dur-base) var(--ease-standard),
+    background   var(--dur-base) var(--ease-standard),
+    transform    var(--dur-fast) var(--ease-standard);
+}
+.pill--continuous .pill-next { color: var(--text-4); }
+.pill--continuous:hover { transform: translateY(-1px); }
+
+.pill--continuous .dot {
+  transition:
+    background var(--dur-base) var(--ease-standard),
+    box-shadow var(--dur-base) var(--ease-standard);
+}
+
+/* State color is themed via CSS vars — same hierarchy as .chip.ok / .chip.warn. */
+.pill--state-on { --pill-color: var(--ok); }
+.pill--state-stale { --pill-color: var(--warn); }
+.pill--state-failing { --pill-color: var(--bad); }
+.pill--state-pending { --pill-color: var(--info); }
+.pill--state-off { --pill-color: var(--text-3); }
+.pill--continuous {
+  border-color: var(--pill-color, var(--text-3));
+  background: color-mix(in oklch, var(--pill-color, var(--text-3)) 8%, transparent);
+}
+.pill--continuous .dot {
+  background: var(--pill-color, var(--text-3));
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--pill-color, var(--text-3)) 18%, transparent);
+}
+.pill--pulse .dot { animation: pulse 1.6s ease-in-out infinite; }
+
+/* ── Alerts bell (topbar) ──────────────────────────────────────── */
+.alerts-bell { position: relative; text-decoration: none; }
+.alerts-bell-count {
+  position: absolute; top: -2px; right: -2px;
+  min-width: 14px; height: 14px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: var(--bad);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1.5px solid var(--surface);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Sidebar nav badge (alerts count) ─────────────────────────── */
+.nav-badge {
+  display: inline-block;
+  min-width: 16px; padding: 0 5px;
+  margin-left: 4px;
+  border-radius: 999px;
+  background: var(--bad);
+  color: #fff;
+  font-size: 10px; font-weight: 600;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Card variants — error / warn coloring without inline oklch ── */
+.card.card--error {
+  border-color: color-mix(in oklch, var(--bad) 40%, transparent);
+  background: color-mix(in oklch, var(--bad) 4%, var(--surface));
+}
+.card.card--warn {
+  border-color: color-mix(in oklch, var(--warn) 40%, transparent);
+  background: color-mix(in oklch, var(--warn) 4%, var(--surface));
+}
+
+/* ── Continuous run-detail row — drifted highlight ─────────────── */
+tr.is-drifted {
+  background: color-mix(in oklch, var(--warn) 5%, transparent);
+}
+
+/* ── Alert row ack interaction ────────────────────────────────── */
+.alert-row {
+  transition:
+    background var(--dur-slow) var(--ease-standard),
+    opacity    var(--dur-slow) var(--ease-standard);
+}
+.alert-row.is-acking {
+  background: color-mix(in oklch, var(--ok) 14%, transparent);
+  opacity: .85;
+}
+.alert-row.is-acked .chip.ok { animation: chip-pop var(--dur-base) var(--ease-emphasized); }
+
+@keyframes chip-pop {
+  0%   { transform: scale(.94); opacity: .6; }
+  60%  { transform: scale(1.04); }
+  100% { transform: scale(1);   opacity: 1; }
+}
+
+/* ── Fleet row hover (legacy table — kept for any callers still using it) ─ */
+.fleet-row {
+  transition: background var(--dur-fast) var(--ease-standard);
+}
+.fleet-row:hover {
+  background: color-mix(in oklch, var(--accent) 4%, transparent);
+}
+
+/* ── Fleet wall (per-environment vital signs tiles) ───────────── */
+.fleet-wall {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+.fleet-tile {
+  display: block;
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 16px;
+  background:
+    linear-gradient(180deg, color-mix(in oklch, var(--surface) 100%, transparent) 0%, var(--surface-2) 100%);
+  color: inherit;
+  text-decoration: none;
+  overflow: hidden;
+  transition: border-color var(--dur-fast) var(--ease-standard),
+              transform var(--dur-fast) var(--ease-standard);
+}
+.fleet-tile:hover {
+  border-color: var(--line-2, color-mix(in oklch, var(--text) 18%, transparent));
+  transform: translateY(-2px);
+}
+.fleet-tile::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+}
+.fleet-tile.healthy::before  { background: var(--ok); }
+.fleet-tile.warn::before     { background: var(--warn); }
+.fleet-tile.critical::before {
+  background: var(--bad);
+  animation: fleet-tile-pulse 1.6s ease-in-out infinite;
+}
+.fleet-tile.cold::before     { background: var(--text-4); }
+@keyframes fleet-tile-pulse {
+  0%, 100% { opacity: .6; }
+  50%      { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fleet-tile.critical::before { animation: none; }
+}
+.fleet-tile-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 10px;
+  gap: 12px;
+}
+.fleet-tile-name {
+  font-family: var(--font-display, var(--mono));
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text);
+}
+.fleet-tile-org {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-3);
+  margin-top: 2px;
+}
+.fleet-tile-score {
+  font-family: var(--font-display, var(--mono));
+  font-weight: 700;
+  font-size: 28px;
+  letter-spacing: -.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.fleet-tile.healthy  .fleet-tile-score { color: var(--ok); }
+.fleet-tile.warn     .fleet-tile-score { color: var(--warn); }
+.fleet-tile.critical .fleet-tile-score { color: var(--bad); }
+.fleet-tile.cold     .fleet-tile-score { color: var(--text-3); }
+.fleet-tile-ekg {
+  height: 44px;
+  margin: 8px -2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-4);
+}
+.fleet-tile-ekg svg { width: 100%; height: 100%; display: block; }
+.fleet-tile-ekg--empty { font-style: italic; }
+.fleet-tile-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-3);
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.fleet-tile-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--r-pill, 999px);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.fleet-tile-chip.healthy  { background: color-mix(in oklch, var(--ok) 16%, transparent);   color: var(--ok); }
+.fleet-tile-chip.warn     { background: color-mix(in oklch, var(--warn) 16%, transparent); color: var(--warn); }
+.fleet-tile-chip.critical { background: color-mix(in oklch, var(--bad) 18%, transparent);  color: var(--bad); }
+.fleet-tile-chip.cold     { background: color-mix(in oklch, var(--text-4) 22%, transparent); color: var(--text-3); }
+.fleet-tile-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+/* ── Channel row (notifications table) ────────────────────────── */
+.channel-row {
+  transition: background var(--dur-fast) var(--ease-standard);
+}
+.channel-row:hover {
+  background: color-mix(in oklch, var(--accent) 3%, transparent);
+}
+
+/* ── Generic loading button feedback ──────────────────────────── */
+.btn.is-loading {
+  cursor: progress;
+  position: relative;
+  opacity: .85;
+}
+.btn.is-loading::after {
+  content: '';
+  position: absolute;
+  right: 8px; top: 50%;
+  width: 10px; height: 10px;
+  margin-top: -5px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  border-right-color: transparent;
+  animation: rotate var(--dur-slow) linear infinite;
+}
+.btn.is-loading {
+  padding-right: 28px;
+}
+
+/* ── JS-toggleable utility — "more reliable than [hidden]" ────── */
+.is-hidden { display: none !important; }
+
+/* ── Toolbar overflow on narrow screens ───────────────────────── */
+.toolbar {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── .empty entrance, slightly delayed so it reads as intentional ── */
+.empty {
+  animation: page-in var(--dur-slow) var(--ease-decel) 80ms both;
+}
+
+/* ── Standardize pill / chip / tile transitions on the new tokens ── */
+.pill {
+  transition:
+    border-color var(--dur-fast) var(--ease-standard),
+    background   var(--dur-fast) var(--ease-standard);
+}
+.chip {
+  transition:
+    background var(--dur-fast) var(--ease-standard),
+    color      var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard);
+}
+.tile {
+  transition:
+    border-color var(--dur-base) var(--ease-standard),
+    box-shadow   var(--dur-base) var(--ease-standard),
+    transform    var(--dur-base) var(--ease-standard);
+}
+
+/* ── Preflight: bar + target cards ───────────────────────────── */
+.preflight-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.preflight-bar__meta { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.preflight-bar__title { display: flex; align-items: baseline; gap: 10px; }
+.preflight-bar__title h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.preflight-bar__count {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.preflight-bar__sub { font-size: 12.5px; color: var(--text-2); }
+.preflight-bar__sub strong { color: var(--text); font-weight: 600; }
+.preflight-bar__action { margin: 0; }
+
+.targets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.target-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  transition:
+    border-color var(--dur-base) var(--ease-standard),
+    transform    var(--dur-base) var(--ease-standard);
+}
+.target-card:hover { border-color: var(--line-2); transform: translateY(-1px); }
+.target-card__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.target-card__primary {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ok);
+  border: 1px solid oklch(80% .14 155 / .35);
+  background: var(--ok-soft);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.target-card__transport {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: auto;
+}
+.target-card__name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  word-break: break-all;
+}
+.target-card__addr {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-2);
+  word-break: break-all;
+}
+.target-card__user { color: var(--text-3); }
+.target-card__port { color: var(--text-3); }
+.target-card__addr--empty { font-style: italic; color: var(--text-3); }
+.target-card__modules { display: flex; flex-wrap: wrap; gap: 4px; }
+.target-card__modules--empty {
+  font-size: 11px;
+  color: var(--text-3);
+  font-style: italic;
+}
+.module-chip {
+  font-size: 11px;
+  font-family: var(--mono);
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text-2);
+  background: var(--surface-2);
+}
+
+/* Role badges — Itential brand colors, fixed across palettes so role
+   identity stays stable regardless of active theme. */
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid;
+}
+.role-badge.role-iap   { color: #1B93D2; border-color: rgba(27, 147, 210, .45);  background: rgba(27, 147, 210, .10); }
+.role-badge.role-mongo { color: #99CA3C; border-color: rgba(153, 202, 60, .45);  background: rgba(153, 202, 60, .12); }
+.role-badge.role-redis { color: #FF6633; border-color: rgba(255, 102, 51, .45);  background: rgba(255, 102, 51, .12); }
+.role-badge.role-iag,
+.role-badge.role-iag5  { color: #C5258F; border-color: rgba(197, 37, 143, .45);  background: rgba(197, 37, 143, .10); }
+.role-badge.role-all,
+.role-badge.role-custom,
+.role-badge.role-other { color: var(--text-2); border-color: var(--line-2); background: var(--surface-2); }
+
+/* ── Responsive: shrink the sidebar on narrow viewports ───────── */
+@media (max-width: 960px) {
+  :root { --sidebar-w: 56px; }
+  .nav-label,
+  .nav-item span:not(.nav-badge),
+  .brand-name,
+  .brand-ver,
+  .upgrade { display: none; }
+  .nav-item { justify-content: center; }
+  .upgrade { display: none !important; }
+}
+@media (max-width: 720px) {
+  .hero { flex-direction: column; align-items: stretch; gap: 12px; }
+  .hero-side { display: flex; gap: 8px; flex-wrap: wrap; }
+  .grid-2 { grid-template-columns: 1fr !important; }
+  .metrics .tile-wrap { min-width: 0; }
+  .preflight-bar { flex-direction: column; align-items: stretch; }
+  .preflight-bar__action { display: flex; }
+  .preflight-bar__action .btn { width: 100%; }
+}
+
+/* ── Live theme transition ────────────────────────────────────────
+   When the user flips palette (Aurora ⇄ Horizon ⇄ Itential …) or
+   mode (Light ⇄ Dark), atlas.js briefly applies `.theme-changing` to
+   <html>. During that ~700ms window every element interpolates its
+   color tokens instead of snapping — surface, accent, text, borders,
+   chart strokes, even box-shadows all morph in sync. The class is
+   removed afterwards so per-component transitions defined elsewhere
+   (button hovers, etc.) keep their own timings unaffected. */
+:root.theme-changing,
+:root.theme-changing *,
+:root.theme-changing *::before,
+:root.theme-changing *::after {
+  transition:
+    background-color 700ms cubic-bezier(.4, 0, .2, 1),
+    color            700ms cubic-bezier(.4, 0, .2, 1),
+    border-color     700ms cubic-bezier(.4, 0, .2, 1),
+    fill             700ms cubic-bezier(.4, 0, .2, 1),
+    stroke           700ms cubic-bezier(.4, 0, .2, 1),
+    box-shadow       700ms cubic-bezier(.4, 0, .2, 1) !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root.theme-changing,
+  :root.theme-changing * { transition: none !important; }
+}
+
+/* ============================================================
+   ── Theme tightening pass ──────────────────────────────────
+   Cross-cutting polish that doesn't belong to any single
+   component:
+     · standardized focus rings
+     · tabular-nums on numeric surfaces
+     · hero gradient text utility
+     · clickable-card hover lift
+     · pink-accent cascade entrance (Atlas brand signature)
+     · base .status-dot pulse for running state
+     · long-list striping
+     · hero bottom-margin bump
+     · unified pill height
+   Kept as one block so the whole pass can be read (and tuned)
+   at once without grep-jumping across the file.
+   ============================================================ */
+
+/* (12) Focus rings — one token, applied to every interactive
+   surface that doesn't already define its own focus state. The
+   3px ring sits in --accent-soft's neighborhood but is sourced
+   independently so themes can over-ride it without disturbing
+   their accent palette. The :not() chain excludes elements that
+   already have a tuned :focus state (filter pills, drawer rows,
+   palette item, etc.) so we don't paint the ring twice. */
+:root { --focus-ring: 0 0 0 3px var(--accent-soft); }
+:focus-visible { outline: none; }
+a:focus-visible,
+button:focus-visible,
+.btn:focus-visible,
+.chip:focus-visible,
+.pill:focus-visible,
+.theme-toggle:focus-visible,
+.brand-mark:focus-visible,
+input:not([type="checkbox"]):not([type="radio"]):focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:not([tabindex="-1"]):focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-color: var(--accent) !important;
+}
+input[type="checkbox"]:focus-visible,
+input[type="radio"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* (13) Tabular-nums sweep — anywhere a number renders, columns
+   should not jitter when digits change. Applies blanket to
+   .font-mono (the common carrier for numeric content) and to a
+   few semantic surfaces where digits appear inside otherwise-
+   proportional fonts. Cheap and lossless: only affects glyphs
+   that have tabular variants in the loaded fonts. */
+.font-mono,
+.pill .val,
+.chip .cnt,
+.kpi,
+.kpi-number,
+.tabular-nums,
+.tabular,
+td.tabular,
+.status-pill,
+.count-badge {
+  font-variant-numeric: tabular-nums;
+}
+
+/* (14) Hero gradient — applied to the secondary span inside h1s
+   so the headline reads as "Plain · accent" without sacrificing
+   the existing typographic structure. Theme-aware via the brand
+   palette: blue → pink crosses Atlas's full identity without
+   pulling in any non-brand color. */
+.text-grad-brand {
+  background: linear-gradient(
+    100deg,
+    #1B93D2 0%,
+    #6E59C5 45%,
+    #C5258F 90%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  /* Fallback for very old browsers that don't support background-clip
+     on text: a visible brand-blue rather than the transparent fill
+     leaving the word invisible. */
+  @supports not (background-clip: text) {
+    color: #1B93D2;
+    -webkit-text-fill-color: #1B93D2;
+  }
+}
+/* Light-mode the same gradient reads with less contrast — bump the
+   stops slightly darker so the text still grabs the eye. */
+:root[data-mode="light"] .text-grad-brand {
+  background: linear-gradient(
+    100deg,
+    #0E7BB5 0%,
+    #5A41A8 45%,
+    #A21E78 90%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* (17) Clickable-card lift — opt-in via .card.is-clickable. The
+   inset 1px highlight reads as a soft pickup of light on the
+   top edge; the 2px translateY is small enough to feel like
+   intention, not motion sickness. Combined with the existing
+   --accent-soft glow on the border so the card feels selected
+   on hover without changing its outer footprint. */
+.card.is-clickable {
+  cursor: pointer;
+  transition:
+    transform 160ms cubic-bezier(.2, .8, .2, 1),
+    box-shadow 160ms cubic-bezier(.2, .8, .2, 1),
+    border-color 160ms ease;
+}
+.card.is-clickable:hover {
+  transform: translateY(-2px);
+  border-color: var(--line-2);
+  box-shadow:
+    inset 0 1px 0 oklch(100% 0 0 / 0.07),
+    0 8px 22px oklch(0% 0 0 / 0.25);
+}
+.card.is-clickable:active { transform: translateY(0); }
+
+/* (15) Brand-pink cascade entrance — Atlas's signature accent
+   makes its only structural appearance here. As [data-cascade]
+   children fade up, a 2px pink border briefly fades in on the
+   left edge and decays with the rise. Pure decoration; doesn't
+   change spacing or layout. */
+[data-cascade] > * {
+  position: relative;
+}
+[data-cascade] > *::before {
+  content: '';
+  position: absolute;
+  left: -1px; top: 6px; bottom: 6px;
+  width: 2px; border-radius: 1px;
+  background: #C5258F;
+  opacity: 0;
+  pointer-events: none;
+  animation: cascade-pink calc(0.65s + var(--i, 0) * 60ms) cubic-bezier(.34, 1.30, .64, 1)
+             calc(var(--i, 0) * 60ms + 80ms) forwards;
+}
+@keyframes cascade-pink {
+  0%, 30% { opacity: 0; }
+  55% { opacity: 0.85; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-cascade] > *::before { animation: none !important; opacity: 0 !important; }
+}
+
+/* (18) Status-dot base pulse — the .row .status-dot.run rule
+   already pulses, but the bare .status-dot.run (used outside
+   .row contexts) was static. Lift the animation onto the base
+   selector so every running dot pulses, regardless of where it
+   sits in the DOM. */
+.status-dot.run {
+  animation: pulse 1.4s ease-in-out infinite;
+}
+/* Slightly richer pulse: combine the opacity fade already in
+   @keyframes pulse with a tiny scale so the eye reads "alive".
+   We re-declare here (not modify the original) so callers that
+   only want opacity-pulse keep working. */
+.status-dot.run,
+.chip.run .dot,
+.pill .dot.run {
+  animation: status-pulse 1.4s ease-in-out infinite;
+}
+@keyframes status-pulse {
+  0%, 100% { transform: scale(1);    opacity: 1; }
+  50%      { transform: scale(1.18); opacity: .55; }
+}
+
+/* (19) Long-list striping — opt-in via .list-striped on any
+   container whose direct children are list rows. The tint is
+   sourced from --surface so it adapts to theme + mode without
+   a second declaration. Anything < 10 rows skips the class
+   entirely — striping is dead weight on short lists. */
+.list-striped > *:nth-child(even) {
+  background: color-mix(in oklch, var(--surface) 50%, transparent);
+}
+:root[data-mode="light"] .list-striped > *:nth-child(even) {
+  background: color-mix(in oklch, var(--surface-2) 35%, transparent);
+}
+table.list-striped tbody tr:nth-child(even) {
+  background: color-mix(in oklch, var(--surface) 50%, transparent);
+}
+
+/* (21) Hero-to-content spacing — the standard hero pattern
+   (header.flex.items-end.justify-between.gap-6.pb-5.border-b.border-line.mb-6)
+   is repeated across 20+ landing pages with Tailwind utilities
+   inline. Rather than touching every template, we override the
+   composed bottom margin when this exact shape appears as a
+   direct child of <main>. The new value reads as a magazine-
+   style first-paragraph drop rather than a form-section gap. */
+main > header.flex.items-end.justify-between.pb-5.border-b.mb-6 {
+  margin-bottom: 30px;
+}
+
+/* (22) Unified pill height — pills appear in the topbar (org /
+   env / tier), in chip rows, and inside dropdowns. The original
+   30px feels chunky alongside the 26-28px nav and filter
+   ecosystem. Settle on 28px so pills sit visually between
+   chips (~22px) and buttons (~30-34px). */
+.pill {
+  height: 28px;
+}
+.pill .label { font-size: 10.5px; }
+.pill .val { font-size: 12.5px; }
+
+/* (16) Per-mode soft-tone tuning — soft tints read differently
+   against dark vs light canvases. Dark needs more saturation to
+   be visible; light needs less to avoid looking like a wash. The
+   selector specificity matches the existing per-theme blocks
+   (:root[data-theme=X][data-mode=Y] = 0,2,1) so this override
+   wins by being later in the cascade. Each soft derives from its
+   theme's own --accent / --ok / --warn / --bad via color-mix, so
+   palette identity is preserved per theme — only the alpha is
+   centralized. The result: lighter, brighter softs in light mode
+   that read as quiet highlights; richer, more saturated softs in
+   dark mode that pop against the canvas. */
+:root[data-theme][data-mode="light"] {
+  --accent-soft: color-mix(in oklch, var(--accent)  9%, transparent);
+  --ok-soft:     color-mix(in oklch, var(--ok)      8%, transparent);
+  --warn-soft:   color-mix(in oklch, var(--warn)    8%, transparent);
+  --bad-soft:    color-mix(in oklch, var(--bad)     8%, transparent);
+}
+:root[data-theme][data-mode="dark"],
+:root[data-theme]:not([data-mode="light"]) {
+  --accent-soft: color-mix(in oklch, var(--accent) 18%, transparent);
+  --ok-soft:     color-mix(in oklch, var(--ok)     16%, transparent);
+  --warn-soft:   color-mix(in oklch, var(--warn)   16%, transparent);
+  --bad-soft:    color-mix(in oklch, var(--bad)    16%, transparent);
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   v1.7.2 release polish — 17 additive ideas distilled from the
+   pre-release UI review. None of these change product semantics;
+   they tighten focus, motion, feedback, and density. Each block is
+   guarded by `prefers-reduced-motion` where relevant.
+   ────────────────────────────────────────────────────────────────── */
+
+/* (01) WCAG-AA focus rings — the earlier focus rules used a 3px
+   color-mixed ring with no offset, which can fall under AA on
+   surfaces that share hue with the accent. This block raises the
+   ring to a 2px solid accent + 2px offset for any element that
+   already qualifies for the existing focus pattern. */
+:root { --focus-ring-aa: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent); }
+a:focus-visible,
+button:focus-visible,
+.btn:focus-visible,
+.chip:focus-visible,
+.pill:focus-visible,
+.theme-toggle:focus-visible,
+.brand-mark:focus-visible,
+input:not([type="checkbox"]):not([type="radio"]):focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:not([tabindex="-1"]):focus-visible {
+  box-shadow: var(--focus-ring-aa);
+  outline: none;
+}
+
+/* (03) Status palette pinned across all six themes — a single
+   semantic source of truth for OK / warn / err / info / drift
+   regardless of which theme the user picked. Pages can read these
+   directly via `var(--status-ok)` etc. */
+:root {
+  --status-ok:    var(--ok,    #66de7c);
+  --status-warn:  var(--warn,  #f6b042);
+  --status-err:   var(--bad,   #ef4d4d);
+  --status-info:  var(--accent, #1B93D2);
+  --status-drift: #C5258F;
+  --status-ok-soft:    var(--ok-soft);
+  --status-warn-soft:  var(--warn-soft);
+  --status-err-soft:   var(--bad-soft);
+  --status-info-soft:  var(--accent-soft);
+  --status-drift-soft: color-mix(in oklch, #C5258F 18%, transparent);
+}
+
+/* (04) Disabled button treatment — replaces the bare opacity:.5
+   with a muted background + dim text + not-allowed cursor so the
+   state reads as "deliberately off" instead of "loading". */
+.btn[disabled],
+.btn[aria-disabled="true"] {
+  background: var(--surface-2, var(--surface));
+  color: var(--text-3);
+  border-color: var(--line);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+.btn[disabled]:hover,
+.btn[aria-disabled="true"]:hover {
+  background: var(--surface-2, var(--surface));
+  border-color: var(--line);
+  filter: none;
+}
+
+/* (05) Sticky table headers — applies to every list-style table
+   inside a scroll container. Cheap and lossless: only kicks in when
+   the table's parent actually overflows vertically. */
+.table-scroll,
+.list-scroll {
+  overflow: auto;
+  max-height: 70vh;
+}
+.list-table thead th,
+table.list thead th,
+table.list-striped thead th,
+table.data thead th,
+.table-scroll table thead th,
+.list-scroll table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--surface-2, var(--surface));
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+
+/* (06) Skeleton loaders — drop-in shimmering placeholders for
+   tables, cards, and KPIs. Use as <div class="skel"> with any
+   width/height, or pre-shaped helpers .skel-line / .skel-block. */
+.skel {
+  background: linear-gradient(
+    90deg,
+    var(--surface)   0%,
+    var(--surface-2) 50%,
+    var(--surface)  100%
+  );
+  background-size: 200% 100%;
+  animation: skel-shimmer 1.4s ease-in-out infinite;
+  border-radius: var(--r-sm, 4px);
+  color: transparent;
+  user-select: none;
+}
+.skel-line  { display: block; height: 10px; margin: 6px 0; }
+.skel-block { display: block; height: 36px; }
+.skel-kpi   { display: block; height: 72px; border-radius: var(--r-lg); }
+@keyframes skel-shimmer {
+  0%   { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+/* (08) Subtle hover lift on cards — only fires for elements that
+   actually act as links/buttons. Pure presentation: 1px translate,
+   accent-soft shadow, accent border. Stays under reduced-motion. */
+.card.is-link,
+a.card,
+a.kpi,
+[data-card-link] {
+  transition:
+    transform .15s ease,
+    box-shadow .15s ease,
+    border-color .15s ease;
+}
+.card.is-link:hover,
+a.card:hover,
+a.kpi:hover,
+[data-card-link]:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent);
+  box-shadow: 0 4px 14px var(--accent-soft);
+}
+
+/* (09) Smooth scroll for in-page anchors — single-rule fix. The
+   scroll-padding-top accounts for the sticky topbar so anchors
+   don't disappear behind it. */
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 72px;
+}
+
+/* (13) Copy-to-clipboard pills — small inline component used for
+   session IDs, env paths, shell snippets. JS hook in atlas.js
+   binds to [data-copy-pill] for the button click handler. */
+.copy-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-2, var(--surface));
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm, 4px);
+  padding: 3px 6px 3px 10px;
+  font-family: var(--font-mono, 'JetBrains Mono', Menlo, Consolas, monospace);
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.4;
+}
+.copy-pill button {
+  background: transparent;
+  border: 0;
+  color: var(--text-3);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--r-sm, 4px);
+  font-size: 12px;
+  font-family: inherit;
+  transition: color .12s, background .12s;
+}
+.copy-pill button:hover { color: var(--accent); background: var(--accent-soft); }
+.copy-pill button[data-copied="1"] { color: var(--ok); background: var(--ok-soft); }
+.copy-pill button .copy-icon { display: inline-block; line-height: 1; font-size: 13px; }
+
+/* (15) Inline form validation — applied via aria-invalid="true"
+   and a .field-error sibling. Works without JS, scales up if the
+   form does client-side validation later. */
+.input[aria-invalid="true"],
+input[aria-invalid="true"]:not([type="checkbox"]):not([type="radio"]),
+select[aria-invalid="true"],
+textarea[aria-invalid="true"] {
+  border-color: var(--bad);
+}
+.input[aria-invalid="true"]:focus-visible,
+input[aria-invalid="true"]:focus-visible,
+select[aria-invalid="true"]:focus-visible,
+textarea[aria-invalid="true"]:focus-visible {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--bad);
+}
+.field-error {
+  margin-top: 4px;
+  color: var(--bad);
+  font-size: 11.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.field-error::before {
+  content: "⚠";
+  font-size: 12px;
+  line-height: 1;
+}
+
+/* (16) Stage-aware capture progress chips — five small stages
+   that pulse on the active one and turn green when done. Markup:
+     <ol class="progress-stages">
+       <li class="stage done">Preflight</li>
+       <li class="stage active">Capture</li>
+       <li class="stage">Validate</li>
+       ...
+     </ol> */
+.progress-stages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+}
+.progress-stages .stage {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--surface-2, var(--surface));
+  color: var(--text-3);
+  border: 1px solid var(--line);
+  white-space: nowrap;
+}
+.progress-stages .stage.done {
+  background: var(--status-ok-soft);
+  color: var(--status-ok);
+  border-color: transparent;
+}
+.progress-stages .stage.done::before { content: "✓"; }
+.progress-stages .stage.active {
+  background: var(--status-info-soft);
+  color: var(--status-info);
+  border-color: transparent;
+  font-weight: 600;
+}
+.progress-stages .stage.active::before {
+  content: "";
+  width: 7px; height: 7px; border-radius: 50%;
+  background: currentColor;
+  animation: stage-pulse 1.4s ease-in-out infinite;
+}
+.progress-stages .arrow {
+  color: var(--text-4, var(--text-3));
+  font-size: 13px;
+  line-height: 1;
+}
+@keyframes stage-pulse { 50% { opacity: .35; } }
+
+/* (17) Confirm-by-typing — visual scaffolding for destructive
+   confirmation modals. JS reveal/enable hook lives in atlas.js
+   under `data-confirm-by-typing`. */
+.danger-confirm input {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  letter-spacing: 0.04em;
+}
+.danger-confirm .hint code {
+  background: var(--bad-soft);
+  color: var(--bad);
+  padding: 0 4px;
+  border-radius: 3px;
+  font-family: var(--font-mono, monospace);
+}
+
+/* "Last updated" badge (12) — small dim chip used in the corner of
+   data cards. Pair with a `<time>` element so the hover tooltip
+   shows the absolute UTC timestamp. */
+.last-updated {
+  font-size: 10.5px;
+  color: var(--text-3);
+  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.last-updated::before {
+  content: "";
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--text-4, var(--text-3));
+}
+.last-updated.fresh::before { background: var(--ok); }
+.last-updated.stale::before { background: var(--warn); }
+
+/* Breadcrumbs (10) — minimal styling so any page can drop in a
+     <nav class="breadcrumbs" aria-label="Breadcrumb">
+       <a href="/sessions">Sessions</a> / <a href="/sessions/prod">prod</a> / <span>Compliance</span>
+     </nav>
+   and have it look right. */
+.breadcrumbs {
+  font-size: 12px;
+  color: var(--text-3);
+  margin: 0 0 12px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+}
+.breadcrumbs a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.breadcrumbs a:hover { text-decoration: underline; }
+.breadcrumbs .sep { color: var(--text-4, var(--text-3)); }
+.breadcrumbs > :last-child { color: var(--text); }
+
+/* Error-with-next-step block (20) — wraps a typical error message
+   so it always shows a fix-it link or shell command next to the
+   error text. Matches the CLI's `details: {fix: ...}` pattern. */
+.error-with-fix {
+  background: var(--bad-soft);
+  border: 1px solid var(--bad);
+  border-left-width: 3px;
+  border-radius: var(--r-md, 6px);
+  padding: 10px 14px;
+  color: var(--text);
+}
+.error-with-fix .err-title {
+  color: var(--bad);
+  font-weight: 700;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.error-with-fix .err-title::before { content: "✘"; }
+.error-with-fix .err-detail {
+  font-size: 12.5px;
+  margin: 4px 0 6px;
+  opacity: 0.92;
+}
+.error-with-fix .err-fix {
+  font-size: 12.5px;
+  color: var(--accent);
+}
+.error-with-fix .err-fix::before {
+  content: "→ ";
+  color: var(--accent);
+  font-weight: 700;
+}
+.error-with-fix .err-fix a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+/* Reduced-motion overrides — disable shimmer, pulse, and the
+   hover translate so motion-sensitive users get static surfaces. */
+@media (prefers-reduced-motion: reduce) {
+  .skel { animation: none; background: var(--surface-2, var(--surface)); }
+  .progress-stages .stage.active::before { animation: none; }
+  .card.is-link:hover,
+  a.card:hover,
+  a.kpi:hover,
+  [data-card-link]:hover { transform: none; }
+  html { scroll-behavior: auto; }
+}

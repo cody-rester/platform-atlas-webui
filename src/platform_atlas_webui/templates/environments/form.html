@@ -1,0 +1,1184 @@
+{% extends "base.html" %}
+{% block title %}{% if mode == 'create' %}New Environment{% else %}Edit {{ env.name }}{% endif %} — Platform Atlas{% endblock %}
+{% block crumb %}<a href="/environments" class="text-inherit hover:text-accent">Environments</a> <span class="sep">›</span> {% if mode == 'create' %}New{% else %}{{ env.name }}{% endif %}{% endblock %}
+{% block content %}
+{% set d = env.data if env else {} %}
+
+{# Step-number wiring is tier-aware. Standard mode skips the entire
+   Topology step (SSH + Topology + Kubernetes — all Extended-only),
+   so Review moves from step 4 to step 3 and the wizard's total
+   drops from 4 to 3. These vars are referenced by every step's
+   data-wizard-step / x-show / and by the wizard data factory below. #}
+{% set _step_total = 3 if is_standard else 4 %}
+{% set _step_review = _step_total %}
+
+{# NOTE: Tailwind migration is partial here — the hero and flash banner are
+   converted, but the long form below stays on atlas.css's .form/.field/.hint
+   classes. Form widget styling is consistent across the app and there's no
+   visual win in translating it utility-by-utility for an 800-line form. #}
+
+{% if from_tier == 'extended' %}
+<div class="flash flash--info mb-5 flex items-start gap-3">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 mt-px"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+  <div>
+    <strong>Extended tier activated — credentials needed</strong><br>
+    <span class="text-[12px]">
+      Extended mode requires SSH access plus MongoDB and Redis connection strings.
+      {% if d.get('credential_backend') == 'vault' %}
+        Add the new keys to your <strong>HashiCorp Vault</strong> KV store, then run a preflight check to verify Atlas can reach them.
+      {% else %}
+        Atlas will prompt you for each credential the first time you run a capture. You can also pre-populate them via <code>platform-atlas credentials set</code> on the CLI.
+      {% endif %}
+      Fill in the topology fields below so Atlas knows where to find your servers.
+    </span>
+  </div>
+</div>
+{% endif %}
+
+<header class="flex items-end justify-between gap-6 pb-5 border-b border-line mb-6">
+  <div>
+    <div class="eyebrow"><span class="dot"></span> {% if mode == 'create' %}Create{% else %}Edit{% endif %}</div>
+    <h1 class="text-[36px] leading-[1.05] font-semibold tracking-[-0.038em] mt-2 mb-1.5">
+      {% if mode == 'create' %}New environment{% else %}{{ env.name }}{% endif %}, <em class="not-italic text-text-3">overlay config</em>
+    </h1>
+    <p class="text-[14px] text-text-2 max-w-[64ch]">
+      {% if is_standard %}
+        Standard mode only needs a name, Platform URI, and OAuth client ID.
+        <a href="/tier" style="color:var(--accent);">Switch to Extended</a>
+        to add SSH-based topology, Kubernetes, and infrastructure fields.
+      {% else %}
+        Standard mode only requires a name, Platform URI, and OAuth client ID.
+        Extended adds optional topology, gateway, and Kubernetes fields.
+      {% endif %}
+    </p>
+  </div>
+  <div class="flex items-center gap-2">
+    <a class="btn" href="/environments">Cancel</a>
+  </div>
+</header>
+
+<section class="card">
+  <div class="card-head">
+    <h3>Environment overlay</h3>
+    <span class="sub">stored at <code>~/.atlas/environments/&lt;name&gt;.json</code></span>
+  </div>
+  <div class="card-body">
+
+<form class="form" method="post" action="/environments"
+      x-data="atlasEnvWizard()"
+      x-init="wizardOn = {% if mode == 'create' %}true{% else %}false{% endif %}"
+      @submit="if (wizardOn && step !== total) { $event.preventDefault(); next(); }">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+  {# ── Stepper header — only renders for create flow.
+     Each pill is clickable once you've reached it (maxStep) so the user can
+     jump back without losing the current step's input. The `x-show="wizardOn"`
+     also ensures edit-mode keeps the legacy single-page layout. #}
+  <div x-show="wizardOn" x-cloak
+       class="flex items-center gap-2 mb-6 -mt-1">
+    <template x-for="(label, i) in labels" :key="i">
+      <div class="flex items-center gap-2 flex-1 last:flex-none">
+        <button type="button"
+                @click="jump(i + 1)"
+                :disabled="(i + 1) > maxStep"
+                :class="{
+                  'bg-accent text-accent-ink border-accent shadow-xs': step === (i + 1),
+                  'bg-surface-2 text-text-2 border-line-2': step !== (i + 1) && (i + 1) <= maxStep,
+                  'bg-surface text-text-4 border-line cursor-not-allowed': (i + 1) > maxStep
+                }"
+                class="flex items-center gap-2 px-3 py-1.5 rounded-md border text-[12.5px] font-medium transition-colors hover:opacity-90 disabled:hover:opacity-100">
+          <span class="inline-flex items-center justify-center w-5 h-5 rounded-full text-[11px] font-semibold border"
+                :class="{
+                  'bg-accent-ink text-accent border-accent-ink': step === (i + 1),
+                  'bg-ok-soft text-ok border-ok': step !== (i + 1) && (i + 1) < step,
+                  'bg-surface text-text-3 border-line-2': step !== (i + 1) && (i + 1) >= step
+                }">
+            <span x-show="(i + 1) >= step" x-text="i + 1"></span>
+            <svg x-show="(i + 1) < step" x-cloak width="11" height="11" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </span>
+          <span x-text="label"></span>
+        </button>
+        <span x-show="i < labels.length - 1" class="flex-1 h-[1.5px]"
+              :class="(i + 1) < step ? 'bg-accent' : 'bg-line'"></span>
+      </div>
+    </template>
+  </div>
+
+  {# ── Step 1 — Identity ─────────────────────────────────────────────── #}
+  <div data-wizard-step="1" x-show="!wizardOn || step === 1" x-cloak>
+  <fieldset>
+    <legend>Identity</legend>
+    <div class="field">
+      <label for="name">Environment name</label>
+      <input id="name" name="name" type="text" required
+             {% if mode == 'edit' %}readonly{% endif %}
+             value="{{ d.get('name') or '' }}"
+             pattern="[A-Za-z0-9][A-Za-z0-9 _.\-]*" maxlength="128"
+             title="Letters, digits, spaces, dots, hyphens, underscores. Must start with a letter or digit. 1–128 chars."
+             placeholder="e.g. production, Acme Prod, dev-2"
+             {% if mode == 'create' %}
+             hx-get="/environments/validate-name"
+             hx-trigger="keyup changed delay:300ms, change, load delay:100ms"
+             hx-target="#env-name-check"
+             hx-swap="innerHTML"
+             {# Cancel any in-flight validation when the user types again
+                so a slow earlier response can't overwrite the result for
+                the current value. #}
+             hx-sync="this:replace"
+             {% endif %}>
+      <span class="hint">
+        Letters, digits, spaces, dots, hyphens, and underscores only.
+        Used as the file name under <code>~/.atlas/environments/</code>,
+        as the keyring scope, and in report metadata — punctuation like
+        <code>!</code>, <code>?</code>, <code>/</code>, <code>#</code> isn't allowed.
+      </span>
+      {% if mode == 'create' %}
+        {# Live availability check — populated by the hx-get above. #}
+        <div id="env-name-check" class="mt-1.5 min-h-[18px]"></div>
+      {% endif %}
+    </div>
+    <div class="field">
+      <label for="description">Description</label>
+      <input id="description" name="description" type="text" value="{{ d.get('description') or '' }}">
+    </div>
+    <div class="field">
+      <label for="organization_name">Organization name</label>
+      {# Read-only here — the global Configuration is the single source of
+         truth for organization_name. We deliberately omit ``name=`` so the
+         field is never POSTed; the env overlay never gets a stale copy. #}
+      <input id="organization_name" type="text" readonly
+             value="{{ organization_name or '' }}"
+             style="opacity:0.7; cursor:not-allowed; background:var(--surface-2);"
+             placeholder="Set in Configuration">
+      <span class="hint">
+        Sourced from <a href="/config" style="color:var(--accent);">Configuration</a> — every
+        environment uses the same organization name. Change it there to update everywhere.
+      </span>
+    </div>
+    <div class="field">
+      <label for="tier">Tier</label>
+      {% if is_standard %}
+        {# Active tier is Standard — lock the dropdown so a Standard-tier user
+           can't create or edit an environment into the Extended tier. The
+           server-side guard in save_environment rejects bypasses. #}
+        <select id="tier" disabled aria-describedby="tier-locked-hint"
+                style="opacity:0.65; cursor:not-allowed; background:var(--surface-2);">
+          <option value="standard" selected>Standard — Application audit (Platform OAuth + IAG4)</option>
+        </select>
+        <input type="hidden" name="tier" value="standard">
+        <span id="tier-locked-hint" class="hint">
+          Locked to Standard because your active tier is Standard.
+          {% if mode == 'edit' and d.get('tier') == 'extended' %}
+            <strong style="color:var(--warn, var(--text));">Saving will change this environment from Extended to Standard.</strong>
+          {% endif %}
+          <a href="/tier" style="color:var(--accent);">Switch to Extended</a> to enable Extended environments.
+        </span>
+      {% else %}
+        <select id="tier" name="tier">
+          <option value="standard" {% if d.get('tier') == 'standard' %}selected{% endif %}>Standard — Application audit (Platform OAuth + IAG4)</option>
+          <option value="extended" {% if d.get('tier') in (None, '', 'extended') %}selected{% endif %}>Extended — Infrastructure audit (SSH/Mongo/Redis/IAG)</option>
+        </select>
+      {% endif %}
+    </div>
+  </fieldset>
+  </div>{# /step 1 #}
+
+  {# ── Step 2 — Connection (Platform + Gateway 4) ───────────────────── #}
+  <div data-wizard-step="2" x-show="!wizardOn || step === 2" x-cloak>
+  <fieldset>
+    <legend>Platform connection</legend>
+    <div class="field">
+      <label for="platform_uri">Platform URI</label>
+      <input id="platform_uri" name="platform_uri" type="url" placeholder="https://platform.acme.com" value="{{ d.get('platform_uri') or '' }}">
+    </div>
+    <div class="field">
+      <label for="platform_client_id">OAuth client ID</label>
+      <input id="platform_client_id" name="platform_client_id" type="text"
+             value="{{ d.get('platform_client_id') or '' }}"
+             autocomplete="off" autocorrect="off" autocapitalize="off"
+             spellcheck="false" data-1p-ignore data-lpignore="true">
+      <span class="hint">The client secret is stored in the OS keyring or Vault — not in this overlay.</span>
+    </div>
+    <div class="field">
+      <label for="credential_backend">Credential backend</label>
+      <select id="credential_backend" name="credential_backend">
+        <option value="keyring" {% if d.get('credential_backend') in (None, '', 'keyring') %}selected{% endif %}>OS keyring</option>
+        <option value="vault" {% if d.get('credential_backend') == 'vault' %}selected{% endif %}>HashiCorp Vault</option>
+      </select>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Gateway 4 <span style="color:var(--text-3); font-weight:400;">(optional, both tiers)</span></legend>
+    <div class="field">
+      <label for="gateway4_uri">Gateway 4 URI</label>
+      <input id="gateway4_uri" name="gateway4_uri" type="url" placeholder="https://iag.acme.com" value="{{ d.get('gateway4_uri') or '' }}">
+    </div>
+    <div class="field">
+      <label for="gateway4_username">Gateway 4 username</label>
+      <input id="gateway4_username" name="gateway4_username" type="text" value="{{ d.get('gateway4_username') or '' }}">
+    </div>
+  </fieldset>
+  </div>{# /step 2 #}
+
+  {# ── Step 3 — Topology (SSH + Topology + Kubernetes) ──────────────────
+     Extended-only. Standard tier doesn't need SSH access, topology hints,
+     or Kubernetes flags — its audit talks to Platform OAuth + IAG4 API
+     and nothing else. We omit the entire step rather than disabling the
+     fields so the wizard reads as three steps end-to-end. #}
+  {% if not is_standard %}
+  <div data-wizard-step="3" x-show="!wizardOn || step === 3" x-cloak>
+  <fieldset>
+    <legend>SSH <span style="color:var(--text-3); font-weight:400;">(Extended only — not used with Kubernetes)</span></legend>
+    {% set _current_ssh_key = d.get('ssh_key') or '' %}
+    {% set _ssh_key_in_dropdown = _current_ssh_key and (ssh_keys | selectattr('path', 'equalto', _current_ssh_key) | list | length > 0) %}
+    <div class="field">
+      <label for="ssh_key_select">SSH private key</label>
+      <select id="ssh_key_select"
+              style="font-family:var(--mono); font-size:13px;"
+              onchange="(function(s){
+                var custom = document.getElementById('ssh_key_custom');
+                var hidden = document.getElementById('ssh_key');
+                if (s.value === '__custom__') {
+                  custom.style.display = '';
+                  custom.required = false;
+                  hidden.value = custom.value;
+                } else {
+                  custom.style.display = 'none';
+                  hidden.value = s.value;
+                }
+              })(this)">
+        <option value="" {% if not _current_ssh_key %}selected{% endif %}>— None (use SSH agent) —</option>
+        {% for k in ssh_keys %}
+          <option value="{{ k.path }}" {% if _current_ssh_key == k.path %}selected{% endif %}>
+            {{ k.name }} <span>· {{ k.path }}</span>
+          </option>
+        {% endfor %}
+        <option value="__custom__" {% if _current_ssh_key and not _ssh_key_in_dropdown %}selected{% endif %}>— Custom path… —</option>
+      </select>
+      {# Hidden field that actually submits the value — kept in sync by the
+         select's onchange and the custom input's oninput handlers. #}
+      <input type="hidden" id="ssh_key" name="ssh_key"
+             value="{{ _current_ssh_key }}">
+      {# Visible input only when "Custom path…" is selected, or the saved
+         value isn't one of the discovered keys. #}
+      <input type="text" id="ssh_key_custom"
+             placeholder="~/.ssh/some_other_key"
+             value="{{ _current_ssh_key if (_current_ssh_key and not _ssh_key_in_dropdown) else '' }}"
+             style="font-family:var(--mono); font-size:13px; margin-top:6px;
+                    {% if _current_ssh_key and not _ssh_key_in_dropdown %}{% else %}display:none;{% endif %}"
+             oninput="document.getElementById('ssh_key').value = this.value">
+      <span class="hint">
+        {% if ssh_keys %}
+          Atlas found {{ ssh_keys | length }} private key{% if ssh_keys | length != 1 %}s{% endif %}
+          in <code>~/.ssh</code>. Pick one, choose <em>Custom path…</em> to enter another path,
+          or leave blank to use the SSH agent.
+        {% else %}
+          No private keys were detected in <code>~/.ssh</code>. Pick <em>Custom path…</em>
+          to enter the full path to your key, or leave blank to use the SSH agent.
+        {% endif %}
+        Saving an empty value removes the key from existing nodes.
+      </span>
+    </div>
+  </fieldset>
+
+  {# Pre-fill topology fields from the existing deployment block, or fall
+     back to the host parsed out of platform_uri. #}
+  {% set _depl = d.get('deployment') or {} %}
+  {% set _depl_mode = (_depl.get('mode') or 'standalone') | lower %}
+  {% set _nodes = _depl.get('nodes') or [] %}
+  {% set _ssh_defaults = _depl.get('ssh_defaults') or {} %}
+  {% set _iap_nodes = _nodes | selectattr('role', 'equalto', 'iap') | list %}
+  {% set _mongo_nodes = _nodes | selectattr('role', 'equalto', 'mongo') | list %}
+  {% set _redis_nodes = _nodes | selectattr('role', 'equalto', 'redis') | list %}
+  {% set _node_iap = _iap_nodes[0] if _iap_nodes else {} %}
+  {% set _node_iap_2 = _iap_nodes[1] if _iap_nodes | length > 1 else {} %}
+  {% set _node_iap_3 = _iap_nodes[2] if _iap_nodes | length > 2 else {} %}
+  {% set _node_mongo = _mongo_nodes[0] if _mongo_nodes else {} %}
+  {% set _node_mongo_2 = _mongo_nodes[1] if _mongo_nodes | length > 1 else {} %}
+  {% set _node_mongo_3 = _mongo_nodes[2] if _mongo_nodes | length > 2 else {} %}
+  {% set _node_redis = _redis_nodes[0] if _redis_nodes else {} %}
+  {% set _node_redis_2 = _redis_nodes[1] if _redis_nodes | length > 1 else {} %}
+  {% set _node_redis_3 = _redis_nodes[2] if _redis_nodes | length > 2 else {} %}
+  {% set _node_iag = (_nodes | selectattr('role', 'equalto', 'iag') | list | first) or {} %}
+  {% set _ssh_user_default = _ssh_defaults.get('username') or _node_iap.get('ssh_user') or 'atlas' %}
+  {% set _ssh_port_default = _ssh_defaults.get('port') or _node_iap.get('ssh_port') or 22 %}
+  {% set _iap_transport = _node_iap.get('transport') or 'ssh' %}
+  {% set _iap_cm_socket = _node_iap.get('ssh_control_socket') or '' %}
+  {% set _iap_cm_target = _node_iap.get('ssh_control_target') or '' %}
+  {% set _iap_cm_port = _node_iap.get('ssh_port') or 22 %}
+  {% set _platform_host_default = '' %}
+  {% if d.get('platform_uri') %}
+    {% set _raw = d.get('platform_uri') %}
+    {% set _stripped = _raw.split('://')[-1] %}
+    {% set _platform_host_default = _stripped.split('/')[0].split(':')[0] %}
+  {% endif %}
+
+  <fieldset id="topology-fieldset">
+    <legend>Topology <span style="color:var(--text-3); font-weight:400;">(Extended only — required for capture)</span></legend>
+    <p class="hint" style="margin:-2px 0 12px;">
+      Tells Atlas where each component lives so it can SSH in and connect to MongoDB/Redis.
+      Standard tier ignores this section — it derives targets from the Platform URI alone.
+    </p>
+
+    <div class="topology-ssh-box">
+      <div class="topology-ssh-box__head">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
+        </svg>
+        <div>
+          <div class="topology-ssh-box__title">SSH access — for capturing config files & system info</div>
+          <div class="topology-ssh-box__sub">
+            These hosts are where Atlas will <strong>SSH in</strong> to read config files,
+            run system checks, and inspect the filesystem. They are <strong>not</strong> the
+            same as the <strong>Platform URI</strong> above — that one is the Platform's
+            HTTPS API endpoint. The SSH host is usually the underlying server's hostname
+            or IP (e.g. <code>iap-prod-1.acme.internal</code>), while the Platform URI
+            is its public URL (e.g. <code>https://platform.acme.com</code>).
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="deployment_mode">Deployment mode</label>
+        <select id="deployment_mode" name="deployment_mode">
+          <option value="standalone" {% if _depl_mode in ('', 'standalone') %}selected{% endif %}>
+            Standalone — single instance per role
+          </option>
+          <option value="ha2" {% if _depl_mode == 'ha2' %}selected{% endif %}>
+            HA2 — multi-node (≥2 IAP, 3 Mongo replica set, 3 Redis sentinel)
+          </option>
+          <option value="kubernetes" {% if _depl_mode == 'kubernetes' %}selected{% endif %}>
+            Kubernetes — values.yaml + kubectl
+          </option>
+          <option value="custom" {% if _depl_mode == 'custom' %}selected{% endif %}>
+            Custom — freeform topology (CLI-managed)
+          </option>
+        </select>
+      </div>
+
+      {# ── Standalone: one host per role ───────────────────────────────── #}
+      <div id="topo-standalone" class="topo-mode-pane" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div class="field" style="grid-column: 1 / -1;">
+          <label for="iap_host">Platform (IAP) host</label>
+          <input id="iap_host" name="iap_host" type="text"
+                 placeholder="iap-prod-1.acme.internal"
+                 value="{{ _node_iap.get('host') or _platform_host_default or '' }}"
+                 style="font-family:var(--mono); font-size:13px;">
+          <span class="hint">Hostname or IP of the Platform server. Defaults to the host parsed from your Platform URI — change it if SSH/access uses a different name.</span>
+        </div>
+
+        <div class="field">
+          <label for="mongo_host">MongoDB SSH host</label>
+          <input id="mongo_host" name="mongo_host" type="text"
+                 placeholder="mongo-prod-1.acme.internal"
+                 value="{{ _node_mongo.get('host') or '' }}"
+                 style="font-family:var(--mono); font-size:13px;">
+          <span class="hint">If blank, the Platform host is reused — change this for split deployments.</span>
+        </div>
+        <div class="field">
+          <label for="redis_host">Redis SSH host</label>
+          <input id="redis_host" name="redis_host" type="text"
+                 placeholder="redis-prod-1.acme.internal"
+                 value="{{ _node_redis.get('host') or '' }}"
+                 style="font-family:var(--mono); font-size:13px;">
+          <span class="hint">Defaults to the Platform host when blank.</span>
+        </div>
+        <div class="field">
+          <label for="iag_host">IAG SSH host <span style="color:var(--text-3); font-weight:400;">(optional)</span></label>
+          <input id="iag_host" name="iag_host" type="text"
+                 placeholder="Leave blank if no Gateway in this env"
+                 value="{{ _node_iag.get('host') or '' }}"
+                 style="font-family:var(--mono); font-size:13px;">
+          <span class="hint">Add an Automation Gateway node if this deployment includes one.</span>
+        </div>
+      </div>
+
+      {# ── HA2: multiple hosts per role ───────────────────────────────── #}
+      <div id="topo-ha2" class="topo-mode-pane" style="display:none; flex-direction:column; gap:14px;">
+        <p class="hint" style="margin:0;">
+          HA2 needs at least 2 IAP nodes plus 3-node Mongo and Redis clusters.
+          Use the <strong>primary</strong> column for the first/leader node — it's the one Atlas
+          targets for protocol-level checks (ipsdk, pymongo, redis-py).
+        </p>
+
+        <div style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:10px;">
+          <div class="field"><label for="iap_host_ha">IAP — primary</label>
+            <input id="iap_host_ha" name="iap_host_ha" type="text"
+                   placeholder="iap-prod-1.acme.internal"
+                   value="{{ _node_iap.get('host') or _platform_host_default or '' }}"
+                   style="font-family:var(--mono); font-size:13px;"></div>
+          <div class="field"><label for="iap_host_2">IAP — secondary</label>
+            <input id="iap_host_2" name="iap_host_2" type="text"
+                   placeholder="iap-prod-2.acme.internal"
+                   value="{{ _node_iap_2.get('host') or '' }}"
+                   style="font-family:var(--mono); font-size:13px;"></div>
+          <div class="field"><label for="iap_host_3">IAP — tertiary <span style="color:var(--text-3); font-weight:400;">(optional)</span></label>
+            <input id="iap_host_3" name="iap_host_3" type="text"
+                   placeholder="iap-prod-3.acme.internal"
+                   value="{{ _node_iap_3.get('host') or '' }}"
+                   style="font-family:var(--mono); font-size:13px;"></div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:10px;">
+          <div class="field"><label for="mongo_host_ha">MongoDB — primary</label>
+            <input id="mongo_host_ha" name="mongo_host_ha" type="text"
+                   placeholder="mongo-prod-1.acme.internal"
+                   value="{{ _node_mongo.get('host') or '' }}"
+                   style="font-family:var(--mono); font-size:13px;"></div>
+          <div class="field"><label for="mongo_host_2">MongoDB — secondary</label>
+            <input id="mongo_host_2" name="mongo_host_2" type="text"
+                   placeholder="mongo-prod-2.acme.internal"
+                   value="{{ _node_mongo_2.get('host') or '' }}"
+                   style="font-family:var(--mono); font-size:13px;"></div>
+          <div class="field"><label for="mongo_host_3">MongoDB — tertiary</label>
+            <input id="mongo_host_3" name="mongo_host_3" type="text"
+                   placeholder="mongo-prod-3.acme.internal"
+                   value="{{ _node_mongo_3.get('host') or '' }}"
+                   style="font-family:var(--mono); font-size:13px;"></div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:10px;">
+          <div class="field"><label for="redis_host_ha">Redis — primary</label>
+            <input id="redis_host_ha" name="redis_host_ha" type="text"
+                   placeholder="redis-prod-1.acme.internal"
+                   value="{{ _node_redis.get('host') or '' }}"
+                   style="font-family:var(--mono); font-size:13px;"></div>
+          <div class="field"><label for="redis_host_2">Redis — secondary</label>
+            <input id="redis_host_2" name="redis_host_2" type="text"
+                   placeholder="redis-prod-2.acme.internal"
+                   value="{{ _node_redis_2.get('host') or '' }}"
+                   style="font-family:var(--mono); font-size:13px;"></div>
+          <div class="field"><label for="redis_host_3">Redis — tertiary</label>
+            <input id="redis_host_3" name="redis_host_3" type="text"
+                   placeholder="redis-prod-3.acme.internal"
+                   value="{{ _node_redis_3.get('host') or '' }}"
+                   style="font-family:var(--mono); font-size:13px;"></div>
+        </div>
+
+        <div class="field">
+          <label for="iag_host_ha">IAG SSH host <span style="color:var(--text-3); font-weight:400;">(optional, single node)</span></label>
+          <input id="iag_host_ha" name="iag_host_ha" type="text"
+                 placeholder="Leave blank if no Gateway in this env"
+                 value="{{ _node_iag.get('host') or '' }}"
+                 style="font-family:var(--mono); font-size:13px;">
+        </div>
+      </div>
+
+      {# ── Kubernetes: hint pointing to dedicated section ──────────────── #}
+      <div id="topo-kubernetes" class="topo-mode-pane" style="display:none;">
+        <div class="flash flash--info" style="margin:0; display:flex; gap:10px; align-items:flex-start;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round" style="margin-top:2px; flex-shrink:0;">
+            <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+          <div style="font-size:12px;">
+            <strong>Kubernetes mode</strong> — Atlas reads <code>values.yaml</code> directly and uses
+            <code>kubectl</code> for live state. SSH host fields don't apply.
+            Fill in the <strong>Kubernetes</strong> section below
+            (the form will auto-enable it when you save).
+          </div>
+        </div>
+      </div>
+
+      {# ── Custom: directs to CLI ──────────────────────────────────────── #}
+      <div id="topo-custom" class="topo-mode-pane" style="display:none;">
+        <div class="flash" style="margin:0; padding:14px 16px; background:var(--surface-2);
+                                   border:1px solid var(--line); border-radius:var(--r-lg);
+                                   font-size:12px; color:var(--text-2);">
+          <strong style="display:block; margin-bottom:6px; color:var(--text);">Custom topology</strong>
+          Custom layouts are freeform JSON and stay CLI-managed for now. Run
+          <code style="font-family:var(--mono); padding:1px 5px; background:var(--bg);
+                       border:1px solid var(--line); border-radius:3px;">platform-atlas config init</code>
+          to (re)build the topology, then return here to manage credentials and capture.
+          Saving this form preserves the existing custom topology — the WebUI never overwrites it.
+        </div>
+      </div>
+
+      {# Shared IAP transport selector — applies to standalone + HA2.
+         Hidden for Kubernetes/Custom. In HA2 the chosen transport applies
+         to the primary IAP node only; secondary/tertiary slots keep
+         whatever transport the CLI wizard previously set on them. #}
+      <div id="topo-iap-transport-shared" class="topo-mode-pane"
+           style="display:flex; flex-direction:column; gap:12px; margin-top:14px;
+                  padding-top:12px; border-top:1px dashed var(--line);">
+
+        <div class="field">
+          <label for="iap_transport">Platform (IAP) connection type</label>
+          <select id="iap_transport" name="iap_transport"
+                  onchange="atlasIapTransportSync(this.value)">
+            <option value="ssh" {% if _iap_transport in ('', 'ssh') %}selected{% endif %}>
+              SSH (recommended) — key or agent-based direct SSH
+            </option>
+            <option value="control_master" {% if _iap_transport == 'control_master' %}selected{% endif %}>
+              ControlMaster — CyberArk PSMP / jump host (pre-opened SSH session)
+            </option>
+            <option value="local" {% if _iap_transport == 'local' %}selected{% endif %}>
+              Local — Atlas CLI is installed on the Platform server itself
+            </option>
+          </select>
+          <span class="hint">SSH is recommended for most deployments. Use ControlMaster if the Platform server is behind CyberArk PSMP or a restricted jump host that doesn't allow direct key-based SSH. Use Local only when the Atlas CLI is installed directly on the IAP server. <span id="iap-transport-ha2-note" style="display:none;">In HA2 this applies to the <strong>primary</strong> IAP node only — Atlas uses just the primary for protocol-level checks.</span></span>
+        </div>
+
+        {# ── ControlMaster fields ────────────────────────────────────────── #}
+        <div id="iap-cm-fields"
+             style="display:{% if _iap_transport == 'control_master' %}grid{% else %}none{% endif %};
+                    grid-template-columns:1fr 1fr; gap:12px;
+                    padding:12px 14px; border:1px solid var(--line);
+                    border-radius:var(--r-lg, 10px); background:var(--surface-2);">
+          <div class="field">
+            <label for="iap_cm_socket">ControlMaster socket path</label>
+            <input id="iap_cm_socket" name="iap_cm_socket" type="text"
+                   placeholder="/tmp/atlas-cm.sock"
+                   value="{{ _iap_cm_socket }}"
+                   {% if _iap_transport == 'control_master' %}required{% endif %}
+                   style="font-family:var(--mono); font-size:13px;">
+            <span class="hint">Path to the <code>-S</code> socket file created by your <code>ssh -M</code> command.</span>
+          </div>
+          <div class="field">
+            <label for="iap_cm_target">SSH destination</label>
+            <input id="iap_cm_target" name="iap_cm_target" type="text"
+                   placeholder="user@10.0.1.100@psmp-gateway.example.com"
+                   value="{{ _iap_cm_target }}"
+                   {% if _iap_transport == 'control_master' %}required{% endif %}
+                   style="font-family:var(--mono); font-size:13px;">
+            <span class="hint">The full SSH destination string — e.g. <code>user@target-host@psmp-gateway.example.com</code> for CyberArk PSMP.</span>
+          </div>
+          <div class="field">
+            <label for="iap_cm_port">SSH port</label>
+            <input id="iap_cm_port" name="iap_cm_port" type="number" min="1" max="65535"
+                   value="{{ _iap_cm_port }}"
+                   style="width:120px;">
+            <span class="hint">Port for the ControlMaster master connection only (default 22). The command preview below adds <code>-p &lt;port&gt;</code> automatically when this isn't 22.</span>
+          </div>
+          <div style="grid-column: 1 / -1; font-size:12px; color:var(--text-2);
+                      background:var(--surface-1); border:1px solid var(--line);
+                      border-radius:6px; padding:10px 12px; line-height:1.6;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px;">
+              <strong style="color:var(--text);">Open the ControlMaster session before running Atlas:</strong>
+              <button type="button" id="cm-cmd-copy"
+                      class="btn sm"
+                      style="font-size:11px; padding:4px 10px; flex-shrink:0;"
+                      data-default-label="Copy"
+                      aria-label="Copy ControlMaster command to clipboard">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
+                     style="vertical-align:-1px; margin-right:4px;">
+                  <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>Copy
+              </button>
+            </div>
+            <code id="cm-cmd-preview"
+                  style="font-family:var(--mono); font-size:11.5px; word-break:break-all;
+                         display:block; margin-bottom:6px; padding:8px 10px;
+                         background:var(--surface-2); border:1px solid var(--line);
+                         border-radius:4px; user-select:all; white-space:pre-wrap;
+                         color:var(--text);"></code>
+            <span><code>ControlPersist=10m</code> keeps the socket alive long enough for a full capture. Atlas multiplexes all connections through the socket — MongoDB and Redis nodes use the separate SSH settings below.</span>
+          </div>
+        </div>
+
+        {# ── Local transport info ────────────────────────────────────────── #}
+        <div id="iap-local-info"
+             style="display:{% if _iap_transport == 'local' %}block{% else %}none{% endif %};">
+          <div class="flash flash--info" style="margin:0; display:flex; gap:10px; align-items:flex-start;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                 style="margin-top:2px; flex-shrink:0;">
+              <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+            <div style="font-size:12px;">
+              <strong>Local transport</strong> — Atlas reads config files and runs commands directly on
+              the local machine without SSH. Use this only when the Atlas CLI is installed on the
+              Platform (IAP) server itself. MongoDB and Redis nodes still connect via SSH.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# Shared SSH credentials — apply to every host above except Kubernetes/Custom. #}
+      <div id="topo-ssh-shared" class="topo-mode-pane"
+           style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:14px;
+                  padding-top:12px; border-top:1px dashed var(--line);">
+        <div class="field">
+          <label for="ssh_user">SSH user</label>
+          <input id="ssh_user" name="ssh_user" type="text"
+                 placeholder="atlas"
+                 value="{{ _ssh_user_default }}"
+                 style="font-family:var(--mono); font-size:13px;">
+          <span class="hint">Same user is used for every SSH node in this environment.</span>
+        </div>
+        <div class="field">
+          <label for="ssh_port">SSH port</label>
+          <input id="ssh_port" name="ssh_port" type="number" min="1" max="65535"
+                 value="{{ _ssh_port_default }}"
+                 style="font-family:var(--mono); font-size:13px;">
+        </div>
+      </div>
+    </div>
+  </fieldset>
+
+  <style nonce="{{ csp_nonce }}">
+    .topology-ssh-box {
+      border: 1px solid var(--line-2);
+      border-left: 3px solid var(--accent);
+      border-radius: var(--r-lg, 10px);
+      background: var(--accent-soft);
+      padding: 14px 16px 6px;
+      margin-top: 8px;
+    }
+    .topology-ssh-box__head {
+      display: flex; gap: 10px; align-items: flex-start;
+      margin: -2px -2px 14px;
+      padding: 8px 10px 12px;
+      border-bottom: 1px solid var(--line-2);
+    }
+    .topology-ssh-box__head svg {
+      width: 18px; height: 18px; flex-shrink: 0; color: var(--accent);
+      margin-top: 2px;
+    }
+    .topology-ssh-box__title {
+      font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px;
+    }
+    .topology-ssh-box__sub {
+      font-size: 12px; line-height: 1.55; color: var(--text-2);
+    }
+    .topology-ssh-box__sub code {
+      font-family: var(--mono);
+      background: var(--surface);
+      border: 1px solid var(--line-2);
+      border-radius: 3px;
+      padding: 0 4px;
+      font-size: 11.5px;
+    }
+    /* User-supplied segments inside the live ControlMaster command preview.
+       Highlighted in the theme accent so the parts that come from the form
+       inputs are visually distinct from the boilerplate ssh -M flags. */
+    #cm-cmd-preview .cm-cmd-user {
+      color: var(--accent);
+      font-weight: 600;
+    }
+    #cm-cmd-preview .cm-cmd-user.cm-cmd-placeholder {
+      color: var(--text-3);
+      font-weight: 500;
+      font-style: italic;
+    }
+  </style>
+
+  <fieldset>
+    <legend>Kubernetes <span style="color:var(--text-3); font-weight:400;">(Extended only)</span></legend>
+    <div class="field field--row">
+      <input id="use_kubectl" name="use_kubectl" type="checkbox" value="1"
+             {% if d.get('use_kubectl') %}checked{% endif %}
+             onchange="atlasK8sToggle(this.checked)">
+      <label for="use_kubectl">This deployment runs on Kubernetes</label>
+    </div>
+    <div id="k8s-fields" style="display:{% if d.get('use_kubectl') %}flex{% else %}none{% endif %}; flex-direction:column; gap:12px; padding-left:26px; border-left:2px solid var(--line); margin-top:4px;">
+
+      {# ── values.yaml ──────────────────────────────────────────────────── #}
+      <div class="field">
+        <label for="values_yaml_path">values.yaml path</label>
+        <input id="values_yaml_path" name="values_yaml_path" type="text"
+               value="{{ d.get('values_yaml_path') or '' }}"
+               onchange="atlasK8sSourceCheck()" oninput="atlasK8sSourceCheck()">
+        <span class="hint">Path to your IAP Helm chart values.yaml (used with <code>helm install -f values.yaml</code>). Optional if kubectl is configured.</span>
+      </div>
+      <div class="field">
+        <label for="iag5_values_yaml_path">IAG5 values.yaml path</label>
+        <input id="iag5_values_yaml_path" name="iag5_values_yaml_path" type="text" value="{{ d.get('iag5_values_yaml_path') or '' }}">
+        <span class="hint">Only required when IAG5 (Automation Gateway 5) is part of this deployment.</span>
+      </div>
+
+      {# ── kubectl ──────────────────────────────────────────────────────── #}
+      <div class="field">
+        <label for="kubectl_context">kubectl context</label>
+        <input id="kubectl_context" name="kubectl_context" type="text"
+               value="{{ d.get('kubectl_context') or '' }}"
+               onchange="atlasK8sSourceCheck()" oninput="atlasK8sSourceCheck()"
+               hx-get="/environments/check-kubectl"
+               hx-trigger="load delay:200ms"
+               hx-target="#kubectl-binary-status"
+               hx-swap="innerHTML"
+               hx-vals='js:{"path": document.getElementById("kubectl_binary_path").value}'>
+        <span class="hint">Leave blank to use the current kubectl context.</span>
+      </div>
+      <div class="field">
+        <label for="kubectl_namespace">kubectl namespace</label>
+        <input id="kubectl_namespace" name="kubectl_namespace" type="text" value="{{ d.get('kubectl_namespace') or '' }}">
+        <span class="hint">Namespace where IAP pods run (e.g. <code>itential</code>, <code>default</code>).</span>
+      </div>
+
+      {# ── Binary check ─────────────────────────────────────────────────── #}
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <span id="kubectl-binary-status"
+                hx-get="/environments/check-kubectl"
+                hx-trigger="load delay:100ms"
+                hx-swap="innerHTML"
+                hx-vals='js:{"path": "{{ d.get("kubectl_binary_path") or "" }}"}'
+                style="font-size:12px;"></span>
+          <button type="button" class="btn"
+                  style="padding:3px 10px; font-size:12px;"
+                  hx-get="/environments/check-kubectl"
+                  hx-target="#kubectl-binary-status"
+                  hx-swap="innerHTML"
+                  hx-vals='js:{"path": document.getElementById("kubectl_binary_path").value}'
+                  onclick="return false;">Re-check binary</button>
+        </div>
+        <div class="field" id="kubectl-binary-path-field"
+             style="display:{% if d.get('kubectl_binary_path') %}flex{% else %}none{% endif %}; flex-direction:column; gap:4px;">
+          <label for="kubectl_binary_path" style="font-size:12px; color:var(--text-2);">kubectl binary path</label>
+          <input id="kubectl_binary_path" name="kubectl_binary_path" type="text"
+                 value="{{ d.get('kubectl_binary_path') or '' }}"
+                 placeholder="/usr/local/bin/kubectl"
+                 style="font-family:var(--mono); font-size:13px;"
+                 oninput="atlasK8sBinaryCheck(this.value)">
+          <span class="hint">Full path to the kubectl binary. Leave blank to use the system PATH.</span>
+        </div>
+        <a href="#" style="font-size:12px; color:var(--accent);"
+           onclick="atlasK8sShowBinaryPath(); return false;">kubectl not in PATH? Specify binary location</a>
+      </div>
+
+      {# ── No-source warning ────────────────────────────────────────────── #}
+      <div id="k8s-no-source-warn"
+           style="display:none; padding:10px 14px; border-radius:var(--r-lg);
+                  background:color-mix(in srgb, var(--orange,#fb923c) 12%, transparent);
+                  border:1px solid color-mix(in srgb, var(--orange,#fb923c) 40%, transparent);
+                  font-size:12px; color:var(--text-2);">
+        <strong style="color:var(--orange,#fb923c);">⚠ No data source configured</strong><br>
+        Atlas needs either a <strong>values.yaml path</strong> or a <strong>kubectl context</strong>
+        to collect data from a Kubernetes deployment. Without at least one, capture will not run.<br>
+        <span style="margin-top:6px; display:block; color:var(--text-3);">
+          If you don't have kubectl access or a values file, this may not be a Kubernetes
+          environment — consider switching the deployment mode to Standalone or HA2.
+        </span>
+      </div>
+
+    </div>
+  </fieldset>
+  </div>{# /step 3 #}
+  {% endif %}{# /not is_standard #}
+
+  {# ── Review (Legacy + summary) ────────────────────────────────────────
+     Step number is dynamic — step 4 in Extended mode (after Topology),
+     step 3 in Standard mode (Topology is skipped entirely). #}
+  <div data-wizard-step="{{ _step_review }}" x-show="!wizardOn || step === {{ _step_review }}" x-cloak>
+  <fieldset>
+    <legend>Legacy</legend>
+    <div class="field">
+      <label for="legacy_profile">Legacy profile</label>
+      <select id="legacy_profile" name="legacy_profile">
+        <option value="" {% if not d.get('legacy_profile') %}selected{% endif %}>None (Platform 6+)</option>
+        <option value="2023" {% if d.get('legacy_profile') == '2023' %}selected{% endif %}>Platform 2023.x</option>
+      </select>
+    </div>
+  </fieldset>
+
+  {# Read-only summary, only shown in the wizard (create flow). Pulls live
+     values from the form's inputs so they reflect whatever the user typed
+     in the prior steps. Empty fields render as a muted dash.
+
+     `v()` is intentionally defined on the parent atlasEnvWizard scope
+     (not as a private inner x-data) so the method can touch `this.step`
+     internally and register the wizard's current step as a reactive
+     dependency. Without that dep, Alpine snapshots each x-text once at
+     component-init time, captures the empty initial value of every text
+     input, and never re-evaluates when the user fills the form out —
+     leaving Name / Platform URI / OAuth client ID / Gateway 4 URI /
+     SSH key permanently dashed even after typing. The dep wiring lives
+     inside v() itself (see its body for the history of this fix). #}
+  <fieldset x-show="wizardOn">
+    <legend>Review</legend>
+    <div class="grid grid-cols-2 gap-x-6 gap-y-2 text-[13px]">
+      <div><span class="text-text-3">Name</span><div class="font-mono" x-text="v('name')"></div></div>
+      <div><span class="text-text-3">Tier</span><div class="font-mono" x-text="v('tier')"></div></div>
+      <div><span class="text-text-3">Platform URI</span><div class="font-mono truncate" x-text="v('platform_uri')"></div></div>
+      <div><span class="text-text-3">OAuth client ID</span><div class="font-mono truncate" x-text="v('platform_client_id')"></div></div>
+      <div><span class="text-text-3">Credential backend</span><div class="font-mono" x-text="v('credential_backend')"></div></div>
+      <div><span class="text-text-3">Gateway 4 URI</span><div class="font-mono truncate" x-text="v('gateway4_uri')"></div></div>
+      {# Deployment mode + SSH key live in the Topology step, which Standard
+         doesn't render — skip the Review rows so they don't show as
+         meaningless dashes. #}
+      {% if not is_standard %}
+      <div><span class="text-text-3">Deployment mode</span><div class="font-mono" x-text="v('deployment_mode')"></div></div>
+      <div><span class="text-text-3">SSH key</span><div class="font-mono truncate" x-text="v('ssh_key')"></div></div>
+      {% endif %}
+    </div>
+  </fieldset>
+  </div>{# /review step #}
+
+  {# Wizard navigation — Prev / Next / Submit. Edit mode (wizardOn === false)
+     collapses back to a single Submit + Cancel row. The browser-native
+     `submit` is left enabled on the final step so Enter keys still work;
+     intercepts on earlier steps live in the form's @submit handler. #}
+  <div class="form-actions">
+    <button type="button" class="btn" @click="prev()"
+            x-show="wizardOn && step > 1" x-cloak>← Back</button>
+    <button type="button" class="btn primary" @click="next()"
+            x-show="wizardOn && step < total" x-cloak>Next →</button>
+    <button type="submit" class="btn primary"
+            x-show="!wizardOn || step === total">{% if mode == 'create' %}Create environment{% else %}Save changes{% endif %}</button>
+    <a class="btn" href="/environments">Cancel</a>
+  </div>
+</form>
+
+<script nonce="{{ csp_nonce }}">
+  // ── Kubernetes section ────────────────────────────────────────────────────
+
+  function atlasK8sToggle(checked) {
+    var fields = document.getElementById('k8s-fields');
+    if (fields) fields.style.display = checked ? 'flex' : 'none';
+    if (checked) {
+      atlasK8sSourceCheck();
+      // Trigger binary check on first show
+      htmx.trigger(document.getElementById('kubectl-binary-status'), 'load');
+    }
+  }
+
+  function atlasK8sSourceCheck() {
+    var valuesPath = (document.getElementById('values_yaml_path') || {}).value || '';
+    var context = (document.getElementById('kubectl_context') || {}).value || '';
+    var binaryPath = (document.getElementById('kubectl_binary_path') || {}).value || '';
+    var warn = document.getElementById('k8s-no-source-warn');
+    if (!warn) return;
+    // Show warning only when neither source is filled in
+    warn.style.display = (!valuesPath.trim() && !context.trim() && !binaryPath.trim()) ? 'block' : 'none';
+  }
+
+  function atlasK8sShowBinaryPath() {
+    var field = document.getElementById('kubectl-binary-path-field');
+    if (field) field.style.display = 'flex';
+  }
+
+  function atlasK8sBinaryCheck(val) {
+    // Debounced HTMX trigger when user types in the binary path field
+    clearTimeout(window._k8sBinaryTimer);
+    window._k8sBinaryTimer = setTimeout(function () {
+      var statusEl = document.getElementById('kubectl-binary-status');
+      if (!statusEl) return;
+      htmx.ajax('GET', '/environments/check-kubectl?path=' + encodeURIComponent(val), {
+        target: '#kubectl-binary-status',
+        swap: 'innerHTML',
+      });
+    }, 400);
+  }
+
+  // ── IAP transport selector ────────────────────────────────────────────────
+  // Show/hide ControlMaster and Local info blocks, and toggle the required
+  // attribute on the CM fields so the browser blocks form submit before the
+  // server has to.
+  function atlasIapTransportSync(val) {
+    var cmFields = document.getElementById('iap-cm-fields');
+    var localInfo = document.getElementById('iap-local-info');
+    if (cmFields) cmFields.style.display = (val === 'control_master') ? 'grid' : 'none';
+    if (localInfo) localInfo.style.display = (val === 'local') ? 'block' : 'none';
+    var sockInput = document.getElementById('iap_cm_socket');
+    var tgtInput = document.getElementById('iap_cm_target');
+    var cmRequired = (val === 'control_master');
+    if (sockInput) sockInput.required = cmRequired;
+    if (tgtInput) tgtInput.required = cmRequired;
+  }
+  // Sync once on load so the required attribute matches the rendered selector.
+  (function () {
+    var sel = document.getElementById('iap_transport');
+    if (sel) atlasIapTransportSync(sel.value);
+  })();
+
+  // Topology applies only in Extended mode — hide the section when the user
+  // picks Standard so the form doesn't ask for SSH/host info we'd ignore.
+  (function () {
+    const tierSel = document.getElementById('tier');
+    const topo = document.getElementById('topology-fieldset');
+    if (!tierSel || !topo) return;
+    const sync = () => {
+      const isStandard = (tierSel.value || '').toLowerCase() === 'standard';
+      topo.style.display = isStandard ? 'none' : '';
+    };
+    tierSel.addEventListener('change', sync);
+    sync();
+  })();
+
+  // Deployment-mode pane switcher. Each pane has id ``topo-<mode>``; the
+  // shared SSH credentials pane (``topo-ssh-shared``) is shown for SSH-based
+  // modes (standalone, ha2) and hidden for kubernetes/custom.
+  (function () {
+    const modeSel = document.getElementById('deployment_mode');
+    if (!modeSel) return;
+    const panes = {
+      standalone: document.getElementById('topo-standalone'),
+      ha2:        document.getElementById('topo-ha2'),
+      kubernetes: document.getElementById('topo-kubernetes'),
+      custom:     document.getElementById('topo-custom'),
+    };
+    const sshShared = document.getElementById('topo-ssh-shared');
+    const transportShared = document.getElementById('topo-iap-transport-shared');
+    const ha2Note = document.getElementById('iap-transport-ha2-note');
+    const useKubectl = document.getElementById('use_kubectl');
+    const k8sFields = document.getElementById('k8s-fields');
+
+    const sshModes = new Set(['standalone', 'ha2']);
+    const paneDisplay = {
+      standalone: 'grid',
+      ha2: 'flex',
+      kubernetes: 'block',
+      custom: 'block',
+    };
+
+    // Show/hide the right deployment-mode pane plus the shared transport
+    // and SSH-credentials panes. Runs on initial load and on every change.
+    const syncPanes = () => {
+      const mode = (modeSel.value || 'standalone').toLowerCase();
+      Object.entries(panes).forEach(([k, el]) => {
+        if (!el) return;
+        el.style.display = (k === mode) ? (paneDisplay[k] || '') : 'none';
+      });
+      if (sshShared) sshShared.style.display = sshModes.has(mode) ? 'grid' : 'none';
+      if (transportShared) transportShared.style.display = sshModes.has(mode) ? 'flex' : 'none';
+      // The "primary only" hint after the transport selector is HA2-specific.
+      if (ha2Note) ha2Note.style.display = (mode === 'ha2') ? 'inline' : 'none';
+    };
+
+    // Mirror the dropdown into the use_kubectl checkbox: ticked when mode
+    // becomes Kubernetes, unticked when the user picks anything else.
+    // Only runs on user-initiated changes — leaves saved state untouched
+    // on initial load even if it's inconsistent (we don't want to silently
+    // flip a checkbox the user didn't just touch).
+    const syncKubectlOnChange = () => {
+      if (!useKubectl) return;
+      const mode = (modeSel.value || 'standalone').toLowerCase();
+      const wantChecked = (mode === 'kubernetes');
+      if (useKubectl.checked !== wantChecked) {
+        useKubectl.checked = wantChecked;
+        if (k8sFields) k8sFields.style.display = wantChecked ? 'flex' : 'none';
+      }
+    };
+
+    modeSel.addEventListener('change', () => {
+      syncKubectlOnChange();
+      syncPanes();
+    });
+    syncPanes();
+  })();
+
+  // Live ControlMaster command builder. Reads the three CM input fields
+  // (socket path, SSH destination, port) and rebuilds the ssh -M command
+  // shown above the inputs every time the user types. User-supplied segments
+  // are wrapped in spans so CSS highlights them in the theme accent — the
+  // unfilled placeholders render in a dimmer/italic style. The Copy button
+  // flattens the segments back to plain text.
+  (function () {
+    const sockInput = document.getElementById('iap_cm_socket');
+    const tgtInput  = document.getElementById('iap_cm_target');
+    const portInput = document.getElementById('iap_cm_port');
+    const preview   = document.getElementById('cm-cmd-preview');
+    const copyBtn   = document.getElementById('cm-cmd-copy');
+    if (!preview || !copyBtn) return;
+
+    // Returns a list of {text, kind} segments. Kind is one of:
+    //   'static'      — boilerplate flags rendered in the default text color
+    //   'user'        — text the user typed; rendered in the accent color
+    //   'placeholder' — empty-input placeholder (e.g. <socket-path>); dimmed
+    function buildSegments() {
+      const sockRaw = sockInput ? sockInput.value.trim() : '';
+      const tgtRaw  = tgtInput  ? tgtInput.value.trim()  : '';
+      const portRaw = portInput ? portInput.value : '';
+      const port = portRaw ? parseInt(portRaw, 10) : NaN;
+
+      const segs = [];
+      segs.push({ text: 'ssh -M -S ', kind: 'static' });
+      if (sockRaw) segs.push({ text: sockRaw, kind: 'user' });
+      else         segs.push({ text: '<socket-path>', kind: 'placeholder' });
+      if (Number.isFinite(port) && port > 0 && port !== 22) {
+        segs.push({ text: ' -p ', kind: 'static' });
+        segs.push({ text: String(port), kind: 'user' });
+      }
+      segs.push({ text: ' -o ControlPersist=10m -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -fN ', kind: 'static' });
+      if (tgtRaw) segs.push({ text: tgtRaw, kind: 'user' });
+      else        segs.push({ text: '<ssh-destination>', kind: 'placeholder' });
+      return segs;
+    }
+
+    function buildCommand() {
+      return buildSegments().map(function (s) { return s.text; }).join('');
+    }
+
+    function render() {
+      // Rebuild via DOM nodes so input text is rendered as text (not HTML)
+      // and span classes drive the highlight. textContent on a fresh span
+      // keeps user input XSS-safe.
+      preview.replaceChildren();
+      buildSegments().forEach(function (seg) {
+        if (seg.kind === 'static') {
+          preview.appendChild(document.createTextNode(seg.text));
+          return;
+        }
+        const span = document.createElement('span');
+        span.className = 'cm-cmd-user' + (seg.kind === 'placeholder' ? ' cm-cmd-placeholder' : '');
+        span.textContent = seg.text;
+        preview.appendChild(span);
+      });
+    }
+
+    [sockInput, tgtInput, portInput].forEach(function (el) {
+      if (el) el.addEventListener('input', render);
+    });
+    render();
+
+    let resetTimer = null;
+    function flashLabel(text, ok) {
+      copyBtn.textContent = text;
+      copyBtn.style.color = ok ? 'var(--ok, #99CA3C)' : 'var(--bad, #FF6633)';
+      clearTimeout(resetTimer);
+      resetTimer = setTimeout(function () {
+        copyBtn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" '
+          + 'stroke="currentColor" stroke-width="2.2" stroke-linecap="round" '
+          + 'stroke-linejoin="round" style="vertical-align:-1px; margin-right:4px;">'
+          + '<rect x="9" y="9" width="13" height="13" rx="2"/>'
+          + '<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'
+          + (copyBtn.dataset.defaultLabel || 'Copy');
+        copyBtn.style.color = '';
+      }, 1500);
+    }
+
+    copyBtn.addEventListener('click', async function () {
+      const text = buildCommand();
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+          flashLabel('✓ Copied', true);
+          return;
+        }
+        // Fallback for older browsers / non-secure contexts.
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        flashLabel(ok ? '✓ Copied' : 'Copy failed', ok);
+      } catch (e) {
+        flashLabel('Copy failed', false);
+      }
+    });
+  })();
+
+  // ── Wizard component ────────────────────────────────────────────────
+  // Drives the create-environment multi-step UX. In edit mode `wizardOn`
+  // stays false (set by x-init in form.html) so the form behaves exactly
+  // as it always has — every fieldset visible, single submit button.
+  //
+  // Registration must run on EITHER an `alpine:init` event (cold load)
+  // OR immediately if Alpine is already running. Without that second
+  // path the form renders blank when reached via hx-boost: body.innerHTML
+  // is swapped, this <script> re-executes and adds a fresh alpine:init
+  // listener, but the event already fired on the original page so the
+  // listener never runs, Alpine.data('atlasEnvWizard') is never called,
+  // and the wizard's x-data scope can't be constructed — leaving every
+  // x-cloak step hidden by [x-cloak] { display: none }.
+  function _registerEnvWizard() {
+    if (!window.Alpine || typeof window.Alpine.data !== 'function') return;
+    window.Alpine.data('atlasEnvWizard', () => ({
+      wizardOn: false,
+      step: 1,
+      maxStep: 1,
+      // Tier-driven step model: Standard skips Topology (SSH + Topology +
+      // Kubernetes are all Extended-only) so the wizard becomes 3 steps.
+      // Values rendered at template time from Jinja so they're locked in
+      // for the lifetime of this page render.
+      total: {{ _step_total }},
+      labels: {{ (['Identity', 'Connection', 'Review'] if is_standard else ['Identity', 'Connection', 'Topology', 'Review']) | tojson }},
+
+      // Run native HTML validation on every input/select inside the current
+      // step. Returning false here keeps the user on the page so the browser
+      // can render its own error bubble next to the offending field.
+      _validateCurrentStep() {
+        const root = this.$root.querySelector('[data-wizard-step="' + this.step + '"]');
+        if (!root) return true;
+        const els = root.querySelectorAll('input, select, textarea');
+        for (const el of els) {
+          if (el.disabled || el.type === 'hidden') continue;
+          if (!el.checkValidity()) {
+            el.reportValidity();
+            return false;
+          }
+        }
+        return true;
+      },
+
+      next() {
+        if (this.step >= this.total) return;
+        if (!this._validateCurrentStep()) return;
+        this.step += 1;
+        if (this.step > this.maxStep) this.maxStep = this.step;
+        this.$nextTick(() => {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+      },
+      prev() {
+        if (this.step <= 1) return;
+        this.step -= 1;
+        this.$nextTick(() => {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+      },
+      jump(n) {
+        // Allow jumping to any step the user has already reached. Forward
+        // jumps are gated by maxStep so an unsubmitted step can't be skipped.
+        if (n < 1 || n > this.maxStep) return;
+        this.step = n;
+      },
+
+      // Read a form input's current value for the Review step. SELECT
+      // elements report the selected option's display text (more useful
+      // for "Standalone — single instance per role" than the bare value
+      // "standalone"); other inputs report el.value verbatim. Empty
+      // strings render as a muted em-dash.
+      //
+      // The first line touches `this.step` so Alpine's reactivity engine
+      // tracks the current wizard step as a dependency of this method —
+      // x-text="v('name')" would otherwise snapshot once at init and
+      // never re-evaluate when the user fills the form out and clicks
+      // Next. Previously the template prefixed each x-text with `step, `
+      // to wire the same dependency, but Alpine wraps expressions as
+      // `__self.result = ${expr}`, and assignment binds tighter than
+      // comma — `__self.result = step, v('name')` parses as
+      // `(__self.result = step), v('name')`, so v()'s return value was
+      // discarded and every Review row showed the literal step number.
+      v(id) {
+        void this.step;
+        const el = document.getElementById(id);
+        if (!el) return '—';
+        const opt = el.tagName === 'SELECT' && el.options[el.selectedIndex];
+        const out = (opt ? (opt.text || opt.value) : el.value) || '';
+        return out.trim() || '—';
+      },
+    }));
+  }
+  if (window.Alpine && typeof window.Alpine.data === 'function') {
+    _registerEnvWizard();
+    // Alpine's MutationObserver may have already attempted to process this
+    // form before the script tag below ran (htmx swaps body.innerHTML
+    // first, then re-creates and runs <script> elements; depending on
+    // microtask ordering, Alpine's MO callback can fire either before or
+    // after script execution). If it tried and the registration was
+    // missing, the form's x-data scope failed to construct and every
+    // x-cloak step is still hidden. Force a re-init now that the data
+    // factory exists. initTree is idempotent on cleanly-initialized
+    // subtrees, so this is safe in the lucky-ordering case too.
+    if (typeof window.Alpine.initTree === 'function') {
+      document.querySelectorAll('[x-data*="atlasEnvWizard"]').forEach(function (el) {
+        try { window.Alpine.initTree(el); } catch (_) { /* noop */ }
+      });
+    }
+  } else {
+    document.addEventListener('alpine:init', _registerEnvWizard);
+  }
+</script>
+
+  </div>
+</section>
+
+{% endblock %}

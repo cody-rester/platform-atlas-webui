@@ -1,0 +1,487 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Platform Atlas{% endblock %}
+{% block crumb %}Dashboard{% endblock %}
+{% block content %}
+
+{# Per-card visibility lives in localStorage (key
+   `atlas-dashboard-visibility-v3`). v3 supersedes v1/v2 which carried
+   gridstack layout data — cleared automatically on first load.
+   The drag/resize editor was removed in favor of a simpler
+   show/hide-only model; revisit if/when free-form layout becomes a
+   real product need. #}
+
+<style>
+  /* Capture-running pulse — kept for the active-session card. */
+  @keyframes sc-capture-pulse {
+    0%, 100% { box-shadow: 0 0 0 1px rgba(197,37,143,0.35), 0 8px 30px rgba(197,37,143,0.18); }
+    50%      { box-shadow: 0 0 0 1px rgba(197,37,143,0.55), 0 12px 40px rgba(197,37,143,0.32); }
+  }
+  .sc-capture-pulse { animation: sc-capture-pulse 2.4s ease-in-out infinite; }
+
+  /* Hover-target glow — applied to the live card while the user
+     mouses over its label in the customize panel, so they can visually
+     confirm WHICH card is about to be hidden. Theme-aware via
+     var(--accent) + color-mix; layered ring + soft halo + far-out wash
+     so it's unmistakable on dark and light themes alike.
+
+     Scoped only to currently-visible widgets — Alpine doesn't apply this
+     class when the card is in `hidden` state, since glowing an invisible
+     element is pointless. */
+  [data-widget-id] { transition: box-shadow 220ms ease-out; }
+  .sc-hover-glow {
+    box-shadow:
+      0 0 0 2px color-mix(in oklab, var(--accent) 55%, transparent),
+      0 8px 30px color-mix(in oklab, var(--accent) 28%, transparent),
+      0 0 60px color-mix(in oklab, var(--accent) 14%, transparent) !important;
+    position: relative;
+    z-index: 5;
+  }
+</style>
+
+{# ── Hero ─────────────────────────────────────────────────────────── #}
+<header class="flex items-start justify-between gap-6 mb-5">
+  <div>
+    <div class="eyebrow"><span class="dot"></span> Welcome back</div>
+    <h1 class="text-[36px] leading-[1.05] font-semibold tracking-[-0.038em] mt-2 mb-1.5">
+      {{ organization_name or 'Workspace' }},
+      <em class="not-italic text-text-3">at a glance</em>
+    </h1>
+    <p class="text-[14px] text-text-2 max-w-[64ch]">
+      Running in <b class="text-text font-semibold">{{ tier|capitalize }} mode</b>{% if tier == 'standard' %}, audit via Platform OAuth{% else %}, full infrastructure audit{% endif %}.
+      {% if active_env and active_env.platform_uri %}
+        Targeting <code class="font-mono text-[12.5px] text-text-2 bg-bg-2 border border-line rounded px-1.5 py-0.5">{{ active_env.platform_uri }}</code>.
+      {% endif %}
+      {% if active_session %}<b class="text-text font-semibold">1 session</b> is currently active.{% else %}No live sessions.{% endif %}
+    </p>
+  </div>
+  <div class="flex items-center gap-2 shrink-0">
+    <a class="btn" href="/reports">Reports</a>
+    <a class="btn primary" href="/sessions/new">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+      Start session
+    </a>
+  </div>
+</header>
+
+{# ── Customize toolbar + cards ────────────────────────────────────── #}
+<div x-data="dashboardEditor" x-init="init()">
+
+  <div class="flex items-center gap-2 flex-wrap mb-3">
+    <button type="button" @click="customizing = !customizing"
+            class="btn"
+            :class="customizing && 'primary'">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1.5">
+        <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+      <span x-show="!customizing">Customize cards</span>
+      <span x-show="customizing" x-cloak>Done customizing</span>
+    </button>
+
+    <div x-show="customizing" x-cloak
+         @mouseleave="hoveredId = null"
+         class="flex items-center gap-2 flex-wrap">
+      <span class="text-[11.5px] text-text-3 ml-1 mr-1">Show:</span>
+      <template x-for="w in widgets" :key="w.id">
+        <label class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-surface-2 border border-line cursor-pointer hover:bg-bg-2 text-[12px] transition-colors"
+               x-show="!w.conditional || w.present"
+               @mouseenter="hoverEnter(w.id)">
+          <input type="checkbox"
+                 :checked="!hidden.includes(w.id)"
+                 @change="toggle(w.id)"
+                 class="accent-accent">
+          <span x-text="w.label"></span>
+        </label>
+      </template>
+      <button type="button" @click="resetVisibility()"
+              class="btn sm ml-2"
+              title="Show all cards again">
+        Reset
+      </button>
+    </div>
+
+    <span x-show="!customizing && hidden.length > 0" x-cloak
+          class="ml-auto text-[11.5px] text-text-3 italic"
+          x-text="hidden.length + ' card' + (hidden.length === 1 ? '' : 's') + ' hidden'"></span>
+  </div>
+
+  {# ── KPI tiles row ──────────────────────────────────────────────── #}
+  {# 4 individual cards in a responsive grid. Hiding one removes it from
+     the grid; CSS Grid auto-reflows the remaining tiles into the freed
+     columns at the current breakpoint. #}
+  <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+
+    <a href="/sessions"
+       data-widget-id="kpi-sessions"
+       :class="{ 'hidden': hidden.includes('kpi-sessions'), 'sc-hover-glow': hoveredId === 'kpi-sessions' }"
+       class="group flex flex-col h-full rounded-lg bg-surface border border-line p-3.5
+              transition-colors hover:border-line-2 hover:bg-surface-2 text-text">
+      <div class="flex items-center justify-between text-[10.5px] uppercase tracking-[0.1em] font-medium text-text-3">
+        <span>Sessions</span>
+        <span class="inline-flex items-center justify-center w-[22px] h-[22px] rounded-md bg-surface-2 border border-line text-text-2">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="3" width="16" height="18" rx="2"/></svg>
+        </span>
+      </div>
+      <div class="flex items-baseline gap-2 mt-3.5 mb-1.5">
+        <span class="text-[34px] leading-none font-medium tracking-[-0.03em] tabular-nums">{{ kpis.session_count }}</span>
+        {% if active_session %}<span class="font-mono text-[11px] text-ok">1 live</span>{% endif %}
+      </div>
+      {% if not kpis.session_count %}
+        <span class="text-[11.5px] text-text-3 leading-snug">Each session captures, validates, and reports against one environment.</span>
+      {% endif %}
+      <div class="mt-auto flex justify-between text-[11.5px] text-text-3 pt-3">
+        <span class="text-text border-b border-line-2 pb-px">Manage</span>
+        <span class="opacity-70 font-mono">audit/sessions</span>
+      </div>
+    </a>
+
+    <a href="/environments"
+       data-widget-id="kpi-environments"
+       :class="{ 'hidden': hidden.includes('kpi-environments'), 'sc-hover-glow': hoveredId === 'kpi-environments' }"
+       class="group flex flex-col h-full rounded-lg bg-surface border border-line p-3.5
+              transition-colors hover:border-line-2 hover:bg-surface-2 text-text">
+      <div class="flex items-center justify-between text-[10.5px] uppercase tracking-[0.1em] font-medium text-text-3">
+        <span>Environments</span>
+        <span class="inline-flex items-center justify-center w-[22px] h-[22px] rounded-md bg-surface-2 border border-line text-text-2">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7l9-4 9 4-9 4-9-4z"/></svg>
+        </span>
+      </div>
+      <div class="flex items-baseline gap-2 mt-3.5 mb-1.5">
+        <span class="text-[34px] leading-none font-medium tracking-[-0.03em] tabular-nums">{{ kpis.env_count }}</span>
+      </div>
+      {% if not kpis.env_count %}
+        <span class="text-[11.5px] text-text-3 leading-snug">Environments hold one Platform's connection and credentials.</span>
+      {% endif %}
+      <div class="mt-auto flex justify-between text-[11.5px] text-text-3 pt-3">
+        <span class="text-text border-b border-line-2 pb-px">Manage</span>
+        <span class="opacity-70 font-mono">config/environments</span>
+      </div>
+    </a>
+
+    <a href="/rulesets"
+       data-widget-id="kpi-rules"
+       :class="{ 'hidden': hidden.includes('kpi-rules'), 'sc-hover-glow': hoveredId === 'kpi-rules' }"
+       class="group flex flex-col h-full rounded-lg bg-surface border border-line p-3.5
+              transition-colors hover:border-line-2 hover:bg-surface-2 text-text">
+      <div class="flex items-center justify-between text-[10.5px] uppercase tracking-[0.1em] font-medium text-text-3">
+        <span>Active rules</span>
+        <span class="inline-flex items-center justify-center w-[22px] h-[22px] rounded-md bg-surface-2 border border-line text-text-2">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m9 11 3 3L22 4"/></svg>
+        </span>
+      </div>
+      <div class="flex items-baseline gap-2 mt-3.5 mb-1.5">
+        <span class="text-[34px] leading-none font-medium tracking-[-0.03em] tabular-nums">{{ kpis.rule_count }}</span>
+        {% if ruleset and ruleset.name %}
+          <span class="font-mono text-[11px] text-text-3 truncate">{{ ruleset.name }}</span>
+        {% endif %}
+      </div>
+      {% if not kpis.rule_count %}
+        <span class="text-[11.5px] text-text-3 leading-snug">No ruleset loaded — rule profiles enable or disable groups of checks.</span>
+      {% endif %}
+      <div class="mt-auto flex justify-between text-[11.5px] text-text-3 pt-3">
+        <span class="text-text border-b border-line-2 pb-px">Inspect</span>
+        <span class="opacity-70 font-mono">config/rulesets</span>
+      </div>
+    </a>
+
+    <a href="/jobs"
+       data-widget-id="kpi-jobs"
+       :class="{ 'hidden': hidden.includes('kpi-jobs'), 'sc-hover-glow': hoveredId === 'kpi-jobs' }"
+       class="group flex flex-col h-full rounded-lg bg-surface border border-line p-3.5
+              transition-colors hover:border-line-2 hover:bg-surface-2 text-text">
+      <div class="flex items-center justify-between text-[10.5px] uppercase tracking-[0.1em] font-medium text-text-3">
+        <span>Running jobs</span>
+        <span class="inline-flex items-center justify-center w-[22px] h-[22px] rounded-md bg-surface-2 border border-line text-text-2">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/></svg>
+        </span>
+      </div>
+      <div class="flex items-baseline gap-2 mt-3.5 mb-1.5">
+        <span class="text-[34px] leading-none font-medium tracking-[-0.03em] tabular-nums">{{ kpis.running_jobs }}</span>
+      </div>
+      {% if not kpis.running_jobs %}
+        <span class="text-[11.5px] text-text-3 leading-snug">No captures or diffs underway. Long-running tasks show up here.</span>
+      {% endif %}
+      <div class="mt-auto flex justify-between text-[11.5px] text-text-3 pt-3">
+        <span class="text-text border-b border-line-2 pb-px">Open queue</span>
+        <span class="opacity-70 font-mono">system/jobs</span>
+      </div>
+    </a>
+
+  </section>
+
+  {# ── Active session card (conditional) ───────────────────────────── #}
+  {% if active_session %}
+  {% set _capturing = active_session.status == 'running' or (active_session.capture_completed is sameas false) %}
+  <section data-widget-id="active-session"
+           :class="{ 'hidden': hidden.includes('active-session'), 'sc-hover-glow': hoveredId === 'active-session' }"
+           class="grid grid-cols-[auto_1fr_auto] gap-5 items-center bg-surface border border-line rounded-lg px-5 py-4 mb-3
+                  shadow-glow-pink {% if _capturing %}sc-capture-pulse{% endif %}
+                  bg-[radial-gradient(120%_80%_at_0%_0%,var(--accent-soft),transparent_55%)]">
+    <div class="relative w-[52px] h-[52px] rounded-lg bg-surface-2 border border-line grid place-items-center text-accent">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <span class="absolute -inset-1 rounded-[14px] border border-dashed border-line opacity-60"
+            style="animation: rotate 30s linear infinite;"></span>
+    </div>
+    <div>
+      <div class="text-[10.5px] uppercase tracking-[0.14em] text-accent font-semibold">Active session</div>
+      <div class="text-[17px] font-medium tracking-[-0.01em] my-1 flex items-center gap-2.5">
+        {{ active_session.name or 'unnamed' }}
+        <span class="font-mono text-[13px] text-text-2 bg-bg-2 border border-line rounded-md px-2 py-0.5">{{ active_session.name }}</span>
+        <span class="chip run"><span class="dot"></span>Live</span>
+      </div>
+      <div class="flex flex-wrap gap-x-[18px] gap-y-1.5 text-text-3 text-[12px]">
+        {% for key, val in [('env', active_session.environment), ('ruleset', active_session.ruleset), ('tier', active_session.tier)] %}
+          {% if val %}
+            <span><span class="text-text-4 mr-1">{{ key }}</span><span class="font-mono text-text-2">{{ val }}</span></span>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    <div class="flex gap-2">
+      <a class="btn primary" href="/sessions/{{ active_session.name }}">Open</a>
+    </div>
+  </section>
+  {% endif %}
+
+  {# ── Activity calendar ───────────────────────────────────────────── #}
+  <section data-widget-id="calendar"
+           :class="{ 'hidden': hidden.includes('calendar'), 'sc-hover-glow': hoveredId === 'calendar' }"
+           class="bg-surface border border-line rounded-lg p-4 mb-3">
+    <div class="flex justify-between items-center mb-3">
+      <h3 class="m-0 text-[13px] font-semibold">
+        Audit activity
+        <span class="footnote ml-2">
+          trailing 12 months · local time
+          {% if calendar.total %}· {{ calendar.total }} session{{ '' if calendar.total == 1 else 's' }}{% endif %}
+        </span>
+      </h3>
+      {% if calendar.total %}
+        <div class="flex flex-wrap gap-1.5 items-center text-text-3 text-[11px]">
+          <span class="inline-flex items-center gap-1.5">less</span>
+          <i class="w-[11px] h-[11px] rounded-xs inline-block bg-surface-2 border border-line"></i>
+          <i class="w-[11px] h-[11px] rounded-xs inline-block border-0" style="background:oklch(from var(--accent) l c h / .18);"></i>
+          <i class="w-[11px] h-[11px] rounded-xs inline-block border-0" style="background:oklch(from var(--accent) l c h / .42);"></i>
+          <i class="w-[11px] h-[11px] rounded-xs inline-block border-0" style="background:oklch(from var(--accent) l c h / .65);"></i>
+          <i class="w-[11px] h-[11px] rounded-xs inline-block bg-accent"></i>
+          <span class="inline-flex items-center gap-1.5">more</span>
+          <i class="w-[11px] h-[11px] rounded-xs inline-block bg-bad ml-2.5" style="box-shadow:0 0 4px color-mix(in oklch, var(--bad) 50%, transparent);"></i>
+          <span class="inline-flex items-center gap-1.5">failure</span>
+        </div>
+      {% endif %}
+    </div>
+
+    {% if calendar.total %}
+      <div class="calendar">
+        <div class="calendar-grid">
+          <div class="calendar-days">
+            <span></span><span>Mon</span><span></span><span>Wed</span><span></span><span>Fri</span><span></span>
+          </div>
+          <div>
+            <div class="calendar-months">
+              {% for m in calendar.months %}<span>{{ m }}</span>{% endfor %}
+            </div>
+            <div class="calendar-cells" id="atlas-calendar">
+              {% for cell in calendar.cells %}
+                <div
+                  class="cell{% if cell.level %} {{ cell.level }}{% endif %}{% if cell.fail %} fail{% endif %}{% if cell.future %} future{% endif %}"
+                  title="{{ cell.date }}{% if cell.count %} · {{ cell.count }} session{{ '' if cell.count == 1 else 's' }}{% endif %}{% if cell.fail %} · failure{% endif %}"
+                ></div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+        <div class="flex flex-wrap gap-x-5 gap-y-2 mt-3 text-[12px] text-text-3">
+          <div><b class="text-text font-semibold mr-1">{{ calendar.total }}</b>session{{ '' if calendar.total == 1 else 's' }} this year</div>
+          <div><b class="text-bad font-semibold mr-1">{{ calendar.fail_days }}</b>day{{ '' if calendar.fail_days == 1 else 's' }} with failures</div>
+          <div><b class="text-text font-semibold mr-1">{{ calendar.longest_gap }}</b>longest gap (days)</div>
+          <div>
+            <b class="text-text font-semibold mr-1">{% if calendar.days_since_last is not none %}{{ calendar.days_since_last }}{% else %}—{% endif %}</b>
+            day{{ '' if calendar.days_since_last == 1 else 's' }} since last audit
+          </div>
+        </div>
+      </div>
+    {% else %}
+      <div class="text-center py-8 text-text-3 text-[13px]">
+        No captures in the last 12&nbsp;months.
+        <a href="/sessions/new" class="text-accent hover:text-accent-hover">Start a session</a>
+        or
+        <a href="/preflight" class="text-accent hover:text-accent-hover">run preflight</a>
+        to populate this view.
+      </div>
+    {% endif %}
+  </section>
+
+  {# ── Bottom pair: recent jobs + active env ───────────────────────── #}
+  {# Flexbox so when one is hidden the other naturally grows to fill
+     the row. CSS grid with fixed columns leaves an awkward empty gap;
+     flex with flex-grow does the right thing. #}
+  <section class="flex flex-col lg:flex-row gap-3">
+
+    <div data-widget-id="recent-jobs"
+         :class="{ 'hidden': hidden.includes('recent-jobs'), 'sc-hover-glow': hoveredId === 'recent-jobs' }"
+         class="flex-[1.6_1.6_0] min-w-0 bg-surface border border-line rounded-lg overflow-hidden">
+      <div class="flex items-center px-4 py-3 border-b border-line">
+        <h3 class="m-0 text-[13px] font-semibold">Recent jobs</h3>
+        <span class="text-text-3 text-[12px] ml-1.5">last 24h</span>
+        <div class="ml-auto inline-flex gap-1.5 items-center">
+          {% if kpis.running_jobs %}
+            <span class="chip run"><span class="dot"></span> {{ kpis.running_jobs }} running</span>
+          {% endif %}
+          <a class="btn sm" href="/jobs">View all</a>
+        </div>
+      </div>
+      <div>
+        {% if recent_jobs %}
+          {% for job in recent_jobs %}
+            <div class="flex items-center gap-3 px-4 py-2.5 text-[13px] border-b border-line last:border-b-0 hover:bg-surface-2">
+              {% set dot_color = 'bg-accent' if job.status == 'running' else
+                                ('bg-ok'    if job.status == 'succeeded' else
+                                ('bg-bad'   if job.status == 'failed' else 'bg-text-4')) %}
+              <span class="w-2 h-2 rounded-full shrink-0 {{ dot_color }}{% if job.status == 'running' %} animate-pulse{% endif %}"></span>
+              <span class="font-medium truncate">{{ job.name }}</span>
+              <span class="font-mono text-[11.5px] text-text-3 truncate">{{ job.id }}</span>
+              <span class="ml-auto text-text-3">{{ job.status }}</span>
+              <span class="text-text-3 w-6 text-right">—</span>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="px-4 py-8 text-center text-text-3 text-[13px]">
+            <strong class="block text-text font-semibold mb-1">No recent jobs</strong>
+            Start a session, run preflight, or fire a diff to see job activity here.
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div data-widget-id="active-env"
+         :class="{ 'hidden': hidden.includes('active-env'), 'sc-hover-glow': hoveredId === 'active-env' }"
+         class="flex-[1_1_0] min-w-0 bg-surface border border-line rounded-lg overflow-hidden">
+      <div class="flex items-center px-4 py-3 border-b border-line">
+        <h3 class="m-0 text-[13px] font-semibold">Active environment</h3>
+        <div class="ml-auto inline-flex gap-1.5 items-center">
+          {% if active_env %}<span class="chip ok"><span class="dot"></span> Active</span>{% endif %}
+        </div>
+      </div>
+      <div class="px-4 py-3.5">
+        {% if active_env %}
+          <div class="flex items-center gap-2.5 text-[14px] font-medium mb-2">
+            <span class="inline-grid place-items-center w-7 h-7 rounded-md bg-accent-soft text-accent border border-line text-[12px] font-semibold">
+              {{ active_env.name[0]|upper if active_env.name else '?' }}
+            </span>
+            <span>{{ active_env.name }}</span>
+          </div>
+          {% if active_env.platform_uri %}
+            <div class="flex items-center gap-1.5 text-text-2 text-[12px] font-mono mb-2.5">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="shrink-0"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <span class="truncate">{{ active_env.platform_uri }}</span>
+            </div>
+          {% endif %}
+          <div class="flex flex-wrap gap-x-4 gap-y-1.5 text-[12px] text-text-3 mb-3.5">
+            <span><span class="text-text-4 mr-1">tier</span><span class="font-mono text-text-2">{{ active_env.tier or tier }}</span></span>
+            {% if active_env.deployment_mode %}
+              <span><span class="text-text-4 mr-1">mode</span><span class="font-mono text-text-2">{{ active_env.deployment_mode }}</span></span>
+            {% endif %}
+            <span><span class="text-text-4 mr-1">cred</span><span class="font-mono text-text-2">{{ active_env.credential_backend or 'keyring' }}</span></span>
+          </div>
+          <div class="flex gap-1.5">
+            <a class="btn sm" href="/environments/{{ active_env.name }}">Inspect</a>
+            <a class="btn sm" href="/environments">Switch</a>
+          </div>
+        {% else %}
+          <div class="py-4 text-center text-text-3 text-[13px]">
+            <strong class="block text-text font-semibold mb-1">No active environment</strong>
+            <a href="/environments" class="text-accent hover:text-accent-hover">Create one →</a>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+  </section>
+
+</div> {# /x-data="dashboardEditor" #}
+
+<div class="footnote mt-3">platform-atlas · webui · htmx · fastapi</div>
+
+<script>
+  // ── Dashboard customization — show/hide cards only ────────────────
+  // Stores a single array of hidden widget IDs in localStorage. Same
+  // try-now-or-on-init Alpine registration pattern as the rest of the
+  // codebase so hx-boost re-entry is safe.
+  const ATLAS_DASH_KEY = 'atlas-dashboard-visibility-v3';
+
+  function _atlasRegisterDashboard() {
+    if (!window.Alpine || typeof window.Alpine.data !== 'function') return;
+    Alpine.data('dashboardEditor', () => ({
+      customizing: false,
+      hidden: [],
+      // Tracks the widget ID currently being hovered in the customize
+      // panel. Only set when the target is visible — `hoverEnter` no-ops
+      // for already-hidden widgets so we don't try to glow nothing.
+      hoveredId: null,
+      widgets: [
+        { id: 'kpi-sessions',     label: 'Sessions tile',         present: true,                                                conditional: false },
+        { id: 'kpi-environments', label: 'Environments tile',     present: true,                                                conditional: false },
+        { id: 'kpi-rules',        label: 'Active rules tile',     present: true,                                                conditional: false },
+        { id: 'kpi-jobs',         label: 'Running jobs tile',     present: true,                                                conditional: false },
+        { id: 'active-session',   label: 'Active session card',   present: {% if active_session %}true{% else %}false{% endif %}, conditional: true  },
+        { id: 'calendar',         label: 'Activity calendar',     present: true,                                                conditional: false },
+        { id: 'recent-jobs',      label: 'Recent jobs',           present: true,                                                conditional: false },
+        { id: 'active-env',       label: 'Active environment',    present: true,                                                conditional: false },
+      ],
+
+      init() {
+        try {
+          const raw = localStorage.getItem(ATLAS_DASH_KEY);
+          if (raw) {
+            const obj = JSON.parse(raw);
+            if (obj && obj.v === 3 && Array.isArray(obj.hidden)) {
+              this.hidden = obj.hidden;
+            }
+          }
+        } catch (_) { /* corrupt entry — start fresh */ }
+      },
+
+      toggle(id) {
+        const i = this.hidden.indexOf(id);
+        if (i === -1) this.hidden.push(id);
+        else this.hidden.splice(i, 1);
+        // Toggling a hidden card on means the hover-glow target just
+        // became invisible — clear any pending hover state so the next
+        // mouseenter can pick it up cleanly.
+        if (this.hidden.includes(id) && this.hoveredId === id) {
+          this.hoveredId = null;
+        }
+        this._save();
+      },
+
+      hoverEnter(id) {
+        // Don't try to glow a card the user can't see. The reverse
+        // direction (turning a hidden card ON) deliberately gets no
+        // hover preview — there's nothing on screen to highlight.
+        if (this.hidden.includes(id)) {
+          this.hoveredId = null;
+          return;
+        }
+        this.hoveredId = id;
+      },
+
+      resetVisibility() {
+        this.hidden = [];
+        try { localStorage.removeItem(ATLAS_DASH_KEY); } catch (_) {}
+      },
+
+      _save() {
+        try {
+          localStorage.setItem(ATLAS_DASH_KEY, JSON.stringify({ v: 3, hidden: this.hidden }));
+        } catch (_) { /* quota etc — ignore */ }
+      },
+    }));
+  }
+  if (window.Alpine && typeof window.Alpine.data === 'function') {
+    _atlasRegisterDashboard();
+  } else {
+    document.addEventListener('alpine:init', _atlasRegisterDashboard);
+  }
+</script>
+
+{% endblock %}

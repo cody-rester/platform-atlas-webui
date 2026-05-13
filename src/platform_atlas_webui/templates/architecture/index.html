@@ -1,0 +1,1943 @@
+{% extends "base.html" %}
+{% block title %}Architecture and Observability — Platform Atlas{% endblock %}
+{% block crumb %}Architecture and Observability{% endblock %}
+{% block content %}
+
+<style>
+/* ── Architecture form — scoped styles ──────────────────────────────
+   This file is a 1,900-line interactive form-builder. The .arch-* class
+   names below are intentionally page-scoped because:
+
+     1. Most are toggled in pairs by inline JS at the bottom of this file
+        (.arch-section.open / .arch-skip.active / .arch-confirm-opt.active
+        / .arch-tag.done / .arch-warning.visible / .arch-save-status.saved
+        / .arch-complete-banner.visible). Converting to Tailwind utilities
+        would require Alpine x-data on every section, which is a much
+        bigger rewrite than a styling translation.
+
+     2. They're applied across hundreds of repeated form fields. Inlining
+        utilities would multiply template size for no functional gain.
+
+     3. They're truly scoped — no other template uses these class names.
+        That's exactly the case page-scoped <style> blocks are designed for.
+
+   .arch-hero rules WERE in this block but the hero was migrated to Tailwind
+   utilities directly on the <header>, so those rules were dead and removed.
+*/
+
+.arch-progress-row {
+  display: flex; align-items: center; gap: 16px; margin-bottom: 28px;
+}
+.arch-progress-track {
+  flex: 1; height: 6px; background: var(--surface-3);
+  border-radius: 3px; overflow: hidden;
+}
+.arch-progress-fill {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, var(--accent), oklch(72% .22 145));
+  border-radius: 3px; transition: width .35s ease;
+}
+.arch-progress-label {
+  font-size: 12px; font-weight: 600; color: var(--text-3);
+  white-space: nowrap; min-width: 90px; text-align: right;
+}
+.arch-save-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 14px; font-size: 12px;
+}
+
+/* ── Section card ──────────────────────────────────────────────────── */
+.arch-section { margin-bottom: 12px; }
+
+.arch-section-head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: var(--r-lg);
+  background: var(--surface-1);
+  transition: background .15s;
+  user-select: none;
+}
+.arch-section-head:hover { background: var(--surface-2); }
+.arch-section.open .arch-section-head {
+  border-bottom-left-radius: 0; border-bottom-right-radius: 0;
+  border-bottom-color: transparent;
+}
+
+.arch-section-icon {
+  width: 28px; height: 28px; border-radius: 6px;
+  background: var(--surface-3); display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; color: var(--accent);
+}
+.arch-section-icon svg { width: 14px; height: 14px; }
+
+.arch-section-meta { flex: 1; min-width: 0; }
+.arch-section-title { font-size: 13px; font-weight: 600; }
+.arch-section-sub { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+
+.arch-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10px; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; padding: 2px 7px; border-radius: 4px;
+  flex-shrink: 0; transition: background .25s, color .25s, border-color .25s;
+}
+/* default: red for Required, amber for Conditional */
+.arch-tag.required   { background: oklch(72% .16 25/.12);  color: var(--bad); border: 1px solid oklch(72% .16 25/.35); }
+.arch-tag.conditional{ background: oklch(82% .13 75/.12);  color: var(--warn); border: 1px solid oklch(82% .13 75/.35); }
+/* done state: green for both */
+.arch-tag.done       { background: oklch(80% .14 155/.12); color: var(--ok);  border: 1px solid oklch(80% .14 155/.35); }
+.arch-tag.skipped    { background: oklch(80% .14 155/.08); color: var(--ok);  border: 1px solid oklch(80% .14 155/.25); }
+.arch-tag svg { width: 10px; height: 10px; flex-shrink: 0; }
+
+.arch-section-mini {
+  font-size: 11px; color: var(--text-3); white-space: nowrap; flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.arch-section-mini.done { color: var(--ok); }
+.arch-section-mini svg { width: 10px; height: 10px; flex-shrink: 0; }
+
+.arch-chevron {
+  width: 16px; height: 16px; color: var(--text-4); flex-shrink: 0;
+  transition: transform .2s;
+}
+.arch-section.open .arch-chevron { transform: rotate(180deg); }
+
+.arch-section-body {
+  display: none;
+  border: 1px solid var(--line); border-top: none;
+  border-bottom-left-radius: var(--r-lg); border-bottom-right-radius: var(--r-lg);
+  background: var(--surface-1); padding: 16px;
+}
+.arch-section.open .arch-section-body { display: block; }
+
+/* ── Skip toggle ───────────────────────────────────────────────────── */
+.arch-skip {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; margin-bottom: 14px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 6px;
+  background: var(--surface-2); font-size: 12px; color: var(--text-2);
+}
+.arch-skip:hover { border-color: var(--accent); }
+.arch-skip.active { border-color: oklch(72% .22 145); color: oklch(72% .22 145); background: oklch(72% .22 145/.07); }
+.arch-skip-box {
+  width: 16px; height: 16px; border: 1.5px solid var(--line); border-radius: 4px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.arch-skip.active .arch-skip-box { border-color: oklch(72% .22 145); background: oklch(72% .22 145); }
+.arch-skip-box svg { width: 10px; height: 10px; stroke: white; display: none; }
+.arch-skip.active .arch-skip-box svg { display: block; }
+
+/* ── Fields ────────────────────────────────────────────────────────── */
+.arch-field { margin-bottom: 14px; }
+.arch-field.hidden { display: none; }
+
+.arch-field-label { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+.arch-field-hint  { font-size: 11px; color: var(--text-3); margin-bottom: 4px; }
+
+.arch-field select,
+.arch-field input[type=text],
+.arch-field input[type=number] {
+  width: 100%; padding: 7px 10px; font-size: 13px;
+  background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: var(--r); color: var(--text); font-family: inherit;
+  transition: border-color .15s;
+}
+.arch-field select:focus,
+.arch-field input:focus { outline: none; border-color: var(--accent); }
+
+.arch-field select.filled,
+.arch-field input.filled { border-color: var(--accent); }
+
+/* ── Confirm (Yes/No) ─────────────────────────────────────────────── */
+.arch-confirm { display: flex; gap: 8px; }
+.arch-confirm-opt {
+  padding: 6px 18px; font-size: 12px; font-weight: 600; cursor: pointer;
+  border: 1px solid var(--line); border-radius: var(--r);
+  background: var(--surface-2); color: var(--text-3);
+  transition: all .15s;
+}
+.arch-confirm-opt:hover { border-color: var(--accent); color: var(--text); }
+.arch-confirm-opt.active { border-color: var(--accent); background: var(--accent); color: #fff; }
+
+/* ── Checkbox group ───────────────────────────────────────────────── */
+.arch-checkbox-group {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px;
+}
+.arch-cb-opt {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 10px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: var(--r);
+  background: var(--surface-2); font-size: 12px; color: var(--text-2);
+  transition: all .15s;
+}
+.arch-cb-opt:hover { border-color: var(--accent); }
+.arch-cb-opt.active { border-color: var(--accent); background: var(--accent); color: #fff; }
+.arch-cb-opt input { display: none; }
+
+/* ── Subsection heading ───────────────────────────────────────────── */
+.arch-subsection {
+  font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--text-3); margin: 18px 0 10px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+/* ── Warning ──────────────────────────────────────────────────────── */
+.arch-warning {
+  display: none; font-size: 11px; color: oklch(72% .16 55);
+  margin-top: 4px; padding: 4px 8px; background: oklch(72% .16 55/.1);
+  border-radius: 4px; border: 1px solid oklch(72% .16 55/.25);
+}
+.arch-warning.visible { display: block; }
+
+/* ── GW5 cluster rows ─────────────────────────────────────────────── */
+.arch-cluster-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  padding: 8px 10px; margin: 6px 0;
+  border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2);
+}
+.arch-cluster-label {
+  grid-column: 1 / -1; font-size: 11px; font-weight: 600; color: var(--text-3);
+  margin-bottom: 2px;
+}
+
+/* ── Save status ──────────────────────────────────────────────────── */
+.arch-save-status {
+  font-size: 11px; color: var(--text-3); transition: color .3s;
+}
+.arch-save-status.saved { color: oklch(72% .22 145); }
+.arch-save-status.error { color: var(--bad); }
+
+/* ── Completion banner ────────────────────────────────────────────── */
+.arch-complete-banner {
+  display: none; margin-top: 20px; padding: 16px 20px;
+  border: 1px solid oklch(72% .22 145/.4); border-radius: var(--r-lg);
+  background: oklch(72% .22 145/.07);
+}
+.arch-complete-banner.visible { display: flex; align-items: center; gap: 14px; }
+.arch-complete-banner h3 { font-size: 14px; margin-bottom: 2px; }
+.arch-complete-banner p { font-size: 12px; color: var(--text-2); }
+
+/* ── Env switcher + copy-from card ────────────────────────────────── */
+.arch-env-bar {
+  display: flex; flex-wrap: wrap; align-items: stretch; gap: 12px;
+  margin-bottom: 18px; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: var(--r-lg);
+  background: var(--surface-1);
+}
+.arch-env-block {
+  display: flex; flex-direction: column; gap: 4px; min-width: 220px; flex: 1 1 220px;
+}
+.arch-env-block .arch-env-label {
+  font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--text-3);
+}
+.arch-env-block select {
+  padding: 7px 10px; font-size: 13px;
+  background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: var(--r); color: var(--text); font-family: inherit;
+}
+.arch-env-block select:focus { outline: none; border-color: var(--accent); }
+.arch-env-actions {
+  display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap;
+}
+.arch-env-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 999px;
+  background: var(--accent); color: #fff; font-size: 11px; font-weight: 700;
+  letter-spacing: .03em;
+}
+.arch-env-pill svg { width: 11px; height: 11px; }
+.arch-copy-hint {
+  font-size: 11px; color: var(--text-3); margin-top: 6px;
+  flex-basis: 100%;
+}
+.arch-copy-hint strong { color: var(--text-2); }
+
+/* ── Copy flash messages ──────────────────────────────────────────── */
+.arch-flash {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 14px; padding: 10px 14px;
+  border-radius: var(--r-lg); font-size: 13px; line-height: 1.45;
+}
+.arch-flash svg { flex-shrink: 0; width: 16px; height: 16px; }
+.arch-flash.ok {
+  border: 1px solid oklch(72% .22 145/.4);
+  background: oklch(72% .22 145/.08);
+  color: oklch(78% .18 145);
+}
+.arch-flash.warn {
+  border: 1px solid oklch(82% .13 75/.4);
+  background: oklch(82% .13 75/.08);
+  color: oklch(82% .13 75);
+}
+.arch-flash strong { color: inherit; font-weight: 700; }
+</style>
+
+<header class="flex items-end justify-between gap-6 pb-5 border-b border-line mb-6">
+  <div>
+    <div class="eyebrow">
+      <span class="dot"></span> Extended Mode
+      <span class="arch-env-pill" title="Editing answers for this environment">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+        {{ target_env }}
+      </span>
+    </div>
+    <h1 class="text-[36px] leading-[1.05] font-semibold tracking-[-0.038em] mt-2 mb-1.5">Architecture and Observability</h1>
+    <p class="text-[14px] text-text-2 max-w-[64ch] leading-relaxed">
+      Describe your Itential deployment — topology, deployment types, server specs,
+      and operational details that Atlas cannot gather automatically.
+      Answers are scoped <strong>per environment</strong> and saved to
+      <code>~/.atlas/architecture/{{ target_env }}.json</code>.{% if show_copy_ui %}
+      If two environments are mostly the same, fill one out and copy it onto the other.{% endif %}
+    </p>
+  </div>
+</header>
+
+{# ── Copy flash messages ── #}
+{% if copied_from %}
+  <div class="arch-flash ok" role="status">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    <div>
+      Copied <strong>{{ copied_count or '?' }}</strong> sections from
+      <strong>{{ copied_from }}</strong> → <strong>{{ target_env }}</strong>.
+      Review the answers below — re-save any changes to update this environment.
+    </div>
+  </div>
+{% endif %}
+{% if copy_error %}
+  <div class="arch-flash warn" role="alert">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12" y2="16"/></svg>
+    <div>{{ copy_error }}</div>
+  </div>
+{% endif %}
+
+{# ── Env switcher + copy-from ── #}
+<div class="arch-env-bar">
+  {% set available_env_names = available_envs | map(attribute='name') | list %}
+  <form method="get" action="/architecture" class="arch-env-block" id="arch-env-switcher">
+    <label class="arch-env-label" for="arch-env-select">Editing environment</label>
+    <select name="env" id="arch-env-select" onchange="this.form.submit()">
+      {% for env_name in available_env_names %}
+        <option value="{{ env_name }}" {% if env_name == target_env %}selected{% endif %}>
+          {{ env_name }}{% if env_name in envs_with_data %} ✓{% endif %}
+        </option>
+      {% endfor %}
+      {% if target_env not in available_env_names %}
+        <option value="{{ target_env }}" selected>{{ target_env }}</option>
+      {% endif %}
+    </select>
+  </form>
+
+  {% if show_copy_ui %}
+    {% if copy_sources %}
+      <form method="post" action="/architecture/copy" class="arch-env-block" id="arch-copy-form">
+        <label class="arch-env-label" for="arch-copy-src">Copy answers from</label>
+        <div style="display:flex; gap:8px;">
+          <select name="src_env" id="arch-copy-src" style="flex:1;">
+            {% for env_name in copy_sources %}
+              <option value="{{ env_name }}">{{ env_name }}</option>
+            {% endfor %}
+          </select>
+          <input type="hidden" name="dst_env" value="{{ target_env }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="btn" id="arch-copy-btn"
+                  style="padding:7px 14px; font-size:12px; white-space:nowrap;">
+            Copy → {{ target_env }}
+          </button>
+        </div>
+      </form>
+      <div class="arch-copy-hint">
+        <strong>Tip:</strong> copying overwrites this environment's current answers.
+        You'll be asked to confirm if data already exists.
+      </div>
+    {% else %}
+      <div class="arch-env-block" style="justify-content:center;">
+        <div class="arch-copy-hint" style="margin-top:0;">
+          Fill out another environment first — once it has answers, you'll be able to copy them here.
+        </div>
+      </div>
+    {% endif %}
+  {% endif %}
+</div>
+
+{# ── Progress bar ── #}
+<div class="arch-progress-row">
+  <div class="arch-progress-track">
+    <div class="arch-progress-fill" id="arch-progress-fill"></div>
+  </div>
+  <div class="arch-progress-label" id="arch-progress-label">0 / 0 fields</div>
+  <span class="arch-save-status" id="arch-save-status"></span>
+</div>
+
+{# ── Sections ── #}
+<div id="arch-sections">
+
+  {# 1. Environment Overview #}
+  <div class="arch-section" data-section="environment">
+    <div class="arch-section-head" onclick="archToggle(this)">
+      <div class="arch-section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg></div>
+      <div class="arch-section-meta">
+        <div class="arch-section-title">Environment Overview</div>
+        <div class="arch-section-sub">General information about this deployment</div>
+      </div>
+      <span class="arch-tag required">Required</span>
+      <span class="arch-section-mini" id="mini-environment">—</span>
+      <svg class="arch-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <div class="arch-section-body">
+      <div class="arch-field" data-field="environment_type">
+        <div class="arch-field-label">Environment type</div>
+        <select id="f-environment-type" onchange="onAF(this)">
+          <option value="">— Select —</option>
+          <option value="Production">Production</option>
+          <option value="Staging">Staging</option>
+          <option value="Development">Development</option>
+          <option value="QA / Test">QA / Test</option>
+          <option value="DR / Failover">DR / Failover</option>
+        </select>
+      </div>
+      <div class="arch-field" data-field="datacenter_location">
+        <div class="arch-field-label">Datacenter location</div>
+        <input type="text" id="f-datacenter-location" placeholder="e.g., us-east-1, London-DC2" oninput="onAF(this)">
+      </div>
+      <div class="arch-field" data-field="hosting_provider">
+        <div class="arch-field-label">Hosting provider</div>
+        <select id="f-hosting-provider" onchange="onAF(this); archCond('hosting_provider_other', this.value === 'Other')">
+          <option value="">— Select —</option>
+          <option value="AWS">AWS</option>
+          <option value="Azure">Azure</option>
+          <option value="GCP">GCP</option>
+          <option value="On-Premises">On-Premises</option>
+          <option value="Hybrid (On-Prem + Cloud)">Hybrid (On-Prem + Cloud)</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="arch-field hidden" data-field="hosting_provider_other" data-cond="true">
+        <div class="arch-field-label">Specify provider</div>
+        <input type="text" id="f-hosting-provider-other" placeholder="e.g., OCI, IBM Cloud" oninput="onAF(this)">
+      </div>
+    </div>
+  </div>
+
+  {# 2. Platform Architecture #}
+  <div class="arch-section" data-section="platform">
+    <div class="arch-section-head" onclick="archToggle(this)">
+      <div class="arch-section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></div>
+      <div class="arch-section-meta">
+        <div class="arch-section-title">Platform Architecture</div>
+        <div class="arch-section-sub">IAP topology and server specs</div>
+      </div>
+      <span class="arch-tag required">Required</span>
+      <span class="arch-section-mini" id="mini-platform">—</span>
+      <svg class="arch-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <div class="arch-section-body">
+      <div class="arch-field" data-field="active_instance_count">
+        <div class="arch-field-label">Number of active Platform instances</div>
+        <input type="number" min="0" id="f-active-instance-count" placeholder="0" oninput="onAF(this); onTotalInstances()">
+      </div>
+      <div class="arch-field" data-field="standby_instance_count">
+        <div class="arch-field-label">Number of standby Platform instances</div>
+        <input type="number" min="0" id="f-standby-instance-count" placeholder="0" value="0" oninput="onAF(this); onTotalInstances()">
+      </div>
+      <div class="arch-field hidden" data-field="all_in_same_datacenter" data-cond="true" id="ff-all-in-same-dc">
+        <div class="arch-field-label">Are all Platform instances in the same datacenter?</div>
+        <div class="arch-confirm">
+          <div class="arch-confirm-opt" onclick="setConfirm('f-all-in-same-datacenter', true, this)">Yes</div>
+          <div class="arch-confirm-opt" onclick="setConfirm('f-all-in-same-datacenter', false, this)">No</div>
+        </div>
+        <input type="hidden" id="f-all-in-same-datacenter">
+      </div>
+      <div class="arch-field hidden" data-field="datacenter_details" data-cond="true">
+        <div class="arch-field-label">Describe the distribution</div>
+        <div class="arch-field-hint">e.g., 2 active in us-east-1, 1 standby in us-west-2</div>
+        <input type="text" id="f-datacenter-details" placeholder="Distribution details" oninput="onAF(this)">
+      </div>
+      <div class="arch-subsection">Deployment Type</div>
+      <div class="arch-field" data-field="deployment_type" data-parent="deployment">
+        <div class="arch-field-label">Platform — Deployment type</div>
+        <select id="f-platform-deployment-type" onchange="onAF(this); archCond('platform_deployment_type_other', this.value === 'Other')">
+          <option value="">— Select —</option>
+          <option value="Bare Metal">Bare Metal</option>
+          <option value="Virtual Machines (VMs)">Virtual Machines (VMs)</option>
+          <option value="Kubernetes (AWS EKS)">Kubernetes (AWS EKS)</option>
+          <option value="Kubernetes (Azure AKS)">Kubernetes (Azure AKS)</option>
+          <option value="Kubernetes (Self-Managed)">Kubernetes (Self-Managed)</option>
+          <option value="AWS Fargate">AWS Fargate</option>
+          <option value="Docker Containers">Docker Containers</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="arch-field hidden" data-field="platform_deployment_type_other" data-parent="deployment" data-cond="true">
+        <div class="arch-field-label">Specify deployment type</div>
+        <input type="text" id="f-platform-deployment-type-other" placeholder="e.g., LXC, Podman" oninput="onAF(this)">
+      </div>
+      <div class="arch-subsection">Server Specs</div>
+      <div class="arch-field" data-field="os_type" data-parent="server_specs">
+        <div class="arch-field-label">Platform — Operating System</div>
+        <select id="f-platform-os-type" onchange="onAF(this); archCond('platform_os_type_other', this.value === 'Other')">
+          <option value="">— Select —</option>
+          <option value="RHEL 8">RHEL 8</option><option value="RHEL 9">RHEL 9</option>
+          <option value="Rocky 8">Rocky 8</option><option value="Rocky 9">Rocky 9</option>
+          <option value="Alpine">Alpine</option><option value="Amazon Linux 2">Amazon Linux 2</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="arch-field hidden" data-field="platform_os_type_other" data-parent="server_specs" data-cond="true">
+        <div class="arch-field-label">Specify OS</div>
+        <input type="text" id="f-platform-os-type-other" placeholder="OS name" oninput="onAF(this)">
+      </div>
+      <div class="arch-field" data-field="cpu_cores" data-parent="server_specs">
+        <div class="arch-field-label">Platform — CPU cores per server</div>
+        <select id="f-platform-cpu-cores" onchange="onAF(this)">
+          <option value="">— Select —</option>
+          <option value="2">2</option><option value="4">4</option><option value="8">8</option>
+          <option value="16">16</option><option value="32">32</option><option value="64+">64+</option>
+          <option value="Unknown">Unknown</option>
+        </select>
+      </div>
+      <div class="arch-field" data-field="memory_gb" data-parent="server_specs">
+        <div class="arch-field-label">Platform — Memory (GB) per server</div>
+        <select id="f-platform-memory-gb" onchange="onAF(this)">
+          <option value="">— Select —</option>
+          <option value="4">4</option><option value="8">8</option><option value="16">16</option>
+          <option value="32">32</option><option value="64">64</option><option value="128+">128+</option>
+          <option value="Unknown">Unknown</option>
+        </select>
+      </div>
+      <div class="arch-field" data-field="disk_space_gb" data-parent="server_specs">
+        <div class="arch-field-label">Platform — Disk space (GB) per server</div>
+        <select id="f-platform-disk-space-gb" onchange="onAF(this)">
+          <option value="">— Select —</option>
+          <option value="20">20</option><option value="50">50</option><option value="100">100</option>
+          <option value="200">200</option><option value="500">500</option><option value="1000+">1000+</option>
+          <option value="Unknown">Unknown</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  {# 3. MongoDB Architecture #}
+  <div class="arch-section" data-section="mongodb">
+    <div class="arch-section-head" onclick="archToggle(this)">
+      <div class="arch-section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/></svg></div>
+      <div class="arch-section-meta">
+        <div class="arch-section-title">MongoDB Architecture</div>
+        <div class="arch-section-sub">Replica set topology and server specs</div>
+      </div>
+      <span class="arch-tag required">Required</span>
+      <span class="arch-section-mini" id="mini-mongodb">—</span>
+      <svg class="arch-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <div class="arch-section-body">
+      <div class="arch-field" data-field="same_datacenter_as_platform">
+        <div class="arch-field-label">MongoDB in same datacenter as Platform?</div>
+        <div class="arch-confirm">
+          <div class="arch-confirm-opt" onclick="setConfirm('f-mongo-same-dc', true, this)">Yes</div>
+          <div class="arch-confirm-opt" onclick="setConfirm('f-mongo-same-dc', false, this)">No</div>
+        </div>
+        <input type="hidden" id="f-mongo-same-dc">
+      </div>
+      <div class="arch-field" data-field="replica_count">
+        <div class="arch-field-label">Number of MongoDB replica set members</div>
+        <input type="number" min="1" id="f-mongo-replica-count" placeholder="3" oninput="onAF(this); archCond('mongo_across_dc', parseInt(this.value) > 1)">
+      </div>
+      <div class="arch-field hidden" data-field="replicas_across_datacenters" data-cond="true" id="ff-mongo-across-dc">
+        <div class="arch-field-label">Are replicas spread across multiple datacenters?</div>
+        <div class="arch-confirm">
+          <div class="arch-confirm-opt" onclick="setConfirm('f-mongo-across-dc', true, this); archCond('mongo_dc_distribution', true)">Yes</div>
+          <div class="arch-confirm-opt" onclick="setConfirm('f-mongo-across-dc', false, this); archCond('mongo_dc_distribution', false)">No</div>
+        </div>
+        <input type="hidden" id="f-mongo-across-dc">
+      </div>
+      <div class="arch-field hidden" data-field="datacenter_distribution" data-cond="true">
+        <div class="arch-field-label">Datacenter distribution</div>
+        <div class="arch-field-hint">e.g., 2 in us-east-1, 1 in us-west-2</div>
+        <input type="text" id="f-mongo-dc-distribution" placeholder="Distribution details" oninput="onAF(this)">
+      </div>
+      <div class="arch-subsection">Server Specs</div>
+      <div class="arch-field" data-field="os_type" data-parent="server_specs">
+        <div class="arch-field-label">MongoDB — Operating System</div>
+        <select id="f-mongo-os-type" onchange="onAF(this); archCond('mongo_os_type_other', this.value === 'Other')">
+          <option value="">— Select —</option>
+          <option value="RHEL 8">RHEL 8</option><option value="RHEL 9">RHEL 9</option>
+          <option value="Rocky 8">Rocky 8</option><option value="Rocky 9">Rocky 9</option>
+          <option value="Alpine">Alpine</option><option value="Amazon Linux 2">Amazon Linux 2</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="arch-field hidden" data-field="mongo_os_type_other" data-parent="server_specs" data-cond="true">
+        <div class="arch-field-label">Specify OS</div>
+        <input type="text" id="f-mongo-os-type-other" placeholder="OS name" oninput="onAF(this)">
+      </div>
+      <div class="arch-field" data-field="cpu_cores" data-parent="server_specs">
+        <div class="arch-field-label">MongoDB — CPU cores per server</div>
+        <select id="f-mongo-cpu-cores" onchange="onAF(this)">
+          <option value="">— Select —</option>
+          <option value="2">2</option><option value="4">4</option><option value="8">8</option>
+          <option value="16">16</option><option value="32">32</option><option value="64+">64+</option>
+          <option value="Unknown">Unknown</option>
+        </select>
+      </div>
+      <div class="arch-field" data-field="memory_gb" data-parent="server_specs">
+        <div class="arch-field-label">MongoDB — Memory (GB) per server</div>
+        <select id="f-mongo-memory-gb" onchange="onAF(this)">
+          <option value="">— Select —</option>
+          <option value="4">4</option><option value="8">8</option><option value="16">16</option>
+          <option value="32">32</option><option value="64">64</option><option value="128+">128+</option>
+          <option value="Unknown">Unknown</option>
+        </select>
+      </div>
+      <div class="arch-field" data-field="disk_space_gb" data-parent="server_specs">
+        <div class="arch-field-label">MongoDB — Disk space (GB) per server</div>
+        <select id="f-mongo-disk-space-gb" onchange="onAF(this)">
+          <option value="">— Select —</option>
+          <option value="20">20</option><option value="50">50</option><option value="100">100</option>
+          <option value="200">200</option><option value="500">500</option><option value="1000+">1000+</option>
+          <option value="Unknown">Unknown</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  {# 4. Redis Architecture #}
+  <div class="arch-section" data-section="redis">
+    <div class="arch-section-head" onclick="archToggle(this)">
+      <div class="arch-section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+      <div class="arch-section-meta">
+        <div class="arch-section-title">Redis Architecture</div>
+        <div class="arch-section-sub">Deployment mode and server specs</div>
+      </div>
+      <span class="arch-tag required">Required</span>
+      <span class="arch-section-mini" id="mini-redis">—</span>
+      <svg class="arch-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <div class="arch-section-body">
+      <div class="arch-field" data-field="deployment_type">
+        <div class="arch-field-label">Redis deployment type</div>
+        <select id="f-redis-deployment-type" onchange="onAF(this); onRedisTopology()">
+          <option value="">— Select —</option>
+          <option value="Standalone">Standalone</option>
+          <option value="Sentinel">Sentinel</option>
+          <option value="Cluster">Cluster</option>
+        </select>
+      </div>
+      <div class="arch-field" data-field="redis_node_count">
+        <div class="arch-field-label">Number of Redis nodes</div>
+        <input type="number" min="1" id="f-redis-node-count" placeholder="1" oninput="onAF(this)">
+      </div>
+      <div class="arch-field hidden" data-field="sentinel_count" data-cond="true" id="ff-redis-sentinel">
+        <div class="arch-field-label">Number of Sentinel nodes</div>
+        <input type="number" min="1" id="f-redis-sentinel-count" placeholder="3" oninput="onAF(this)">
+      </div>
+      <div class="arch-field" data-field="same_datacenter_as_platform">
+        <div class="arch-field-label">Redis in same datacenter as Platform?</div>
+        <div class="arch-confirm">
+          <div class="arch-confirm-opt" onclick="setConfirm('f-redis-same-dc', true, this); archCond('redis_across_dc', false)">Yes</div>
+          <div class="arch-confirm-opt" onclick="setConfirm('f-redis-same-dc', false, this); archCond('redis_across_dc', true)">No</div>
+        </div>
+        <input type="hidden" id="f-redis-same-dc">
+      </div>
+      <div class="arch-field hidden" data-field="nodes_across_datacenters" data-cond="true" id="ff-redis-across-dc">
+        <div class="arch-field-label">Are Redis nodes spread across multiple datacenters?</div>
+        <div class="arch-confirm">
+          <div class="arch-confirm-opt" onclick="setConfirm('f-redis-across-dc', true, this)">Yes</div>
+          <div class="arch-confirm-opt" onclick="setConfirm('f-redis-across-dc', false, this)">No</div>
+        </div>
+        <input type="hidden" id="f-redis-across-dc">
+      </div>
+      <div class="arch-subsection">Server Specs</div>
+      <div class="arch-field" data-field="os_type" data-parent="server_specs">
+        <div class="arch-field-label">Redis — Operating System</div>
+        <select id="f-redis-os-type" onchange="onAF(this); archCond('redis_os_type_other', this.value === 'Other')">
+          <option value="">— Select —</option>
+          <option value="RHEL 8">RHEL 8</option><option value="RHEL 9">RHEL 9</option>
+          <option value="Rocky 8">Rocky 8</option><option value="Rocky 9">Rocky 9</option>
+          <option value="Alpine">Alpine</option><option value="Amazon Linux 2">Amazon Linux 2</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="arch-field hidden" data-field="redis_os_type_other" data-parent="server_specs" data-cond="true">
+        <div class="arch-field-label">Specify OS</div>
+        <input type="text" id="f-redis-os-type-other" placeholder="OS name" oninput="onAF(this)">
+      </div>
+      <div class="arch-field" data-field="cpu_cores" data-parent="server_specs">
+        <div class="arch-field-label">Redis — CPU cores per server</div>
+        <select id="f-redis-cpu-cores" onchange="onAF(this)">
+          <option value="">— Select —</option>
+          <option value="2">2</option><option value="4">4</option><option value="8">8</option>
+          <option value="16">16</option><option value="32">32</option><option value="64+">64+</option>
+          <option value="Unknown">Unknown</option>
+        </select>
+      </div>
+      <div class="arch-field" data-field="memory_gb" data-parent="server_specs">
+        <div class="arch-field-label">Redis — Memory (GB) per server</div>
+        <select id="f-redis-memory-gb" onchange="onAF(this)">
+          <option value="">— Select —</option>
+          <option value="4">4</option><option value="8">8</option><option value="16">16</option>
+          <option value="32">32</option><option value="64">64</option><option value="128+">128+</option>
+          <option value="Unknown">Unknown</option>
+        </select>
+      </div>
+      <div class="arch-field" data-field="disk_space_gb" data-parent="server_specs">
+        <div class="arch-field-label">Redis — Disk space (GB) per server</div>
+        <select id="f-redis-disk-space-gb" onchange="onAF(this)">
+          <option value="">— Select —</option>
+          <option value="20">20</option><option value="50">50</option><option value="100">100</option>
+          <option value="200">200</option><option value="500">500</option><option value="1000+">1000+</option>
+          <option value="Unknown">Unknown</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  {# 5. Gateway 4 Architecture #}
+  <div class="arch-section" data-section="gateway4">
+    <div class="arch-section-head" onclick="archToggle(this)">
+      <div class="arch-section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="6" width="20" height="4" rx="1"/><rect x="2" y="14" width="20" height="4" rx="1"/></svg></div>
+      <div class="arch-section-meta">
+        <div class="arch-section-title">Gateway 4 Architecture</div>
+        <div class="arch-section-sub">Automation Gateway 4 topology and specs</div>
+      </div>
+      <span class="arch-tag conditional">Conditional</span>
+      <span class="arch-section-mini" id="mini-gateway4">—</span>
+      <svg class="arch-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <div class="arch-section-body">
+      <div class="arch-skip" id="skip-gateway4" onclick="archSkip('gateway4', this)">
+        <div class="arch-skip-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1.5,6 4.5,9.5 10.5,2.5"/></svg></div>
+        <span>This environment does not have Gateway 4 — skip section</span>
+      </div>
+      <div id="body-gateway4">
+        <div class="arch-field" data-field="instance_count">
+          <div class="arch-field-label">Number of Gateway 4 servers</div>
+          <input type="number" min="1" id="f-gw4-instance-count" placeholder="1" oninput="onAF(this)">
+        </div>
+        <div class="arch-field" data-field="same_datacenter_as_platform">
+          <div class="arch-field-label">Gateway 4 in same datacenter as Platform?</div>
+          <div class="arch-confirm">
+            <div class="arch-confirm-opt" onclick="setConfirm('f-gw4-same-dc', true, this)">Yes</div>
+            <div class="arch-confirm-opt" onclick="setConfirm('f-gw4-same-dc', false, this)">No</div>
+          </div>
+          <input type="hidden" id="f-gw4-same-dc">
+        </div>
+        <div class="arch-subsection">Deployment Type</div>
+        <div class="arch-field" data-field="deployment_type" data-parent="deployment">
+          <div class="arch-field-label">Gateway 4 — Deployment type</div>
+          <select id="f-gw4-deployment-type" onchange="onAF(this); archCond('gw4_deployment_type_other', this.value === 'Other')">
+            <option value="">— Select —</option>
+            <option value="Bare Metal">Bare Metal</option><option value="Virtual Machines (VMs)">Virtual Machines (VMs)</option>
+            <option value="Kubernetes (AWS EKS)">Kubernetes (AWS EKS)</option><option value="Kubernetes (Azure AKS)">Kubernetes (Azure AKS)</option>
+            <option value="Kubernetes (Self-Managed)">Kubernetes (Self-Managed)</option>
+            <option value="AWS Fargate">AWS Fargate</option><option value="Docker Containers">Docker Containers</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="arch-field hidden" data-field="gw4_deployment_type_other" data-parent="deployment" data-cond="true">
+          <div class="arch-field-label">Specify deployment type</div>
+          <input type="text" id="f-gw4-deployment-type-other" placeholder="e.g., LXC, Podman" oninput="onAF(this)">
+        </div>
+        <div class="arch-subsection">Server Specs</div>
+        <div class="arch-field" data-field="os_type" data-parent="server_specs">
+          <div class="arch-field-label">Gateway 4 — Operating System</div>
+          <select id="f-gw4-os-type" onchange="onAF(this); archCond('gw4_os_type_other', this.value === 'Other')">
+            <option value="">— Select —</option>
+            <option value="RHEL 8">RHEL 8</option><option value="RHEL 9">RHEL 9</option>
+            <option value="Rocky 8">Rocky 8</option><option value="Rocky 9">Rocky 9</option>
+            <option value="Alpine">Alpine</option><option value="Amazon Linux 2">Amazon Linux 2</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="arch-field hidden" data-field="gw4_os_type_other" data-parent="server_specs" data-cond="true">
+          <input type="text" id="f-gw4-os-type-other" placeholder="OS name" oninput="onAF(this)">
+        </div>
+        <div class="arch-field" data-field="cpu_cores" data-parent="server_specs">
+          <div class="arch-field-label">Gateway 4 — CPU cores per server</div>
+          <select id="f-gw4-cpu-cores" onchange="onAF(this)">
+            <option value="">— Select —</option>
+            <option value="2">2</option><option value="4">4</option><option value="8">8</option>
+            <option value="16">16</option><option value="32">32</option><option value="64+">64+</option>
+            <option value="Unknown">Unknown</option>
+          </select>
+        </div>
+        <div class="arch-field" data-field="memory_gb" data-parent="server_specs">
+          <div class="arch-field-label">Gateway 4 — Memory (GB) per server</div>
+          <select id="f-gw4-memory-gb" onchange="onAF(this)">
+            <option value="">— Select —</option>
+            <option value="4">4</option><option value="8">8</option><option value="16">16</option>
+            <option value="32">32</option><option value="64">64</option><option value="128+">128+</option>
+            <option value="Unknown">Unknown</option>
+          </select>
+        </div>
+        <div class="arch-field" data-field="disk_space_gb" data-parent="server_specs">
+          <div class="arch-field-label">Gateway 4 — Disk space (GB) per server</div>
+          <select id="f-gw4-disk-space-gb" onchange="onAF(this)">
+            <option value="">— Select —</option>
+            <option value="20">20</option><option value="50">50</option><option value="100">100</option>
+            <option value="200">200</option><option value="500">500</option><option value="1000+">1000+</option>
+            <option value="Unknown">Unknown</option>
+          </select>
+        </div>
+        <div class="arch-field" data-field="device_count">
+          <div class="arch-field-label">Approximate number of managed network devices</div>
+          <select id="f-gw4-device-count" onchange="onAF(this)">
+            <option value="">— Select —</option>
+            <option value="1-500">1–500</option><option value="500-2000">500–2000</option>
+            <option value="2000-5000">2000–5000</option><option value="5000-10000">5000–10000</option>
+            <option value="10000+">10000+</option><option value="Unknown">Unknown</option>
+          </select>
+        </div>
+        <div class="arch-subsection">Gateway 5 Migration</div>
+        <div class="arch-field" data-field="plans_to_migrate_to_gw5">
+          <div class="arch-field-label">Plans to migrate from Gateway 4 to Gateway 5?</div>
+          <div class="arch-confirm">
+            <div class="arch-confirm-opt" onclick="setConfirm('f-gw4-plans-migrate', true, this); archCond('gw4_migration_timeline', true)">Yes</div>
+            <div class="arch-confirm-opt" onclick="setConfirm('f-gw4-plans-migrate', false, this); archCond('gw4_migration_timeline', false)">No</div>
+          </div>
+          <input type="hidden" id="f-gw4-plans-migrate">
+        </div>
+        <div class="arch-field hidden" data-field="gw4_migration_timeline" data-cond="true">
+          <div class="arch-field-label">Expected migration timeline</div>
+          <select id="f-gw4-migration-timeline" onchange="onAF(this)">
+            <option value="">— Select —</option>
+            <option value="Next 3 months">Next 3 months</option><option value="3-6 months">3–6 months</option>
+            <option value="6-12 months">6–12 months</option><option value="12+ months">12+ months</option>
+            <option value="No timeline yet">No timeline yet</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# 6. Gateway 5 Architecture #}
+  <div class="arch-section" data-section="gateway5">
+    <div class="arch-section-head" onclick="archToggle(this)">
+      <div class="arch-section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="6" rx="1"/><rect x="2" y="14" width="20" height="6" rx="1"/></svg></div>
+      <div class="arch-section-meta">
+        <div class="arch-section-title">Gateway 5 Architecture</div>
+        <div class="arch-section-sub">Cluster configuration and HA</div>
+      </div>
+      <span class="arch-tag conditional">Conditional</span>
+      <span class="arch-section-mini" id="mini-gateway5">—</span>
+      <svg class="arch-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <div class="arch-section-body">
+      <div class="arch-skip" id="skip-gateway5" onclick="archSkip('gateway5', this)">
+        <div class="arch-skip-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1.5,6 4.5,9.5 10.5,2.5"/></svg></div>
+        <span>This environment does not have Gateway 5 — skip section</span>
+      </div>
+      <div id="body-gateway5">
+        <div class="arch-field" data-field="same_datacenter_as_platform">
+          <div class="arch-field-label">Gateway 5 in same datacenter as Platform?</div>
+          <div class="arch-confirm">
+            <div class="arch-confirm-opt" onclick="setConfirm('f-gw5-same-dc', true, this)">Yes</div>
+            <div class="arch-confirm-opt" onclick="setConfirm('f-gw5-same-dc', false, this)">No</div>
+          </div>
+          <input type="hidden" id="f-gw5-same-dc">
+        </div>
+        <div class="arch-subsection">Cluster Configuration</div>
+        <div class="arch-field" data-field="cluster_count">
+          <div class="arch-field-label">Number of Gateway 5 clusters</div>
+          <input type="number" min="1" id="f-gw5-cluster-count" placeholder="1" oninput="onAF(this); rebuildGw5Clusters()">
+        </div>
+        <div id="gw5-clusters-wrap"></div>
+        <div class="arch-subsection">High Availability</div>
+        <div class="arch-field" data-field="ha_enabled">
+          <div class="arch-field-label">Is HA enabled for Gateway 5?</div>
+          <div class="arch-confirm">
+            <div class="arch-confirm-opt" onclick="setConfirm('f-gw5-ha-enabled', true, this); archCond('gw5_ha_mode', true)">Yes</div>
+            <div class="arch-confirm-opt" onclick="setConfirm('f-gw5-ha-enabled', false, this); archCond('gw5_ha_mode', false)">No</div>
+          </div>
+          <input type="hidden" id="f-gw5-ha-enabled">
+        </div>
+        <div class="arch-field hidden" data-field="gw5_ha_mode" data-cond="true">
+          <div class="arch-field-label">HA mode</div>
+          <select id="f-gw5-ha-mode" onchange="onAF(this)">
+            <option value="">— Select —</option>
+            <option value="Active-Standby">Active-Standby</option>
+            <option value="Active-Active">Active-Active</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="arch-field" data-field="has_redundant_instances">
+          <div class="arch-field-label">Are there redundant Gateway 5 instances for failover?</div>
+          <div class="arch-confirm">
+            <div class="arch-confirm-opt" onclick="setConfirm('f-gw5-redundant', true, this)">Yes</div>
+            <div class="arch-confirm-opt" onclick="setConfirm('f-gw5-redundant', false, this)">No</div>
+          </div>
+          <input type="hidden" id="f-gw5-redundant">
+        </div>
+        <div class="arch-subsection">Deployment Type</div>
+        <div class="arch-field" data-field="deployment_type" data-parent="deployment">
+          <div class="arch-field-label">Gateway 5 — Deployment type</div>
+          <select id="f-gw5-deployment-type" onchange="onAF(this); archCond('gw5_deployment_type_other', this.value === 'Other')">
+            <option value="">— Select —</option>
+            <option value="Bare Metal">Bare Metal</option><option value="Virtual Machines (VMs)">Virtual Machines (VMs)</option>
+            <option value="Kubernetes (AWS EKS)">Kubernetes (AWS EKS)</option><option value="Kubernetes (Azure AKS)">Kubernetes (Azure AKS)</option>
+            <option value="Kubernetes (Self-Managed)">Kubernetes (Self-Managed)</option>
+            <option value="AWS Fargate">AWS Fargate</option><option value="Docker Containers">Docker Containers</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="arch-field hidden" data-field="gw5_deployment_type_other" data-parent="deployment" data-cond="true">
+          <input type="text" id="f-gw5-deployment-type-other" placeholder="e.g., LXC, Podman" oninput="onAF(this)">
+        </div>
+        <div class="arch-subsection">Server Specs</div>
+        <div class="arch-field" data-field="os_type" data-parent="server_specs">
+          <div class="arch-field-label">Gateway 5 — Operating System</div>
+          <select id="f-gw5-os-type" onchange="onAF(this); archCond('gw5_os_type_other', this.value === 'Other')">
+            <option value="">— Select —</option>
+            <option value="RHEL 8">RHEL 8</option><option value="RHEL 9">RHEL 9</option>
+            <option value="Rocky 8">Rocky 8</option><option value="Rocky 9">Rocky 9</option>
+            <option value="Alpine">Alpine</option><option value="Amazon Linux 2">Amazon Linux 2</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="arch-field hidden" data-field="gw5_os_type_other" data-parent="server_specs" data-cond="true">
+          <input type="text" id="f-gw5-os-type-other" placeholder="OS name" oninput="onAF(this)">
+        </div>
+        <div class="arch-field" data-field="cpu_cores" data-parent="server_specs">
+          <div class="arch-field-label">Gateway 5 — CPU cores per server</div>
+          <select id="f-gw5-cpu-cores" onchange="onAF(this)">
+            <option value="">— Select —</option>
+            <option value="2">2</option><option value="4">4</option><option value="8">8</option>
+            <option value="16">16</option><option value="32">32</option><option value="64+">64+</option>
+            <option value="Unknown">Unknown</option>
+          </select>
+        </div>
+        <div class="arch-field" data-field="memory_gb" data-parent="server_specs">
+          <div class="arch-field-label">Gateway 5 — Memory (GB) per server</div>
+          <select id="f-gw5-memory-gb" onchange="onAF(this)">
+            <option value="">— Select —</option>
+            <option value="4">4</option><option value="8">8</option><option value="16">16</option>
+            <option value="32">32</option><option value="64">64</option><option value="128+">128+</option>
+            <option value="Unknown">Unknown</option>
+          </select>
+        </div>
+        <div class="arch-field" data-field="disk_space_gb" data-parent="server_specs">
+          <div class="arch-field-label">Gateway 5 — Disk space (GB) per server</div>
+          <select id="f-gw5-disk-space-gb" onchange="onAF(this)">
+            <option value="">— Select —</option>
+            <option value="20">20</option><option value="50">50</option><option value="100">100</option>
+            <option value="200">200</option><option value="500">500</option><option value="1000+">1000+</option>
+            <option value="Unknown">Unknown</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# 7. Load Balancer #}
+  <div class="arch-section" data-section="load_balancer">
+    <div class="arch-section-head" onclick="archToggle(this)">
+      <div class="arch-section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><line x1="12" y1="7" x2="5" y2="17"/><line x1="12" y1="7" x2="19" y2="17"/></svg></div>
+      <div class="arch-section-meta">
+        <div class="arch-section-title">Load Balancer</div>
+        <div class="arch-section-sub">Type, routing, health checks</div>
+      </div>
+      <span class="arch-tag conditional">Conditional</span>
+      <span class="arch-section-mini" id="mini-load_balancer">—</span>
+      <svg class="arch-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <div class="arch-section-body">
+      <div class="arch-skip" id="skip-load_balancer" onclick="archSkip('load_balancer', this)">
+        <div class="arch-skip-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1.5,6 4.5,9.5 10.5,2.5"/></svg></div>
+        <span>No load balancer in front of Platform — skip section</span>
+      </div>
+      <div id="body-load_balancer">
+        <div class="arch-field" data-field="lb_type">
+          <div class="arch-field-label">Load balancer type</div>
+          <select id="f-lb-type" onchange="onAF(this); archCond('lb_type_other', this.value === 'Other')">
+            <option value="">— Select —</option>
+            <option value="F5 BIG-IP">F5 BIG-IP</option><option value="Nginx">Nginx</option>
+            <option value="AWS ALB">AWS ALB</option><option value="AWS NLB">AWS NLB</option>
+            <option value="Azure Load Balancer">Azure Load Balancer</option>
+            <option value="HAProxy">HAProxy</option><option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="arch-field hidden" data-field="lb_type_other" data-cond="true">
+          <div class="arch-field-label">Specify load balancer type</div>
+          <input type="text" id="f-lb-type-other" placeholder="e.g., Traefik, Envoy" oninput="onAF(this)">
+        </div>
+        <div class="arch-field" data-field="routing_policy">
+          <div class="arch-field-label">Routing policy</div>
+          <select id="f-lb-routing-policy" onchange="onAF(this)">
+            <option value="">— Select —</option>
+            <option value="Round Robin">Round Robin</option><option value="Least Connections">Least Connections</option>
+            <option value="IP Hash">IP Hash</option><option value="Weighted">Weighted</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="arch-field" data-field="session_stickiness">
+          <div class="arch-field-label">Session stickiness (sticky sessions) enabled?</div>
+          <div class="arch-confirm">
+            <div class="arch-confirm-opt" onclick="setConfirm('f-lb-stickiness', true, this); document.getElementById('lb-sticky-warn').classList.remove('visible')">Yes</div>
+            <div class="arch-confirm-opt" onclick="setConfirm('f-lb-stickiness', false, this); document.getElementById('lb-sticky-warn').classList.add('visible')">No</div>
+          </div>
+          <input type="hidden" id="f-lb-stickiness">
+          <div class="arch-warning" id="lb-sticky-warn">⚠ Session stickiness is recommended for Platform.</div>
+        </div>
+        <div class="arch-subsection">Health Checks</div>
+        <div class="arch-field" data-field="platform_health_endpoint">
+          <div class="arch-field-label">Platform health check endpoint</div>
+          <input type="text" id="f-lb-health-endpoint" placeholder="/health/status?exclude-services=true" value="/health/status?exclude-services=true" oninput="onAF(this)">
+        </div>
+        <div class="arch-field" data-field="health_check_interval">
+          <div class="arch-field-label">Health check interval</div>
+          <select id="f-lb-health-interval" onchange="onAF(this)">
+            <option value="">— Select —</option>
+            <option value="5 seconds">5 seconds</option><option value="10 seconds">10 seconds</option>
+            <option value="30 seconds">30 seconds</option><option value="60 seconds">60 seconds</option>
+            <option value="Other">Other</option><option value="Unknown">Unknown</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# 8. Kubernetes #}
+  <div class="arch-section" data-section="kubernetes">
+    <div class="arch-section-head" onclick="archToggle(this)">
+      <div class="arch-section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="12 2 2 7 2 17 12 22 22 17 22 7 12 2"/><polyline points="2 7 12 12 22 7"/><line x1="12" y1="22" x2="12" y2="12"/></svg></div>
+      <div class="arch-section-meta">
+        <div class="arch-section-title">Kubernetes Configuration</div>
+        <div class="arch-section-sub">Deployment method, probes, resources</div>
+      </div>
+      <span class="arch-tag conditional">Conditional</span>
+      <span class="arch-section-mini" id="mini-kubernetes">—</span>
+      <svg class="arch-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <div class="arch-section-body">
+      <div class="arch-skip" id="skip-kubernetes" onclick="archSkip('kubernetes', this)">
+        <div class="arch-skip-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1.5,6 4.5,9.5 10.5,2.5"/></svg></div>
+        <span>Not deployed on Kubernetes — skip section</span>
+      </div>
+      <div id="body-kubernetes">
+        <div class="arch-field" data-field="k8s_distribution">
+          <div class="arch-field-label">Kubernetes distribution</div>
+          <select id="f-k8s-distribution" onchange="onAF(this)">
+            <option value="">— Select —</option>
+            <option value="AWS EKS">AWS EKS</option><option value="Azure AKS">Azure AKS</option>
+            <option value="Google GKE">Google GKE</option><option value="OpenShift">OpenShift</option>
+            <option value="Rancher (RKE/RKE2)">Rancher (RKE/RKE2)</option>
+            <option value="Self-Managed (kubeadm)">Self-Managed (kubeadm)</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="arch-field" data-field="deployment_method">
+          <div class="arch-field-label">How are Itential components deployed to Kubernetes?</div>
+          <select id="f-k8s-deployment-method" onchange="onAF(this); document.getElementById('k8s-method-warn').classList.toggle('visible', this.value !== '' && !this.value.includes('Helm'))">
+            <option value="">— Select —</option>
+            <option value="Helm Charts (recommended)">Helm Charts (recommended)</option>
+            <option value="ArgoCD + Helm">ArgoCD + Helm</option><option value="FluxCD">FluxCD</option>
+            <option value="kubectl / Raw Manifests">kubectl / Raw Manifests</option>
+            <option value="Kustomize">Kustomize</option><option value="Other">Other</option>
+          </select>
+          <div class="arch-warning" id="k8s-method-warn">⚠ Itential recommends Helm charts for consistent, repeatable deployments.</div>
+        </div>
+        <div class="arch-subsection">Resource Configuration</div>
+        <div class="arch-field" data-field="has_custom_resources">
+          <div class="arch-field-label">Customized CPU/memory limits or Helm values for Itential pods?</div>
+          <div class="arch-confirm">
+            <div class="arch-confirm-opt" onclick="setConfirm('f-k8s-custom-resources', true, this); archCond('k8s_values_source', true); archCond('k8s_resource_notes', true)">Yes</div>
+            <div class="arch-confirm-opt" onclick="setConfirm('f-k8s-custom-resources', false, this); archCond('k8s_values_source', false); archCond('k8s_resource_notes', false)">No</div>
+          </div>
+          <input type="hidden" id="f-k8s-custom-resources">
+        </div>
+        <div class="arch-field hidden" data-field="k8s_values_source" data-cond="true">
+          <div class="arch-field-label">Where are Helm values / resource configs stored?</div>
+          <select id="f-k8s-values-source" onchange="onAF(this)">
+            <option value="">— Select —</option>
+            <option value="Git repository">Git repository</option>
+            <option value="Local files on bastion/admin host">Local files on bastion/admin host</option>
+            <option value="ArgoCD ApplicationSet">ArgoCD ApplicationSet</option>
+            <option value="Rancher Fleet">Rancher Fleet</option>
+            <option value="Other">Other</option><option value="Unknown">Unknown</option>
+          </select>
+        </div>
+        <div class="arch-field hidden" data-field="k8s_resource_notes" data-cond="true">
+          <div class="arch-field-label">Notable resource overrides (optional)</div>
+          <input type="text" id="f-k8s-resource-notes" placeholder="e.g., Platform pods set to 8Gi memory" oninput="onAF(this)">
+        </div>
+        <div class="arch-subsection">Probe Configuration</div>
+        <div class="arch-field" data-field="probes_customized">
+          <div class="arch-field-label">Liveness/readiness/startup probes customized from Itential defaults?</div>
+          <div class="arch-confirm">
+            <div class="arch-confirm-opt" onclick="setConfirm('f-k8s-probes-customized', true, this); archCond('k8s_probe_notes', true)">Yes</div>
+            <div class="arch-confirm-opt" onclick="setConfirm('f-k8s-probes-customized', false, this); archCond('k8s_probe_notes', false)">No</div>
+          </div>
+          <input type="hidden" id="f-k8s-probes-customized">
+        </div>
+        <div class="arch-field hidden" data-field="k8s_probe_notes" data-cond="true">
+          <div class="arch-field-label">Describe the probe changes (optional)</div>
+          <input type="text" id="f-k8s-probe-notes" placeholder="e.g., startup probe timeout increased to 120s" oninput="onAF(this)">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# 9. Monitoring #}
+  <div class="arch-section" data-section="monitoring">
+    <div class="arch-section-head" onclick="archToggle(this)">
+      <div class="arch-section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+      <div class="arch-section-meta">
+        <div class="arch-section-title">Monitoring &amp; Health Checks</div>
+        <div class="arch-section-sub">Monitoring tools and observability</div>
+      </div>
+      <span class="arch-tag required">Required</span>
+      <span class="arch-section-mini" id="mini-monitoring">—</span>
+      <svg class="arch-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <div class="arch-section-body">
+      <div class="arch-field" data-field="monitoring_tools">
+        <div class="arch-field-label">Monitoring tools in use (select all that apply)</div>
+        <div class="arch-checkbox-group" id="g-monitoring-tools">
+          <label class="arch-cb-opt"><input type="checkbox" value="Prometheus" onchange="onCB(this, 'monitoring_tools')"><span>Prometheus</span></label>
+          <label class="arch-cb-opt"><input type="checkbox" value="Grafana" onchange="onCB(this, 'monitoring_tools')"><span>Grafana</span></label>
+          <label class="arch-cb-opt"><input type="checkbox" value="Datadog" onchange="onCB(this, 'monitoring_tools')"><span>Datadog</span></label>
+          <label class="arch-cb-opt"><input type="checkbox" value="Splunk" onchange="onCB(this, 'monitoring_tools')"><span>Splunk</span></label>
+          <label class="arch-cb-opt"><input type="checkbox" value="New Relic" onchange="onCB(this, 'monitoring_tools')"><span>New Relic</span></label>
+          <label class="arch-cb-opt"><input type="checkbox" value="Dynatrace" onchange="onCB(this, 'monitoring_tools')"><span>Dynatrace</span></label>
+          <label class="arch-cb-opt"><input type="checkbox" value="Zabbix" onchange="onCB(this, 'monitoring_tools')"><span>Zabbix</span></label>
+          <label class="arch-cb-opt"><input type="checkbox" value="Nagios / Icinga" onchange="onCB(this, 'monitoring_tools')"><span>Nagios / Icinga</span></label>
+          <label class="arch-cb-opt"><input type="checkbox" value="AWS CloudWatch" onchange="onCB(this, 'monitoring_tools')"><span>AWS CloudWatch</span></label>
+          <label class="arch-cb-opt"><input type="checkbox" value="Azure Monitor" onchange="onCB(this, 'monitoring_tools')"><span>Azure Monitor</span></label>
+          <label class="arch-cb-opt"><input type="checkbox" value="Elastic / ELK Stack" onchange="onCB(this, 'monitoring_tools')"><span>Elastic / ELK</span></label>
+          <label class="arch-cb-opt"><input type="checkbox" value="Other" onchange="onCB(this, 'monitoring_tools'); archCond('monitoring_tools_other', this.checked)"><span>Other</span></label>
+          <label class="arch-cb-opt"><input type="checkbox" value="None" onchange="onCB(this, 'monitoring_tools'); onMonitoringNone()"><span>None</span></label>
+        </div>
+        <div class="arch-warning" id="monitoring-none-warn">⚠ Itential recommends monitoring for production environments.</div>
+      </div>
+      <div class="arch-field hidden" data-field="monitoring_tools_other" data-cond="true">
+        <div class="arch-field-label">Specify other monitoring tools</div>
+        <input type="text" id="f-monitoring-tools-other" placeholder="Tool names" oninput="onAF(this)">
+      </div>
+      <div id="monitoring-coverage-group">
+        <div class="arch-subsection">Monitoring Coverage</div>
+        <div class="arch-field" data-field="monitored_components">
+          <div class="arch-field-label">Which components are actively monitored? (select all that apply)</div>
+          <div class="arch-checkbox-group" id="g-monitored-components">
+            <label class="arch-cb-opt"><input type="checkbox" value="Platform (IAP) — application health and performance" onchange="onCB(this, 'monitored_components')"><span>Platform (IAP)</span></label>
+            <label class="arch-cb-opt"><input type="checkbox" value="MongoDB — replica set status, query performance, disk usage" onchange="onCB(this, 'monitored_components')"><span>MongoDB</span></label>
+            <label class="arch-cb-opt"><input type="checkbox" value="Redis — memory usage, key eviction, sentinel status" onchange="onCB(this, 'monitored_components')"><span>Redis</span></label>
+            <label class="arch-cb-opt"><input type="checkbox" value="Automation Gateway — job execution, health endpoints" onchange="onCB(this, 'monitored_components')"><span>Automation Gateway</span></label>
+            <label class="arch-cb-opt"><input type="checkbox" value="Host / VM — CPU, memory, disk, network at the OS level" onchange="onCB(this, 'monitored_components')"><span>Host / VM</span></label>
+            <label class="arch-cb-opt"><input type="checkbox" value="Load Balancer — backend health, request rates" onchange="onCB(this, 'monitored_components')"><span>Load Balancer</span></label>
+            <label class="arch-cb-opt"><input type="checkbox" value="None of the above are monitored specifically" onchange="onCB(this, 'monitored_components')"><span>None specifically</span></label>
+          </div>
+        </div>
+        <div class="arch-subsection">Alerting</div>
+        <div class="arch-field" data-field="has_alerting">
+          <div class="arch-field-label">Automated alerts configured for Itential component failures?</div>
+          <div class="arch-confirm">
+            <div class="arch-confirm-opt" onclick="setConfirm('f-mon-has-alerting', true, this); archCond('alert_channels', true)">Yes</div>
+            <div class="arch-confirm-opt" onclick="setConfirm('f-mon-has-alerting', false, this); archCond('alert_channels', false)">No</div>
+          </div>
+          <input type="hidden" id="f-mon-has-alerting">
+        </div>
+        <div class="arch-field hidden" data-field="alert_channels" data-cond="true">
+          <div class="arch-field-label">Alert delivery channels (select all that apply)</div>
+          <div class="arch-checkbox-group" id="g-alert-channels">
+            <label class="arch-cb-opt"><input type="checkbox" value="Email" onchange="onCB(this, 'alert_channels')"><span>Email</span></label>
+            <label class="arch-cb-opt"><input type="checkbox" value="Slack / Teams" onchange="onCB(this, 'alert_channels')"><span>Slack / Teams</span></label>
+            <label class="arch-cb-opt"><input type="checkbox" value="PagerDuty / OpsGenie" onchange="onCB(this, 'alert_channels')"><span>PagerDuty / OpsGenie</span></label>
+            <label class="arch-cb-opt"><input type="checkbox" value="ServiceNow / Ticketing" onchange="onCB(this, 'alert_channels')"><span>ServiceNow</span></label>
+            <label class="arch-cb-opt"><input type="checkbox" value="SMS" onchange="onCB(this, 'alert_channels')"><span>SMS</span></label>
+            <label class="arch-cb-opt"><input type="checkbox" value="Other" onchange="onCB(this, 'alert_channels')"><span>Other</span></label>
+          </div>
+        </div>
+        <div class="arch-subsection">Platform Health Endpoint</div>
+        <div class="arch-field" data-field="monitors_health_endpoint">
+          <div class="arch-field-label">Is <code>/health/status</code> polled by an external monitor?</div>
+          <div class="arch-confirm">
+            <div class="arch-confirm-opt" onclick="setConfirm('f-mon-health-endpoint', true, this); archCond('health_poll_interval', true)">Yes</div>
+            <div class="arch-confirm-opt" onclick="setConfirm('f-mon-health-endpoint', false, this); archCond('health_poll_interval', false)">No</div>
+          </div>
+          <input type="hidden" id="f-mon-health-endpoint">
+        </div>
+        <div class="arch-field hidden" data-field="health_poll_interval" data-cond="true">
+          <div class="arch-field-label">Polling interval</div>
+          <select id="f-mon-health-poll-interval" onchange="onAF(this)">
+            <option value="">— Select —</option>
+            <option value="10 seconds">10 seconds</option><option value="30 seconds">30 seconds</option>
+            <option value="60 seconds">60 seconds</option><option value="5 minutes">5 minutes</option>
+            <option value="Other">Other</option><option value="Unknown">Unknown</option>
+          </select>
+        </div>
+        <div class="arch-subsection">Log Aggregation</div>
+        <div class="arch-field" data-field="has_log_aggregation">
+          <div class="arch-field-label">Platform logs shipped to a central log aggregator?</div>
+          <div class="arch-confirm">
+            <div class="arch-confirm-opt" onclick="setConfirm('f-mon-log-agg', true, this); archCond('log_aggregator', true)">Yes</div>
+            <div class="arch-confirm-opt" onclick="setConfirm('f-mon-log-agg', false, this); archCond('log_aggregator', false)">No</div>
+          </div>
+          <input type="hidden" id="f-mon-log-agg">
+        </div>
+        <div class="arch-field hidden" data-field="log_aggregator" data-cond="true">
+          <div class="arch-field-label">Log aggregation tool</div>
+          <select id="f-mon-log-aggregator" onchange="onAF(this); archCond('log_aggregator_other', this.value === 'Other')">
+            <option value="">— Select —</option>
+            <option value="Splunk">Splunk</option><option value="Elastic / ELK">Elastic / ELK</option>
+            <option value="Datadog Logs">Datadog Logs</option><option value="Grafana Loki">Grafana Loki</option>
+            <option value="AWS CloudWatch Logs">AWS CloudWatch Logs</option>
+            <option value="Azure Log Analytics">Azure Log Analytics</option><option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="arch-field hidden" data-field="log_aggregator_other" data-cond="true">
+          <div class="arch-field-label">Specify log aggregation tool</div>
+          <input type="text" id="f-mon-log-agg-other" placeholder="Tool name" oninput="onAF(this)">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# 10. Network & Security #}
+  <div class="arch-section" data-section="network_security">
+    <div class="arch-section-head" onclick="archToggle(this)">
+      <div class="arch-section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+      <div class="arch-section-meta">
+        <div class="arch-section-title">Network &amp; Security</div>
+        <div class="arch-section-sub">Network config and compliance standards</div>
+      </div>
+      <span class="arch-tag required">Required</span>
+      <span class="arch-section-mini" id="mini-network_security">—</span>
+      <svg class="arch-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <div class="arch-section-body">
+      <div class="arch-field" data-field="mtu_size">
+        <div class="arch-field-label">MTU size across platform network</div>
+        <select id="f-net-mtu-size" onchange="onAF(this); document.getElementById('mtu-warn').classList.toggle('visible', this.value.includes('9000')); archCond('mtu_size_other', this.value === 'Other')">
+          <option value="">— Select —</option>
+          <option value="1500 (Standard — recommended)">1500 (Standard — recommended)</option>
+          <option value="9000 (Jumbo Frames)">9000 (Jumbo Frames)</option>
+          <option value="Other">Other</option><option value="Unknown">Unknown</option>
+        </select>
+        <div class="arch-warning" id="mtu-warn">⚠ MTU 9000 has caused issues with Platform. MTU 1500 is recommended.</div>
+      </div>
+      <div class="arch-field hidden" data-field="mtu_size_other" data-cond="true">
+        <div class="arch-field-label">Specify MTU size</div>
+        <div class="arch-field-hint">e.g., 1492, 4500</div>
+        <input type="text" id="f-net-mtu-size-other" placeholder="MTU value (bytes)" oninput="onAF(this)">
+      </div>
+      <div class="arch-field" data-field="has_connectivity_concerns">
+        <div class="arch-field-label">Any known network concerns between components?</div>
+        <div class="arch-field-hint">Latency, firewalls, VPNs, etc.</div>
+        <div class="arch-confirm">
+          <div class="arch-confirm-opt" onclick="setConfirm('f-net-connectivity', true, this); archCond('connectivity_notes', true)">Yes</div>
+          <div class="arch-confirm-opt" onclick="setConfirm('f-net-connectivity', false, this); archCond('connectivity_notes', false)">No</div>
+        </div>
+        <input type="hidden" id="f-net-connectivity">
+      </div>
+      <div class="arch-field hidden" data-field="connectivity_notes" data-cond="true">
+        <div class="arch-field-label">Describe the connectivity concerns</div>
+        <input type="text" id="f-net-connectivity-notes" placeholder="e.g., 15ms latency between Platform and MongoDB" oninput="onAF(this)">
+      </div>
+      <div class="arch-subsection">Security Standards</div>
+      <div class="arch-field" data-field="selinux_mode">
+        <div class="arch-field-label">SELinux mode</div>
+        <select id="f-sec-selinux-mode" onchange="onAF(this)">
+          <option value="">— Select —</option>
+          <option value="Enforcing">Enforcing</option><option value="Permissive">Permissive</option>
+          <option value="Disabled">Disabled</option>
+          <option value="N/A (Containers / Non-Linux)">N/A (Containers / Non-Linux)</option>
+        </select>
+      </div>
+      <div class="arch-field" data-field="compliance_standards">
+        <div class="arch-field-label">Security compliance standards (select all that apply)</div>
+        <div class="arch-checkbox-group" id="g-compliance-standards">
+          <label class="arch-cb-opt"><input type="checkbox" value="FIPS 140-2" onchange="onCB(this, 'compliance_standards')"><span>FIPS 140-2</span></label>
+          <label class="arch-cb-opt"><input type="checkbox" value="FIPS 140-3" onchange="onCB(this, 'compliance_standards')"><span>FIPS 140-3</span></label>
+          <label class="arch-cb-opt"><input type="checkbox" value="DISA STIG" onchange="onCB(this, 'compliance_standards')"><span>DISA STIG</span></label>
+          <label class="arch-cb-opt"><input type="checkbox" value="CIS Benchmarks" onchange="onCB(this, 'compliance_standards')"><span>CIS Benchmarks</span></label>
+          <label class="arch-cb-opt"><input type="checkbox" value="None" onchange="onCB(this, 'compliance_standards')"><span>None</span></label>
+          <label class="arch-cb-opt"><input type="checkbox" value="Other" onchange="onCB(this, 'compliance_standards'); archCond('compliance_other', this.checked)"><span>Other</span></label>
+        </div>
+      </div>
+      <div class="arch-field hidden" data-field="compliance_other" data-cond="true">
+        <div class="arch-field-label">Specify compliance standards</div>
+        <input type="text" id="f-sec-compliance-other" placeholder="e.g., FedRAMP, SOC 2, PCI-DSS" oninput="onAF(this)">
+      </div>
+    </div>
+  </div>
+
+  {# 11. Vulnerability Assessments #}
+  <div class="arch-section" data-section="vulnerability_assessments">
+    <div class="arch-section-head" onclick="archToggle(this)">
+      <div class="arch-section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2L3 7v6c0 5 4 9 9 10 5-1 9-5 9-10V7l-9-5z"/><path d="M9 12l2 2 4-4"/></svg></div>
+      <div class="arch-section-meta">
+        <div class="arch-section-title">Vulnerability Assessments</div>
+        <div class="arch-section-sub">Security scanning practices for this environment</div>
+      </div>
+      <span class="arch-tag required">Required</span>
+      <span class="arch-section-mini" id="mini-vulnerability_assessments">—</span>
+      <svg class="arch-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <div class="arch-section-body">
+      <div class="arch-field" data-field="performs_assessments">
+        <div class="arch-field-label">Do you perform vulnerability assessments on this environment?</div>
+        <div class="arch-field-hint">Includes vulnerability scans, penetration tests, or compliance audits.</div>
+        <div class="arch-confirm">
+          <div class="arch-confirm-opt" onclick="setConfirm('f-va-performs', true, this); onVAPerformsChange(true)">Yes</div>
+          <div class="arch-confirm-opt" onclick="setConfirm('f-va-performs', false, this); onVAPerformsChange(false)">No</div>
+        </div>
+        <input type="hidden" id="f-va-performs">
+      </div>
+      <div class="arch-field hidden" data-field="tools" data-cond="true">
+        <div class="arch-field-label">Tools used (select all that apply)</div>
+        <div class="arch-checkbox-group" id="g-va-tools">
+          <label class="arch-cb-opt"><input type="checkbox" value="Tenable / Nessus" onchange="onCB(this, 'tools')"><span>Tenable / Nessus</span></label>
+          <label class="arch-cb-opt"><input type="checkbox" value="Qualys" onchange="onCB(this, 'tools')"><span>Qualys</span></label>
+          <label class="arch-cb-opt"><input type="checkbox" value="Rapid7 / InsightVM" onchange="onCB(this, 'tools')"><span>Rapid7 / InsightVM</span></label>
+          <label class="arch-cb-opt"><input type="checkbox" value="OpenSCAP" onchange="onCB(this, 'tools')"><span>OpenSCAP</span></label>
+          <label class="arch-cb-opt"><input type="checkbox" value="Trivy" onchange="onCB(this, 'tools')"><span>Trivy</span></label>
+          <label class="arch-cb-opt"><input type="checkbox" value="Wiz" onchange="onCB(this, 'tools')"><span>Wiz</span></label>
+          <label class="arch-cb-opt"><input type="checkbox" value="Prisma Cloud" onchange="onCB(this, 'tools')"><span>Prisma Cloud</span></label>
+          <label class="arch-cb-opt"><input type="checkbox" value="CrowdStrike" onchange="onCB(this, 'tools')"><span>CrowdStrike</span></label>
+          <label class="arch-cb-opt"><input type="checkbox" value="Other" onchange="onCB(this, 'tools'); archCond('tools_other', this.checked)"><span>Other</span></label>
+        </div>
+      </div>
+      <div class="arch-field hidden" data-field="tools_other" data-cond="true">
+        <div class="arch-field-label">Specify other tool(s)</div>
+        <input type="text" id="f-va-tools-other" placeholder="e.g., custom scanner, in-house tool" oninput="onAF(this)">
+      </div>
+      <div class="arch-field hidden" data-field="frequency" data-cond="true">
+        <div class="arch-field-label">How often are assessments run?</div>
+        <select id="f-va-frequency" onchange="onAF(this)">
+          <option value="">— Select —</option>
+          <option value="Continuous (daily / on commit)">Continuous (daily / on commit)</option>
+          <option value="Weekly">Weekly</option>
+          <option value="Monthly">Monthly</option>
+          <option value="Quarterly">Quarterly</option>
+          <option value="Annually">Annually</option>
+          <option value="Ad hoc / On demand">Ad hoc / On demand</option>
+          <option value="Unknown">Unknown</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+</div>{# /arch-sections #}
+
+<div class="arch-complete-banner" id="arch-complete-banner">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="oklch(72% .22 145)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+  <div>
+    <h3>Architecture overview complete for <code>{{ target_env }}</code></h3>
+    <p>All required sections are filled in. Data is saved to <code>~/.atlas/architecture/{{ target_env }}.json</code> and will be included in the next Architecture Report for this environment.</p>
+  </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+(function () {
+  // ── Saved data from server ───────────────────────────────────────────
+  const SAVED = {{ arch_data_json | safe }};
+
+  // ── Section registry ─────────────────────────────────────────────────
+  // Maps section id → { fields[], skippable }
+  // field: { key, inputId, type, parent?, cond? }
+  const SECTIONS = [
+    { id: 'environment', skippable: false, fields: [
+      { key: 'environment_type',       inputId: 'f-environment-type',          type: 'select' },
+      { key: 'datacenter_location',    inputId: 'f-datacenter-location',       type: 'text' },
+      { key: 'hosting_provider',       inputId: 'f-hosting-provider',          type: 'select' },
+      { key: 'hosting_provider_other', inputId: 'f-hosting-provider-other',    type: 'text', cond: true },
+    ]},
+    { id: 'platform', skippable: false, fields: [
+      { key: 'active_instance_count',         inputId: 'f-active-instance-count',         type: 'int' },
+      { key: 'standby_instance_count',        inputId: 'f-standby-instance-count',        type: 'int' },
+      { key: 'all_in_same_datacenter',        inputId: 'f-all-in-same-datacenter',        type: 'confirm', cond: true },
+      { key: 'datacenter_details',            inputId: 'f-datacenter-details',            type: 'text', cond: true },
+      { key: 'deployment_type',               inputId: 'f-platform-deployment-type',      type: 'select', parent: 'deployment' },
+      { key: 'deployment_type_other',         inputId: 'f-platform-deployment-type-other',type: 'text', parent: 'deployment', cond: true },
+      { key: 'os_type',                       inputId: 'f-platform-os-type',              type: 'select', parent: 'server_specs' },
+      { key: 'os_type_other',                 inputId: 'f-platform-os-type-other',        type: 'text', parent: 'server_specs', cond: true },
+      { key: 'cpu_cores',                     inputId: 'f-platform-cpu-cores',            type: 'select', parent: 'server_specs' },
+      { key: 'memory_gb',                     inputId: 'f-platform-memory-gb',            type: 'select', parent: 'server_specs' },
+      { key: 'disk_space_gb',                 inputId: 'f-platform-disk-space-gb',        type: 'select', parent: 'server_specs' },
+    ]},
+    { id: 'mongodb', skippable: false, fields: [
+      { key: 'same_datacenter_as_platform',   inputId: 'f-mongo-same-dc',                 type: 'confirm' },
+      { key: 'replica_count',                 inputId: 'f-mongo-replica-count',           type: 'int' },
+      { key: 'replicas_across_datacenters',   inputId: 'f-mongo-across-dc',               type: 'confirm', cond: true },
+      { key: 'datacenter_distribution',       inputId: 'f-mongo-dc-distribution',         type: 'text', cond: true },
+      { key: 'os_type',                       inputId: 'f-mongo-os-type',                 type: 'select', parent: 'server_specs' },
+      { key: 'os_type_other',                 inputId: 'f-mongo-os-type-other',           type: 'text', parent: 'server_specs', cond: true },
+      { key: 'cpu_cores',                     inputId: 'f-mongo-cpu-cores',               type: 'select', parent: 'server_specs' },
+      { key: 'memory_gb',                     inputId: 'f-mongo-memory-gb',               type: 'select', parent: 'server_specs' },
+      { key: 'disk_space_gb',                 inputId: 'f-mongo-disk-space-gb',           type: 'select', parent: 'server_specs' },
+    ]},
+    { id: 'redis', skippable: false, fields: [
+      { key: 'deployment_type',               inputId: 'f-redis-deployment-type',         type: 'select' },
+      { key: 'redis_node_count',              inputId: 'f-redis-node-count',              type: 'int' },
+      { key: 'sentinel_count',               inputId: 'f-redis-sentinel-count',           type: 'int', cond: true },
+      { key: 'same_datacenter_as_platform',   inputId: 'f-redis-same-dc',                 type: 'confirm' },
+      { key: 'nodes_across_datacenters',      inputId: 'f-redis-across-dc',               type: 'confirm', cond: true },
+      { key: 'os_type',                       inputId: 'f-redis-os-type',                 type: 'select', parent: 'server_specs' },
+      { key: 'os_type_other',                 inputId: 'f-redis-os-type-other',           type: 'text', parent: 'server_specs', cond: true },
+      { key: 'cpu_cores',                     inputId: 'f-redis-cpu-cores',               type: 'select', parent: 'server_specs' },
+      { key: 'memory_gb',                     inputId: 'f-redis-memory-gb',               type: 'select', parent: 'server_specs' },
+      { key: 'disk_space_gb',                 inputId: 'f-redis-disk-space-gb',           type: 'select', parent: 'server_specs' },
+    ]},
+    { id: 'gateway4', skippable: true, fields: [
+      { key: 'instance_count',                inputId: 'f-gw4-instance-count',            type: 'int' },
+      { key: 'same_datacenter_as_platform',   inputId: 'f-gw4-same-dc',                   type: 'confirm' },
+      { key: 'deployment_type',               inputId: 'f-gw4-deployment-type',           type: 'select', parent: 'deployment' },
+      { key: 'deployment_type_other',         inputId: 'f-gw4-deployment-type-other',     type: 'text', parent: 'deployment', cond: true },
+      { key: 'os_type',                       inputId: 'f-gw4-os-type',                   type: 'select', parent: 'server_specs' },
+      { key: 'os_type_other',                 inputId: 'f-gw4-os-type-other',             type: 'text', parent: 'server_specs', cond: true },
+      { key: 'cpu_cores',                     inputId: 'f-gw4-cpu-cores',                 type: 'select', parent: 'server_specs' },
+      { key: 'memory_gb',                     inputId: 'f-gw4-memory-gb',                 type: 'select', parent: 'server_specs' },
+      { key: 'disk_space_gb',                 inputId: 'f-gw4-disk-space-gb',             type: 'select', parent: 'server_specs' },
+      { key: 'device_count',                  inputId: 'f-gw4-device-count',              type: 'select' },
+      { key: 'plans_to_migrate_to_gw5',       inputId: 'f-gw4-plans-migrate',             type: 'confirm' },
+      { key: 'migration_timeline',            inputId: 'f-gw4-migration-timeline',        type: 'select', cond: true },
+    ]},
+    { id: 'gateway5', skippable: true, fields: [
+      { key: 'same_datacenter_as_platform',   inputId: 'f-gw5-same-dc',                   type: 'confirm' },
+      { key: 'cluster_count',                 inputId: 'f-gw5-cluster-count',             type: 'int' },
+      { key: 'ha_enabled',                    inputId: 'f-gw5-ha-enabled',                type: 'confirm' },
+      { key: 'ha_mode',                       inputId: 'f-gw5-ha-mode',                   type: 'select', cond: true },
+      { key: 'has_redundant_instances',       inputId: 'f-gw5-redundant',                 type: 'confirm' },
+      { key: 'deployment_type',               inputId: 'f-gw5-deployment-type',           type: 'select', parent: 'deployment' },
+      { key: 'deployment_type_other',         inputId: 'f-gw5-deployment-type-other',     type: 'text', parent: 'deployment', cond: true },
+      { key: 'os_type',                       inputId: 'f-gw5-os-type',                   type: 'select', parent: 'server_specs' },
+      { key: 'os_type_other',                 inputId: 'f-gw5-os-type-other',             type: 'text', parent: 'server_specs', cond: true },
+      { key: 'cpu_cores',                     inputId: 'f-gw5-cpu-cores',                 type: 'select', parent: 'server_specs' },
+      { key: 'memory_gb',                     inputId: 'f-gw5-memory-gb',                 type: 'select', parent: 'server_specs' },
+      { key: 'disk_space_gb',                 inputId: 'f-gw5-disk-space-gb',             type: 'select', parent: 'server_specs' },
+    ]},
+    { id: 'load_balancer', skippable: true, fields: [
+      { key: 'lb_type',                       inputId: 'f-lb-type',                       type: 'select' },
+      { key: 'lb_type_other',                 inputId: 'f-lb-type-other',                 type: 'text', cond: true },
+      { key: 'routing_policy',                inputId: 'f-lb-routing-policy',             type: 'select' },
+      { key: 'session_stickiness',            inputId: 'f-lb-stickiness',                 type: 'confirm' },
+      { key: 'platform_health_endpoint',      inputId: 'f-lb-health-endpoint',            type: 'text' },
+      { key: 'health_check_interval',         inputId: 'f-lb-health-interval',            type: 'select' },
+    ]},
+    { id: 'kubernetes', skippable: true, fields: [
+      { key: 'k8s_distribution',              inputId: 'f-k8s-distribution',              type: 'select' },
+      { key: 'deployment_method',             inputId: 'f-k8s-deployment-method',         type: 'select' },
+      { key: 'has_custom_resources',          inputId: 'f-k8s-custom-resources',          type: 'confirm' },
+      { key: 'values_source',                 inputId: 'f-k8s-values-source',             type: 'select', cond: true },
+      { key: 'resource_notes',                inputId: 'f-k8s-resource-notes',            type: 'text', cond: true },
+      { key: 'probes_customized',             inputId: 'f-k8s-probes-customized',         type: 'confirm' },
+      { key: 'probe_notes',                   inputId: 'f-k8s-probe-notes',               type: 'text', cond: true },
+    ]},
+    { id: 'monitoring', skippable: false, fields: [
+      { key: 'monitoring_tools',              inputId: 'g-monitoring-tools',              type: 'checkbox-group' },
+      { key: 'monitoring_tools_other',        inputId: 'f-monitoring-tools-other',        type: 'text', cond: true },
+      { key: 'monitored_components',          inputId: 'g-monitored-components',          type: 'checkbox-group', cond: true },
+      { key: 'has_alerting',                  inputId: 'f-mon-has-alerting',              type: 'confirm', cond: true },
+      { key: 'alert_channels',               inputId: 'g-alert-channels',                type: 'checkbox-group', cond: true },
+      { key: 'monitors_health_endpoint',      inputId: 'f-mon-health-endpoint',           type: 'confirm', cond: true },
+      { key: 'health_poll_interval',          inputId: 'f-mon-health-poll-interval',      type: 'select', cond: true },
+      { key: 'has_log_aggregation',           inputId: 'f-mon-log-agg',                   type: 'confirm', cond: true },
+      { key: 'log_aggregator',               inputId: 'f-mon-log-aggregator',             type: 'select', cond: true },
+      { key: 'log_aggregator_other',          inputId: 'f-mon-log-agg-other',             type: 'text', cond: true },
+    ]},
+    { id: 'network_security', skippable: false, fields: [
+      { key: 'mtu_size',                      inputId: 'f-net-mtu-size',                  type: 'select' },
+      { key: 'mtu_size_other',                inputId: 'f-net-mtu-size-other',            type: 'text', cond: true },
+      { key: 'has_connectivity_concerns',     inputId: 'f-net-connectivity',              type: 'confirm' },
+      { key: 'connectivity_notes',            inputId: 'f-net-connectivity-notes',        type: 'text', cond: true },
+      { key: 'selinux_mode',                  inputId: 'f-sec-selinux-mode',              type: 'select' },
+      { key: 'compliance_standards',          inputId: 'g-compliance-standards',          type: 'checkbox-group' },
+      { key: 'compliance_other',              inputId: 'f-sec-compliance-other',          type: 'text', cond: true },
+    ]},
+    { id: 'vulnerability_assessments', skippable: false, fields: [
+      { key: 'performs_assessments',          inputId: 'f-va-performs',                   type: 'confirm' },
+      { key: 'tools',                         inputId: 'g-va-tools',                      type: 'checkbox-group', cond: true },
+      { key: 'tools_other',                   inputId: 'f-va-tools-other',                type: 'text', cond: true },
+      { key: 'frequency',                     inputId: 'f-va-frequency',                  type: 'select', cond: true },
+    ]},
+  ];
+
+  // Active environment — used as the ?env= param for save calls.
+  const TARGET_ENV = {{ target_env | tojson }};
+
+  const SKIPPABLE = new Set(SECTIONS.filter(s => s.skippable).map(s => s.id));
+
+  // ── State ─────────────────────────────────────────────────────────────
+  // completed: {sectionId: {key: value, ...}, ...}
+  // skipped: [sectionId, ...]
+  let _completed = SAVED.completed || {};
+  let _skipped   = new Set(SAVED.skipped || []);
+  let _saveTimer = null;
+  let _statusTimer = null;
+
+  // Cancel any pending architecture-save / status-clear timers when the
+  // user navigates away via hx-boost. Without this, an 800ms debounced
+  // save fires AFTER the body has swapped — POSTing the OLD env's
+  // architecture data while the user is now editing a different env.
+  // Both timers must be cleared because the status-clear closure also
+  // touches DOM nodes that will be detached after nav.
+  document.addEventListener('htmx:beforeSwap', function () {
+    if (_saveTimer)   { clearTimeout(_saveTimer);   _saveTimer = null; }
+    if (_statusTimer) { clearTimeout(_statusTimer); _statusTimer = null; }
+  }, { once: true });
+
+  // ── Toggle section open/close ─────────────────────────────────────────
+  window.archToggle = function(headEl) {
+    headEl.parentElement.classList.toggle('open');
+  };
+
+  // ── Show/hide conditional field ───────────────────────────────────────
+  window.archCond = function(dataField, show) {
+    document.querySelectorAll(`[data-field="${dataField}"]`).forEach(el => {
+      el.classList.toggle('hidden', !show);
+    });
+    schedSave();
+  };
+
+  // ── Confirm (Yes/No) helper ───────────────────────────────────────────
+  window.setConfirm = function(hiddenId, val, clickedOpt) {
+    const hidden = document.getElementById(hiddenId);
+    if (!hidden) return;
+    hidden.value = val ? 'true' : 'false';
+    const group = clickedOpt.parentElement;
+    group.querySelectorAll('.arch-confirm-opt').forEach(o => o.classList.remove('active'));
+    clickedOpt.classList.add('active');
+    schedSave();
+  };
+
+  // ── Checkbox group helper ─────────────────────────────────────────────
+  window.onCB = function(checkbox, _groupId) {
+    const opt = checkbox.closest('.arch-cb-opt');
+    opt.classList.toggle('active', checkbox.checked);
+    schedSave();
+  };
+
+  // ── Generic field change ──────────────────────────────────────────────
+  window.onAF = function(el) {
+    const val = el.value;
+    el.classList.toggle('filled', val !== '' && val !== null);
+    schedSave();
+  };
+
+  // ── Redis topology ────────────────────────────────────────────────────
+  window.onRedisTopology = function() {
+    const v = document.getElementById('f-redis-deployment-type').value;
+    archCond('sentinel_count', v === 'Sentinel');
+  };
+
+  // ── Platform instance count → cross-dc question ───────────────────────
+  window.onTotalInstances = function() {
+    const active  = parseInt(document.getElementById('f-active-instance-count').value  || '0');
+    const standby = parseInt(document.getElementById('f-standby-instance-count').value || '0');
+    const multi   = (active + standby) > 1;
+    archCond('all_in_same_datacenter', multi);
+    if (!multi) archCond('datacenter_details', false);
+  };
+
+  // ── Vulnerability Assessments — performs toggles tools/frequency ──────
+  window.onVAPerformsChange = function(performs) {
+    archCond('tools', performs);
+    archCond('frequency', performs);
+    if (!performs) {
+      // hide & clear "tools_other" when assessments aren't performed
+      archCond('tools_other', false);
+      const otherEl = document.getElementById('f-va-tools-other');
+      if (otherEl) { otherEl.value = ''; otherEl.classList.remove('filled'); }
+      // also clear all tool checkboxes so a "No" answer round-trips clean
+      document.querySelectorAll('#g-va-tools input[type=checkbox]').forEach(cb => {
+        cb.checked = false;
+        cb.closest('.arch-cb-opt').classList.remove('active');
+      });
+    }
+    schedSave();
+  };
+
+  // ── Monitoring — None selected hides coverage group ───────────────────
+  window.onMonitoringNone = function() {
+    const noneChecked = Array.from(
+      document.querySelectorAll('#g-monitoring-tools input[type=checkbox]')
+    ).some(cb => cb.value === 'None' && cb.checked);
+    document.getElementById('monitoring-coverage-group').style.display = noneChecked ? 'none' : '';
+    document.getElementById('monitoring-none-warn').classList.toggle('visible', noneChecked);
+    schedSave();
+  };
+
+  // ── Skip section ──────────────────────────────────────────────────────
+  window.archSkip = function(sectionId, skipEl) {
+    const wasSkipped = _skipped.has(sectionId);
+    if (wasSkipped) {
+      _skipped.delete(sectionId);
+      skipEl.classList.remove('active');
+      const body = document.getElementById('body-' + sectionId);
+      if (body) body.style.display = '';
+    } else {
+      _skipped.add(sectionId);
+      skipEl.classList.add('active');
+      const body = document.getElementById('body-' + sectionId);
+      if (body) body.style.display = 'none';
+    }
+    schedSave();
+  };
+
+  // ── GW5 cluster rows ──────────────────────────────────────────────────
+  window.rebuildGw5Clusters = function() {
+    const n = parseInt(document.getElementById('f-gw5-cluster-count').value) || 0;
+    const wrap = document.getElementById('gw5-clusters-wrap');
+    // preserve existing values
+    const existing = {};
+    wrap.querySelectorAll('input').forEach(inp => { if (inp.value) existing[inp.id] = inp.value; });
+    wrap.innerHTML = '';
+    for (let i = 1; i <= Math.min(n, 20); i++) {
+      const sid = `gw5-c${i}-servers`;
+      const rid = `gw5-c${i}-runners`;
+      const row = document.createElement('div');
+      row.className = 'arch-cluster-row';
+      row.innerHTML = `
+        <div class="arch-cluster-label">Cluster ${i}</div>
+        <div><label style="font-size:11px;color:var(--text-3)">App servers</label>
+          <input type="number" min="1" id="${sid}" class="arch-field" placeholder="1"
+            value="${existing[sid] || ''}" oninput="schedSave()" style="margin-top:3px">
+        </div>
+        <div><label style="font-size:11px;color:var(--text-3)">Script runners</label>
+          <input type="number" min="1" id="${rid}" class="arch-field" placeholder="1"
+            value="${existing[rid] || ''}" oninput="schedSave()" style="margin-top:3px">
+        </div>`;
+      wrap.appendChild(row);
+    }
+    schedSave();
+  };
+
+  // ── Read a single field value from the DOM ────────────────────────────
+  function readField(f) {
+    const el = document.getElementById(f.inputId);
+    if (!el) return null;
+    if (f.type === 'checkbox-group') {
+      return Array.from(el.querySelectorAll('input[type=checkbox]'))
+        .filter(cb => cb.checked).map(cb => cb.value);
+    }
+    if (f.type === 'confirm') return el.value === '' ? null : el.value === 'true';
+    if (f.type === 'int') { const v = parseInt(el.value); return isNaN(v) ? null : v; }
+    return el.value || null;
+  }
+
+  // ── Extract section data into manual.py-compatible shape ─────────────
+  function extractSection(sec) {
+    const flat = {}, nested = {};
+    sec.fields.forEach(f => {
+      const fieldEl = document.querySelector(`[data-field="${f.key}"]`);
+      const isVisible = !f.cond || (fieldEl && !fieldEl.classList.contains('hidden'));
+      if (!isVisible) return;
+      const v = readField(f);
+      if (v === null || v === '' || (Array.isArray(v) && v.length === 0)) return;
+      if (f.parent) {
+        if (!nested[f.parent]) nested[f.parent] = {};
+        nested[f.parent][f.key] = v;
+      } else {
+        flat[f.key] = v;
+      }
+    });
+    // GW5 clusters
+    if (sec.id === 'gateway5') {
+      const n = parseInt(document.getElementById('f-gw5-cluster-count')?.value) || 0;
+      const clusters = [];
+      for (let i = 1; i <= n; i++) {
+        const s = parseInt(document.getElementById(`gw5-c${i}-servers`)?.value) || null;
+        const r = parseInt(document.getElementById(`gw5-c${i}-runners`)?.value) || null;
+        clusters.push({ cluster: i, app_servers: s, script_runners: r });
+      }
+      if (clusters.length) flat.clusters = clusters;
+    }
+    return Object.assign(flat, nested);
+  }
+
+  // ── Build the full payload ────────────────────────────────────────────
+  function buildPayload() {
+    const completed = {};
+    const skipped   = [];
+
+    SECTIONS.forEach(sec => {
+      const isSkipped = _skipped.has(sec.id);
+      if (sec.id === 'gateway4' || sec.id === 'gateway5' || sec.id === 'load_balancer') {
+        completed[sec.id] = isSkipped ? { present: false } : { present: true, ...extractSection(sec) };
+        if (isSkipped) skipped.push(sec.id);
+        return;
+      }
+      if (sec.id === 'kubernetes') {
+        completed[sec.id] = isSkipped
+          ? { deployed_on_kubernetes: false }
+          : { deployed_on_kubernetes: true, ...extractSection(sec) };
+        if (isSkipped) skipped.push(sec.id);
+        return;
+      }
+      completed[sec.id] = extractSection(sec);
+    });
+
+    const allDone = SECTIONS.every(sec => {
+      if (_skipped.has(sec.id)) return true;
+      const p = sectionProgress(sec);
+      return p.total === 0 || p.filled >= p.total;
+    });
+
+    return { completed, skipped, status: allDone ? 'complete' : 'in_progress' };
+  }
+
+  // ── Progress counting ─────────────────────────────────────────────────
+  function sectionProgress(sec) {
+    if (_skipped.has(sec.id)) return { total: 0, filled: 0 };
+    let total = 0, filled = 0;
+    sec.fields.forEach(f => {
+      const fieldWrap = document.querySelector(`[data-field="${f.key}"]`);
+      if (!fieldWrap || fieldWrap.classList.contains('hidden')) return;
+      if (f.cond) return; // don't count conditionals in total (they vary)
+      total++;
+      const v = readField(f);
+      if (v !== null && v !== '' && !(Array.isArray(v) && v.length === 0)) filled++;
+    });
+    return { total, filled };
+  }
+
+  const CHECK_SVG = '<svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1.5,5 4,8 8.5,2"/></svg>';
+
+  function updateProgress() {
+    let totalFields = 0, filledFields = 0;
+    SECTIONS.forEach(sec => {
+      const p = sectionProgress(sec);
+      totalFields  += p.total;
+      filledFields += p.filled;
+
+      const secEl  = document.querySelector(`.arch-section[data-section="${sec.id}"]`);
+      const mini   = document.getElementById('mini-' + sec.id);
+      const tagEl  = secEl ? secEl.querySelector('.arch-tag') : null;
+      const isDone = p.total > 0 && p.filled >= p.total;
+      const isSkip = _skipped.has(sec.id);
+
+      // Mini progress text
+      if (mini) {
+        if (isSkip) {
+          mini.textContent = '';
+          mini.className = 'arch-section-mini';
+        } else if (p.total === 0) {
+          mini.textContent = '—';
+          mini.className = 'arch-section-mini';
+        } else {
+          mini.textContent = `${p.filled} / ${p.total}`;
+          mini.className = 'arch-section-mini' + (isDone ? ' done' : '');
+        }
+      }
+
+      // Badge state
+      if (tagEl) {
+        if (isSkip) {
+          tagEl.className = 'arch-tag skipped';
+          tagEl.innerHTML = CHECK_SVG + ' Skipped';
+        } else if (isDone) {
+          tagEl.className = 'arch-tag done';
+          tagEl.innerHTML = CHECK_SVG + ' Complete';
+        } else {
+          // restore original label
+          const orig = sec.skippable ? 'Conditional' : 'Required';
+          tagEl.className = 'arch-tag ' + (sec.skippable ? 'conditional' : 'required');
+          tagEl.textContent = orig;
+        }
+      }
+    });
+    const pct = totalFields > 0 ? Math.round((filledFields / totalFields) * 100) : 0;
+    document.getElementById('arch-progress-fill').style.width = pct + '%';
+    document.getElementById('arch-progress-label').textContent = `${filledFields} / ${totalFields} fields`;
+
+    const allDone = totalFields > 0 && filledFields >= totalFields;
+    document.getElementById('arch-complete-banner').classList.toggle('visible', allDone);
+  }
+
+  // ── Auto-save ─────────────────────────────────────────────────────────
+  window.schedSave = function() {
+    clearTimeout(_saveTimer);
+    _saveTimer = setTimeout(doSave, 800);
+    updateProgress();
+  };
+
+  async function doSave() {
+    const payload = buildPayload();
+    const status  = document.getElementById('arch-save-status');
+    try {
+      const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+      const url = '/architecture/save?env=' + encodeURIComponent(TARGET_ENV);
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': csrfMeta ? csrfMeta.content : '',
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!resp.ok) throw new Error(await resp.text());
+      status.textContent = 'Saved to ' + TARGET_ENV;
+      status.className = 'arch-save-status saved';
+      // Track this timer so the htmx:beforeSwap cleanup can cancel it —
+      // otherwise it fires on a detached node after nav.
+      if (_statusTimer) clearTimeout(_statusTimer);
+      _statusTimer = setTimeout(() => {
+        _statusTimer = null;
+        if (!status.isConnected) return;
+        status.textContent = '';
+        status.className = 'arch-save-status';
+      }, 2500);
+    } catch (e) {
+      status.textContent = 'Save failed';
+      status.className = 'arch-save-status error';
+    }
+  }
+
+  // ── Restore saved state into form ─────────────────────────────────────
+  function setValue(inputId, type, value) {
+    const el = document.getElementById(inputId);
+    if (!el || value === null || value === undefined) return;
+    if (type === 'checkbox-group') {
+      const vals = Array.isArray(value) ? value : [value];
+      el.querySelectorAll('input[type=checkbox]').forEach(cb => {
+        if (vals.includes(cb.value)) {
+          cb.checked = true;
+          cb.closest('.arch-cb-opt').classList.add('active');
+        }
+      });
+    } else if (type === 'confirm') {
+      el.value = value ? 'true' : 'false';
+      const group = el.previousElementSibling;
+      if (group && group.classList.contains('arch-confirm')) {
+        group.querySelectorAll('.arch-confirm-opt').forEach(opt => {
+          const isYes = opt.textContent.trim() === 'Yes';
+          opt.classList.toggle('active', value ? isYes : !isYes);
+        });
+      }
+    } else {
+      el.value = value;
+      if (value !== '') el.classList.add('filled');
+    }
+  }
+
+  function restoreSection(sec, data) {
+    if (!data) return;
+    sec.fields.forEach(f => {
+      const src = f.parent ? data[f.parent] : data;
+      if (!src) return;
+      setValue(f.inputId, f.type, src[f.key]);
+    });
+    // GW5 clusters
+    if (sec.id === 'gateway5' && data.clusters) {
+      const countEl = document.getElementById('f-gw5-cluster-count');
+      if (countEl) { countEl.value = data.clusters.length; countEl.classList.add('filled'); }
+      rebuildGw5Clusters();
+      data.clusters.forEach((c, i) => {
+        const sid = `gw5-c${i + 1}-servers`;
+        const rid = `gw5-c${i + 1}-runners`;
+        const se  = document.getElementById(sid);
+        const re  = document.getElementById(rid);
+        if (se && c.app_servers)    se.value = c.app_servers;
+        if (re && c.script_runners) re.value = c.script_runners;
+      });
+    }
+  }
+
+  function restoreAll() {
+    const completed = SAVED.completed || {};
+    const skipped   = new Set(SAVED.skipped || []);
+
+    SECTIONS.forEach(sec => {
+      const isSkipped = skipped.has(sec.id);
+      if (isSkipped) {
+        _skipped.add(sec.id);
+        const skipEl = document.getElementById('skip-' + sec.id);
+        if (skipEl) skipEl.classList.add('active');
+        const body = document.getElementById('body-' + sec.id);
+        if (body) body.style.display = 'none';
+        return;
+      }
+      const sdata = completed[sec.id] || {};
+      // strip wrapper keys added for skippable sections
+      const clean = Object.assign({}, sdata);
+      delete clean.present;
+      delete clean.deployed_on_kubernetes;
+      restoreSection(sec, clean);
+    });
+
+    // fire conditional logic based on restored values
+    onTotalInstances();
+    const redisType = document.getElementById('f-redis-deployment-type');
+    if (redisType && redisType.value) onRedisTopology();
+    const monNone = Array.from(document.querySelectorAll('#g-monitoring-tools input[type=checkbox]'))
+      .some(cb => cb.value === 'None' && cb.checked);
+    if (monNone) onMonitoringNone();
+    const lbStickyHidden = document.getElementById('f-lb-stickiness');
+    if (lbStickyHidden && lbStickyHidden.value === 'false') {
+      const w = document.getElementById('lb-sticky-warn');
+      if (w) w.classList.add('visible');
+    }
+    const mtuEl = document.getElementById('f-net-mtu-size');
+    if (mtuEl && mtuEl.value.includes('9000')) {
+      const w = document.getElementById('mtu-warn');
+      if (w) w.classList.add('visible');
+    }
+    if (mtuEl && mtuEl.value === 'Other') archCond('mtu_size_other', true);
+    // Vulnerability Assessments — show tools/frequency only when "Yes"
+    const vaPerforms = document.getElementById('f-va-performs');
+    if (vaPerforms) {
+      const performs = vaPerforms.value === 'true';
+      archCond('tools', performs);
+      archCond('frequency', performs);
+      if (performs) {
+        const otherCb = Array.from(
+          document.querySelectorAll('#g-va-tools input[type=checkbox]')
+        ).find(cb => cb.value === 'Other');
+        if (otherCb && otherCb.checked) archCond('tools_other', true);
+      }
+    }
+  }
+
+  // ── Copy-from confirmation ────────────────────────────────────────────
+  const copyForm = document.getElementById('arch-copy-form');
+  if (copyForm) {
+    // True if the current env already has any completed sections.
+    const hasExisting = Object.keys(_completed).some(
+      k => _completed[k] && Object.keys(_completed[k]).length > 0
+    );
+    copyForm.addEventListener('submit', function(ev) {
+      if (!hasExisting) return; // nothing to overwrite
+      const src = document.getElementById('arch-copy-src');
+      const srcName = src ? src.value : 'another environment';
+      const ok = window.confirm(
+        `This will overwrite '` + TARGET_ENV + `' with answers from '` + srcName + `'.\n\n` +
+        `Your current answers for '` + TARGET_ENV + `' will be replaced. Continue?`
+      );
+      if (!ok) {
+        ev.preventDefault();
+        return;
+      }
+      // Server refuses overwrite without explicit flag; add it now.
+      let hidden = copyForm.querySelector('input[name="overwrite"]');
+      if (!hidden) {
+        hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'overwrite';
+        copyForm.appendChild(hidden);
+      }
+      hidden.value = '1';
+    });
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────
+  restoreAll();
+  updateProgress();
+  // Open first section by default if nothing saved
+  if (!Object.keys(_completed).length && !_skipped.size) {
+    const first = document.querySelector('.arch-section');
+    if (first) first.classList.add('open');
+  }
+
+  // Strip one-shot copy flash params from the URL so a reload doesn't keep
+  // re-displaying the success/error banner.
+  try {
+    const u = new URL(window.location.href);
+    const dirty = ['copied_from', 'copied_count', 'copy_error']
+      .some(k => u.searchParams.has(k));
+    if (dirty) {
+      ['copied_from', 'copied_count', 'copy_error'].forEach(k => u.searchParams.delete(k));
+      window.history.replaceState({}, '', u.toString());
+    }
+  } catch (_) { /* old browser — leave URL alone */ }
+})();
+</script>
+
+{% endblock %}

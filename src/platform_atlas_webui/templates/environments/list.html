@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Environments — Platform Atlas{% endblock %}
+{% block crumb %}Environments{% endblock %}
+{% block content %}
+
+{% if from_tier == 'extended' %}
+<div class="flash flash--info mb-5 flex items-start gap-3">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 mt-px"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+  <div>
+    <strong>Extended tier activated — set up credentials</strong><br>
+    <span class="text-[12px]">
+      Edit your active environment to add SSH, MongoDB, and Redis connection details, or create a new environment configured for Extended tier.
+    </span>
+  </div>
+</div>
+{% endif %}
+
+<header class="flex items-end justify-between gap-6 pb-5 border-b border-line mb-6">
+  <div>
+    <div class="eyebrow"><span class="dot"></span> Configuration</div>
+    <h1 class="text-[36px] leading-[1.05] font-semibold tracking-[-0.038em] mt-2 mb-1.5">
+      Environments, <em class="not-italic text-text-3">audit targets</em>
+    </h1>
+    <p class="text-[14px] text-text-2 max-w-[64ch]">
+      Each environment is an overlay with its own URI, topology, tier, and credentials.
+      The active environment determines what the next capture targets.
+    </p>
+  </div>
+  <div class="flex items-center gap-2">
+    <a class="btn primary" href="/environments/new">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+      New environment
+    </a>
+  </div>
+</header>
+
+{% if not environments %}
+  <section class="flex flex-col items-center justify-center py-12 px-6 text-center bg-surface border border-line rounded-lg">
+    <strong class="mb-1.5">No environments configured</strong>
+    <span class="text-text-3 max-w-[440px] text-[13px]">
+      An environment captures the URIs, tier, and credential backend for one deployment.
+      Atlas won't run captures or preflight without one.
+    </span>
+    <div class="mt-4">
+      <a class="btn primary" href="/environments/new">+ New environment</a>
+    </div>
+  </section>
+{% else %}
+  <section class="card">
+    <div class="card-head">
+      <h3>All environments</h3>
+      <span class="sub">{{ environments|length }} total</span>
+    </div>
+    <div>
+      {% for env in environments %}
+        <div x-data="{ pending: false }"
+             :class="pending && 'bg-ok-soft transition-colors duration-150'"
+             class="flex items-center gap-3 px-4 py-3 text-[13px] border-b border-line last:border-b-0 hover:bg-surface-2">
+          <span class="status-dot {% if env.is_active %}ok{% else %}idle{% endif %}"></span>
+          <span class="font-medium truncate">
+            <a href="/environments/{{ env.name }}" class="text-inherit hover:text-accent no-underline">{{ env.name }}</a>
+            {% if env.is_active %}<span class="chip ok ml-2"><span class="dot"></span>Active</span>{% endif %}
+          </span>
+          <span class="text-text-3 truncate">
+            {{ env.tier|capitalize }}
+            {% if env.organization_name %} · {{ env.organization_name }}{% endif %}
+            {% if env.credential_backend %} · {{ env.credential_backend }}{% endif %}
+          </span>
+          <span class="ml-auto text-text-3 font-mono truncate max-w-[40ch]">{{ env.platform_uri or '—' }}</span>
+          <span class="flex gap-1.5 shrink-0">
+            {% if not env.is_active %}
+              <form action="/environments/{{ env.name }}/activate" method="post" class="inline" @submit="pending = true">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button class="btn sm" type="submit" data-loading-label="Activating…" :disabled="pending">Activate</button>
+              </form>
+            {% endif %}
+            <a class="btn sm" href="/environments/{{ env.name }}/edit">Edit</a>
+            <form action="/environments/{{ env.name }}/delete" method="post" class="inline"
+                  data-confirm-action data-confirm-kind="danger"
+                  data-confirm-title="Delete environment?"
+                  data-confirm-message="Delete environment '{{ env.name }}'? This cannot be undone."
+                  data-confirm-label="Delete">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button class="btn sm danger" type="submit">Delete</button>
+            </form>
+          </span>
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block title %}Reports — Platform Atlas{% endblock %}
+{% block crumb %}Reports{% endblock %}
+{% block content %}
+
+<header class="flex items-end justify-between gap-6 pb-5 border-b border-line mb-6">
+  <div>
+    <div class="eyebrow"><span class="dot"></span> Reports</div>
+    <h1 class="text-[36px] leading-[1.05] font-semibold tracking-[-0.038em] mt-2 mb-1.5">Compliance reports</h1>
+    <p class="text-[14px] text-text-2 max-w-[64ch]">
+      Generated reports from completed audit sessions. Each report is a self-contained HTML file
+      you can open in any browser or share with your team and stakeholders.
+    </p>
+  </div>
+  {% if reports %}
+    {% set _env_unique = reports | map(attribute='environment') | list | unique | list %}
+    <div class="hidden md:flex items-center gap-6 text-[12px] text-text-3 pb-1 shrink-0">
+      <span class="inline-flex flex-col items-end leading-tight">
+        <b class="text-text font-semibold text-[20px] tracking-[-0.02em]">{{ reports | length }}</b>
+        <span class="uppercase tracking-wider text-[10px]">report{{ '' if reports|length == 1 else 's' }}</span>
+      </span>
+      <span class="inline-flex flex-col items-end leading-tight">
+        <b class="text-text font-semibold text-[20px] tracking-[-0.02em]">{{ _env_unique | length }}</b>
+        <span class="uppercase tracking-wider text-[10px]">environment{{ '' if _env_unique|length == 1 else 's' }}</span>
+      </span>
+    </div>
+  {% endif %}
+</header>
+
+{% if not reports %}
+  <section class="flex flex-col items-center justify-center py-14 px-6 text-center bg-surface border border-line rounded-lg">
+    <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" class="opacity-40 mb-3.5 text-text-3">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+      <line x1="9" y1="13" x2="15" y2="13"/>
+      <line x1="9" y1="17" x2="13" y2="17"/>
+    </svg>
+    <strong class="text-[15px] mb-1.5">No reports yet</strong>
+    <span class="text-text-3 max-w-[460px] text-[13px]">
+      Reports appear here once a session completes the full pipeline (capture → validate → report).
+      Open a session to run each step, or use <em>Run full pipeline</em> to do it in one shot.
+    </span>
+    <div class="flex gap-2 mt-4">
+      <a class="btn primary" href="/sessions">Go to sessions</a>
+    </div>
+  </section>
+
+{% else %}
+
+  {% set env_names = [] %}
+  {% for r in reports %}
+    {% set env = r.environment or '(no environment)' %}
+    {% if env not in env_names %}{% set _ = env_names.append(env) %}{% endif %}
+  {% endfor %}
+
+  {% for env_name in env_names %}
+    {% set env_reports = reports | selectattr('environment', 'equalto', env_name) | list if env_name != '(no environment)' else reports | selectattr('environment', 'equalto', '') | list %}
+
+    {# Aggregate compliance for this environment, weighted by rules evaluated.
+       A report where everything was skipped contributes nothing to the average,
+       which is what we want — "0% green-fielded" shouldn't drag the env down. #}
+    {% set ns = namespace(p=0, f=0) %}
+    {% for r in env_reports %}
+      {% set ns.p = ns.p + (r.pass_count or 0) %}
+      {% set ns.f = ns.f + (r.fail_count or 0) %}
+    {% endfor %}
+    {% set env_eval = ns.p + ns.f %}
+    {% set env_pct = ((ns.p / env_eval) * 100) | int if env_eval else 0 %}
+    {% if env_eval == 0 %}{% set env_health_class = 'text-text-3' %}
+    {% elif ns.f == 0 %}{% set env_health_class = 'text-ok' %}
+    {% elif ns.f < 5 %}{% set env_health_class = 'text-warn' %}
+    {% else %}{% set env_health_class = 'text-bad' %}{% endif %}
+
+    <section class="card mb-5">
+      <div class="card-head">
+        <h3 class="flex items-center gap-2">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-accent shrink-0"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 12l9 4 9-4"/><path d="M3 17l9 4 9-4"/></svg>
+          {{ env_name }}
+        </h3>
+        <span class="sub">{{ env_reports | length }} report{{ '' if env_reports | length == 1 else 's' }}</span>
+        {% if env_eval %}
+          <span class="right text-[12px]">
+            <span class="text-text-3 mr-1.5">avg compliance</span>
+            <b class="font-semibold {{ env_health_class }}">{{ env_pct }}%</b>
+          </span>
+        {% endif %}
+      </div>
+
+      {# Column headers #}
+      <div class="grid grid-cols-[8px_minmax(220px,1fr)_240px_140px_140px] gap-x-4 px-4 pt-3 pb-2 border-b border-line">
+        <span></span>
+        <span class="text-[11px] text-text-3 font-semibold uppercase tracking-wider">Session</span>
+        <span class="text-[11px] text-text-3 font-semibold uppercase tracking-wider">Compliance</span>
+        <span class="text-[11px] text-text-3 font-semibold uppercase tracking-wider">Updated</span>
+        <span class="text-[11px] text-text-3 font-semibold uppercase tracking-wider text-right">Actions</span>
+      </div>
+
+      {% for r in env_reports %}
+        {% set evaluated = (r.pass_count or 0) + (r.fail_count or 0) %}
+        {% if evaluated > 0 %}
+          {% set pass_pct = ((r.pass_count / evaluated) * 100) | int %}
+          {% if r.fail_count == 0 %}{% set health_token = 'ok' %}
+          {% elif r.fail_count < 5 %}{% set health_token = 'warn' %}
+          {% else %}{% set health_token = 'bad' %}{% endif %}
+        {% else %}
+          {% set pass_pct = 0 %}
+          {% set health_token = '' %}
+        {% endif %}
+
+        {% if evaluated == 0 %}{% set dot_class = 'idle' %}
+        {% elif r.fail_count == 0 %}{% set dot_class = 'ok' %}
+        {% else %}{% set dot_class = 'fail' %}{% endif %}
+
+        <div class="grid grid-cols-[8px_minmax(220px,1fr)_240px_140px_140px] gap-x-4 items-center px-4 py-4 border-b border-line last:border-b-0 hover:bg-surface-2 transition-colors duration-100">
+          <span class="status-dot {{ dot_class }}"></span>
+
+          <div class="min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-[13px] font-medium">{{ r.name }}</span>
+              {% if r.is_active %}<span class="chip ok text-[10px] px-1.5 py-px"><span class="dot"></span>Active</span>{% endif %}
+              {% if r.tier == 'standard' %}
+                <span class="chip text-[10px] px-1.5 py-px" style="color:oklch(60% 0.18 220); border-color:oklch(60% 0.18 220/.3); background:oklch(60% 0.18 220/.07);">Standard</span>
+              {% else %}
+                <span class="chip text-[10px] px-1.5 py-px" style="color:oklch(70% 0.18 30); border-color:oklch(70% 0.18 30/.3); background:oklch(70% 0.18 30/.07);">Extended</span>
+              {% endif %}
+            </div>
+            {% if r.ruleset_id %}
+              <div class="text-[11px] text-text-3 font-mono mt-1 truncate">
+                {{ r.ruleset_id }}{% if r.ruleset_profile %} <span class="text-text-4">({{ r.ruleset_profile }})</span>{% endif %}
+              </div>
+            {% endif %}
+          </div>
+
+          {# Compliance — stacked: big %, breakdown chips, progress bar #}
+          <div class="min-w-0">
+            {% if evaluated > 0 %}
+              <div class="flex items-baseline gap-2.5 mb-2">
+                <span class="text-[20px] font-semibold tracking-[-0.025em] text-{{ health_token }} leading-none">{{ pass_pct }}%</span>
+                <span class="text-[11px] text-text-3 leading-none">
+                  <span class="text-ok font-semibold">{{ r.pass_count }}</span><span class="text-text-4"> pass</span>
+                  <span class="text-text-4 mx-0.5">·</span>
+                  <span class="text-bad font-semibold">{{ r.fail_count }}</span><span class="text-text-4"> fail</span>
+                  {% if r.skip_count %}
+                    <span class="text-text-4 mx-0.5">·</span>
+                    <span class="text-text-3 font-semibold">{{ r.skip_count }}</span><span class="text-text-4"> skip</span>
+                  {% endif %}
+                </span>
+              </div>
+              <div class="progress" style="height:5px;"><i style="width:{{ pass_pct }}%; background:var(--{{ health_token }});"></i></div>
+            {% else %}
+              <div class="text-[12px] leading-tight">
+                <div class="text-text-3">Not evaluated</div>
+                {% if r.skip_count %}
+                  <div class="text-text-4 text-[11px] mt-0.5">{{ r.skip_count }} rule{{ '' if r.skip_count == 1 else 's' }} skipped</div>
+                {% endif %}
+              </div>
+            {% endif %}
+          </div>
+
+          {# Updated — date + time, stacked #}
+          <div class="font-mono leading-tight">
+            {% if r.updated_at %}
+              <div class="text-[12px] text-text-2">{{ r.updated_at[:10] }}</div>
+              <div class="text-[11px] text-text-4 mt-0.5">{{ r.updated_at[11:16] }}</div>
+            {% else %}
+              <span class="text-text-4 text-[12px]">—</span>
+            {% endif %}
+          </div>
+
+          {# Actions — primary CTA opens the in-WebUI tabbed view; the
+             standalone HTML stays one click away for export/download. #}
+          <div class="flex items-center gap-3 justify-end">
+            <a class="btn sm primary inline-flex items-center gap-1"
+               href="/reports/{{ r.name }}"
+               title="Open the unified report (Compliance / Operational / Architecture)">
+              Open
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </a>
+            <a class="text-[12px] text-text-3 hover:text-accent no-underline whitespace-nowrap"
+               href="/reports/{{ r.name }}/html" target="_blank" rel="noopener"
+               title="Open the standalone HTML report in a new tab">HTML</a>
+            <a class="text-[12px] text-text-3 hover:text-accent no-underline whitespace-nowrap"
+               href="/sessions/{{ r.name }}"
+               title="Go to the audit session that produced this report">Session</a>
+          </div>
+        </div>
+      {% endfor %}
+    </section>
+  {% endfor %}
+
+{% endif %}
+
+{% endblock %}

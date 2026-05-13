@@ -1,0 +1,572 @@
+{% extends "base.html" %}
+{% block title %}Atlas Report · {{ session_name }}{% endblock %}
+{% block crumb %}<a href="/reports" class="text-text-3 hover:text-accent no-underline">Reports</a> <span class="text-text-4 mx-1">/</span> <span class="font-mono">{{ session_name }}</span>{% endblock %}
+{% block content %}
+
+{# ── Report-specific stylesheet (theme-agnostic — uses atlas.css vars) ── #}
+<link rel="stylesheet" href="{{ url_for('static', path='css/reports/viewmodel.css') }}?v={{ asset_version }}">
+
+{# ── Display + mono fonts (Inter + JetBrains Mono) — loaded only on this
+     route via parallel <link>s so they don't block the stylesheet. Falls
+     back to system sans / mono if the network is unreachable. The
+     "frosted" style guide calls for these two families. #}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+{# ── Tabbed report shell ──────────────────────────────────────────────── #}
+{# Alpine drives tab state; viewmodel.js hydrates each panel from JSON.
+   data-vm-session passes the session name to JS without inline scripts so
+   our CSP stays strict-source. data-vm-url is the fetch endpoint — keeping
+   it in markup means the JS file has zero hard-coded paths. #}
+<section id="vm-root"
+         x-data="{ tab: 'compliance', loaded: false, error: null }"
+         data-vm-session="{{ session_name }}"
+         data-vm-url="/reports/{{ session_name }}/viewmodel"
+         class="vm-root">
+
+  {# ── Backdrop ────────────────────────────────────────────────────────
+       Two soft washes + a faint grid sit behind every panel so the
+       backdrop-filter blur on each panel has something to bite on.
+       Position is `absolute` (scoped to .vm-root) — never `fixed`, so
+       the wash doesn't paint over the global sidebar / topbar. #}
+  <div class="vm-backdrop" aria-hidden="true">
+    <div class="vm-backdrop__wash vm-backdrop__wash--accent"></div>
+    <div class="vm-backdrop__wash vm-backdrop__wash--info"></div>
+  </div>
+
+  {# ── Action bar — just the export shortcuts, right-aligned. The
+       session name is already in the topbar breadcrumb and the tier is
+       already in the topbar pill, so we don't repeat them here. #}
+  <div class="vm-actionbar">
+    <a class="btn sm" href="/reports/{{ session_name }}/html" target="_blank" rel="noopener"
+       title="Open the standalone HTML report (the file the CLI generates) in a new tab">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+      </svg>
+      Standalone HTML
+    </a>
+    <a class="btn sm" href="/sessions/{{ session_name }}"
+       title="Go to the audit session that produced this report">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4" y="3" width="16" height="18" rx="2"/>
+        <path d="M8 7h8M8 11h8M8 15h5"/>
+      </svg>
+      Session
+    </a>
+  </div>
+
+  {# ── Tab strip ─────────────────────────────────────────────────────── #}
+  {# The identity strip moved to the bottom of the report (acts as the
+     footer / provenance row). The tabs sit directly under the title so
+     the viewer drops into content immediately.
+
+     `data-tab-id` is read by the JS-driven sliding indicator so the
+     active underline animates smoothly between tabs. Alpine still owns
+     panel visibility via `tab`; the indicator just rides along. #}
+  <nav class="vm-tabs" role="tablist" aria-label="Report sections">
+    {# Sliding underline — JS positions it under the active tab and
+       animates between positions on tab change (anime.js outElastic). #}
+    <span class="vm-tab-indicator" data-vm-tab-indicator aria-hidden="true"></span>
+    <button type="button" role="tab" class="vm-tab"
+            data-tab-id="compliance"
+            :class="tab === 'compliance' && 'is-active'"
+            :aria-selected="tab === 'compliance'"
+            @click="tab = 'compliance'">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+      </svg>
+      <span>Compliance</span>
+      <span class="vm-tab-count" data-vm-tab-count="compliance">—</span>
+    </button>
+    <button type="button" role="tab" class="vm-tab"
+            data-tab-id="operational"
+            :class="tab === 'operational' && 'is-active'"
+            :aria-selected="tab === 'operational'"
+            @click="tab = 'operational'">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 12h3l2-6 4 12 2-6h7"/>
+      </svg>
+      <span>Operational</span>
+      <span class="vm-tab-count" data-vm-tab-count="operational">—</span>
+    </button>
+    <button type="button" role="tab" class="vm-tab"
+            data-tab-id="architecture"
+            :class="tab === 'architecture' && 'is-active'"
+            :aria-selected="tab === 'architecture'"
+            @click="tab = 'architecture'">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="7" height="5" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/>
+        <rect x="3" y="13" width="7" height="8" rx="1"/><rect x="14" y="13" width="7" height="8" rx="1"/>
+      </svg>
+      <span>Architecture</span>
+      <span class="vm-tab-count" data-vm-tab-count="architecture">—</span>
+    </button>
+  </nav>
+
+  {# ── Loading skeleton ─────────────────────────────────────────────── #}
+  <div x-show="!loaded && !error" class="vm-loading" role="status" aria-live="polite">
+    <div class="vm-skel-card"></div>
+    <div class="vm-skel-grid">
+      <div class="vm-skel-card"></div>
+      <div class="vm-skel-card"></div>
+      <div class="vm-skel-card"></div>
+      <div class="vm-skel-card"></div>
+    </div>
+    <div class="vm-skel-card vm-skel-tall"></div>
+    <span class="visually-hidden">Loading report data…</span>
+  </div>
+
+  {# ── Error state ──────────────────────────────────────────────────── #}
+  <div x-show="error" class="vm-error" role="alert">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
+    <div>
+      <strong>Could not load report data.</strong>
+      <p class="text-text-3 text-[12px] mt-1" x-text="error"></p>
+      <p class="text-text-4 text-[11px] mt-2">
+        The standalone HTML report is still available
+        <a class="text-accent" href="/reports/{{ session_name }}/html" target="_blank" rel="noopener">here</a>.
+      </p>
+    </div>
+  </div>
+
+  {# ── Panel: Compliance ────────────────────────────────────────────── #}
+  <section x-show="loaded && tab === 'compliance'" x-cloak
+           x-transition:enter="vm-panel-enter"
+           x-transition:enter-start="vm-panel-enter-start"
+           x-transition:enter-end="vm-panel-enter-end"
+           role="tabpanel" aria-labelledby="tab-compliance"
+           class="vm-panel" data-vm-panel="compliance">
+
+    {# Hero — single L2 frosted panel with text on the left, score ring
+       on the right, and the four supporting stat tiles nested inside as
+       L1 panels. Per the frosted style guide §10. #}
+    <section class="card vm-hero" data-vm-hero>
+      <div class="vm-hero-text">
+        <span class="vm-smallcap">Health rating</span>
+        <div class="vm-hero-title" data-vm-id="health_rating">—</div>
+        {# Lede is fully hydrated by JS so the format adapts to skipped /
+           errors counts ("One rule was deliberately skipped" vs "3 rules
+           were deliberately skipped"). #}
+        <p class="vm-hero-lede" data-vm-hero-lede></p>
+
+        <div class="vm-stat-grid">
+          <div class="card vm-stat" data-vm-stat="compliant">
+            <span class="vm-smallcap">Compliant</span>
+            <span class="vm-stat-value text-ok" data-vm-counter="compliant">0</span>
+          </div>
+          <div class="card vm-stat" data-vm-stat="non_compliant">
+            <span class="vm-smallcap">Non-compliant</span>
+            <span class="vm-stat-value text-bad" data-vm-counter="non_compliant">0</span>
+          </div>
+          <div class="card vm-stat" data-vm-stat="skipped">
+            <span class="vm-smallcap">Skipped</span>
+            <span class="vm-stat-value text-mute" data-vm-counter="skipped">0</span>
+          </div>
+          <div class="card vm-stat" data-vm-stat="errors">
+            <span class="vm-smallcap">Errors</span>
+            <span class="vm-stat-value text-warn" data-vm-counter="errors">0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="vm-hero-ring">
+        {# Single-stroke score ring — flat var(--accent) on a faint track.
+           No gradient. Animated via anime.js (see viewmodel.js). #}
+        <svg viewBox="0 0 220 220" aria-hidden="true">
+          <circle class="vm-ring-track" cx="110" cy="110" r="100"/>
+          <circle class="vm-ring-arc"   cx="110" cy="110" r="100"
+                  data-vm-dial="pass-rate"
+                  pathLength="100"
+                  stroke-dasharray="100 100"
+                  stroke-dashoffset="100"
+                  transform="rotate(-90 110 110)"/>
+        </svg>
+        <div class="vm-ring-label">
+          {# .vm-ring-row keeps the number and the % glyph on the same
+             baseline. The parent .vm-ring-label is flex-column so the
+             "Pass rate" smallcap drops underneath. #}
+          <div class="vm-ring-row">
+            <span class="vm-ring-num" data-vm-id="pass_rate">0</span><span class="vm-ring-pct">%</span>
+          </div>
+          <span class="vm-smallcap vm-ring-sub">Pass rate</span>
+        </div>
+      </div>
+    </section>
+
+    {# Two-column split: All rules occupies the wider left column (it
+       benefits most from horizontal real estate); the right rail stacks
+       Priority actions, By category, By severity, and Audit metadata
+       top-to-bottom. The All rules card flex-grows to match the right
+       rail's natural height so the table reveals more rows when the
+       right stack runs tall. #}
+    <div class="vm-split">
+      <div class="vm-split-left">
+        <div class="card vm-rules-card">
+          <div class="card-head vm-rules-head">
+            <h3>All rules</h3>
+            <span class="vm-count" data-vm-rules-count>—</span>
+            <div class="vm-rules-controls" x-data="{ q: '', filter: 'all' }">
+              <input type="search" placeholder="Search rules…"
+                     class="vm-search" x-model="q"
+                     @input="window.atlasReportRulesFilter && window.atlasReportRulesFilter({ q: $event.target.value, status: filter })">
+              <div class="vm-filter-chips" role="tablist" aria-label="Filter by status">
+                {# Sliding pill behind the active chip — JS positions it
+                   and animates between chips on click (anime.js outElastic). #}
+                <span class="vm-filter-pill" data-vm-filter-pill aria-hidden="true"></span>
+                {% for f, label in [('all','All'), ('FAIL','Non-compliant'), ('PASS','Compliant'), ('SKIP','Skip'), ('ERROR','Error')] %}
+                  <button type="button"
+                          class="vm-chip"
+                          :class="filter === '{{ f }}' && 'is-active'"
+                          @click="filter = '{{ f }}'; window.atlasReportRulesFilter && window.atlasReportRulesFilter({ q, status: filter })">
+                    {{ label }}
+                  </button>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+          <div class="vm-rules-table-wrap">
+            <table class="vm-rules-table">
+              <thead>
+                <tr>
+                  {# data-sort enables click-to-sort with FLIP animation
+                     (handled in viewmodel.js). The Details column is not
+                     sortable. #}
+                  <th class="vm-col-rule" data-sort="rule_number">Rule</th>
+                  <th class="vm-col-name" data-sort="name">Name</th>
+                  <th class="vm-col-category" data-sort="category">Category</th>
+                  <th class="vm-col-status" data-sort="status">Status</th>
+                  <th class="vm-col-view">Details</th>
+                </tr>
+              </thead>
+              <tbody data-vm-rules-body></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="vm-split-right">
+        <div class="card vm-split-right-priority">
+          <div class="card-head">
+            <h3>Priority actions</h3>
+            <span class="sub">Top failures by severity</span>
+          </div>
+          <ol class="vm-priority" data-vm-priority>
+            {# Filled by JS #}
+          </ol>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h3>By category</h3>
+            <span class="sub">Compliant / total</span>
+          </div>
+          <div class="vm-bars" data-vm-bars="category">
+            {# Filled by JS #}
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h3>By severity</h3>
+            <span class="sub">Distribution of evaluated rules</span>
+          </div>
+          <div class="vm-severity" data-vm-severity>
+            {# Filled by JS — rendered as a horizontal stacked bar plus legend #}
+          </div>
+        </div>
+
+        {# Audit metadata — provenance card mirroring the identity footer
+           fields. Same data, surfaced near the summary cards so readers
+           don't have to scroll to the bottom to see who/where/when.
+           Each row's value reuses the existing data-vm-id attribute that
+           paintIdentity already populates via querySelectorAll, so no JS
+           change is required. #}
+        <div class="card vm-meta-card">
+          <div class="card-head">
+            <h3>Audit metadata</h3>
+            <span class="sub">Provenance</span>
+          </div>
+          <div class="vm-meta-rows">
+            <div class="vm-meta-r">
+              <span class="k">Organization</span>
+              <span class="v" data-vm-id="organization_name">—</span>
+            </div>
+            <div class="vm-meta-r">
+              <span class="k">Environment</span>
+              <span class="v mono" data-vm-id="environment">—</span>
+            </div>
+            <div class="vm-meta-r">
+              <span class="k">Tier</span>
+              <span class="v mono" data-vm-id="tier">—</span>
+            </div>
+            <div class="vm-meta-r">
+              <span class="k">Ruleset</span>
+              <span class="v mono" data-vm-id="ruleset">—</span>
+            </div>
+            <div class="vm-meta-r">
+              <span class="k">Host</span>
+              <span class="v mono" data-vm-id="hostname">—</span>
+            </div>
+            <div class="vm-meta-r">
+              <span class="k">Platform</span>
+              <span class="v mono" data-vm-id="platform_version">—</span>
+            </div>
+            <div class="vm-meta-r">
+              <span class="k">Captured at</span>
+              <span class="v mono" data-vm-id="captured_at">—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {# ── Panel: Operational ──────────────────────────────────────────── #}
+  <section x-show="loaded && tab === 'operational'" x-cloak
+           x-transition:enter="vm-panel-enter"
+           x-transition:enter-start="vm-panel-enter-start"
+           x-transition:enter-end="vm-panel-enter-end"
+           role="tabpanel" aria-labelledby="tab-operational"
+           class="vm-panel" data-vm-panel="operational">
+
+    {# Top-line metrics — three L1 stat tiles flowing inline. No L2
+       wrapper; the panels carry their own frosted treatment. #}
+    <div class="vm-stat-grid vm-stat-grid--3">
+      <div class="card vm-stat">
+        <span class="vm-smallcap">Pipelines run</span>
+        <span class="vm-stat-value" data-vm-counter="pipeline_count">0</span>
+      </div>
+      <div class="card vm-stat">
+        <span class="vm-smallcap">Successful</span>
+        <span class="vm-stat-value text-ok" data-vm-counter="success_count">0</span>
+      </div>
+      <div class="card vm-stat">
+        <span class="vm-smallcap">Errored</span>
+        <span class="vm-stat-value text-bad" data-vm-counter="error_count">0</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>MongoDB pipelines</h3>
+        <span class="vm-count" data-vm-mongo-sub>—</span>
+      </div>
+      {# Horizontal tab strip (JS-rendered) sits above a single content
+         pane that swaps in the active pipeline. Tables inside each
+         pane are sortable — see paintMongoPipelines() in viewmodel.js. #}
+      <div class="vm-mongo" data-vm-mongo-root>
+        <div class="vm-subtab-bar" data-vm-mongo-tabs role="tablist" aria-label="MongoDB pipelines">
+          {# Tabs inserted by JS #}
+        </div>
+        <div class="vm-mongo-pane" data-vm-mongo-pane>
+          {# Active pipeline body inserted by JS #}
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>Log analysis</h3>
+        <span class="vm-count" data-vm-logs-sub>—</span>
+      </div>
+      <div data-vm-log-sections class="vm-log-sections">
+        {# Filled by JS #}
+      </div>
+    </div>
+  </section>
+
+  {# ── Panel: Architecture ─────────────────────────────────────────── #}
+  <section x-show="loaded && tab === 'architecture'" x-cloak
+           x-transition:enter="vm-panel-enter"
+           x-transition:enter-start="vm-panel-enter-start"
+           x-transition:enter-end="vm-panel-enter-end"
+           role="tabpanel" aria-labelledby="tab-architecture"
+           class="vm-panel" data-vm-panel="architecture">
+
+    <div class="card">
+      <div class="card-head">
+        <h3>Additional validation checks</h3>
+        <span class="vm-count" data-vm-extended-sub>—</span>
+      </div>
+      {# JS renders a horizontal tab bar (one tab per category) above
+         this container, then writes the selected category's checks into
+         the body. Empty-state lives inside `data-vm-extended-checks` if
+         no checks ran. #}
+      <div class="vm-extended" data-vm-extended-root>
+        <div class="vm-subtab-bar" data-vm-extended-tabs role="tablist" aria-label="Extended check categories">
+          {# Tab buttons inserted by JS #}
+        </div>
+        <div class="vm-extended-checks" data-vm-extended-checks>
+          {# Filled by JS #}
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>Architecture overview</h3>
+        <span class="sub">Captured deployment configuration</span>
+      </div>
+      <div data-vm-arch-sections class="vm-arch-sections">
+        {# Filled by JS — one accordion per captured section. Sections
+           that were not captured are silently omitted. #}
+      </div>
+    </div>
+  </section>
+
+  {# ── Identity row (footer) — org / env / tier / ruleset / host /
+       capture time. Was previously at the top; now serves as the
+       provenance row at the very bottom of the report. #}
+  <footer class="vm-identity vm-identity--footer" data-vm="identity">
+    <div class="vm-identity-cell"><span class="lbl">Organization</span><span class="val" data-vm-id="organization_name">—</span></div>
+    <div class="vm-identity-cell"><span class="lbl">Environment</span><span class="val mono" data-vm-id="environment">—</span></div>
+    <div class="vm-identity-cell"><span class="lbl">Tier</span><span class="val mono" data-vm-id="tier">—</span></div>
+    <div class="vm-identity-cell"><span class="lbl">Ruleset</span><span class="val mono" data-vm-id="ruleset">—</span></div>
+    <div class="vm-identity-cell"><span class="lbl">Host</span><span class="val mono" data-vm-id="hostname">—</span></div>
+    <div class="vm-identity-cell"><span class="lbl">Platform</span><span class="val mono" data-vm-id="platform_version">—</span></div>
+    <div class="vm-identity-cell"><span class="lbl">Captured</span><span class="val mono" data-vm-id="captured_at">—</span></div>
+  </footer>
+
+{# closes #vm-root — modal lives OUTSIDE so its `position: fixed` is
+   relative to the viewport regardless of any properties on .vm-root. #}
+</section>
+
+{# ── Rule-detail slide-over panel ─────────────────────────────────────
+     Slides in from the right when the user clicks a row's "View"
+     button. JS owns open/close + content fill; Alpine isn't involved
+     so the panel survives hx-boost navigations cleanly.
+     Prev/Next walk through the currently *visible* rules (search
+     filter + status filter respected) so the user can crawl through
+     failures without closing the panel. #}
+<aside class="vm-detail-panel" data-vm-detail-panel role="dialog"
+       aria-modal="false" aria-labelledby="vm-detail-name" hidden>
+    <div class="vm-detail-backdrop" data-vm-detail-backdrop></div>
+    <div class="vm-detail-card" role="document">
+      {# Status-coloured stripe across the top of the card. JS sets a
+         vm-stripe-{pass|fail|skip|error} class on this element when the
+         panel opens so the bar tints to match the rule outcome. #}
+      <div class="vm-detail-stripe" data-vm-detail-stripe aria-hidden="true"></div>
+
+      <header class="vm-detail-head">
+        <div class="vm-detail-head-main">
+          <div class="vm-detail-crumb">
+            <span class="vm-detail-rule-id" data-vm-detail-id></span>
+            <span class="vm-detail-crumb-sep" aria-hidden="true">·</span>
+            <span class="vm-detail-crumb-cat" data-vm-detail-cat></span>
+          </div>
+          <h3 class="vm-detail-name" id="vm-detail-name" data-vm-detail-name></h3>
+          <div class="vm-detail-pills" data-vm-detail-pills>
+            {# Status + severity pills — built by JS. Category lives in
+               the breadcrumb above so the pill row stays focused on the
+               outcome. #}
+          </div>
+        </div>
+        <button type="button" class="vm-detail-close" data-vm-detail-close
+                aria-label="Close details">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </header>
+
+      <div class="vm-detail-body">
+        {# Each body section is its own L1 card — subtle background,
+           rounded corners, hairline border. The card-based treatment
+           replaces the previous flat-section design so the panel reads
+           as a structured runbook entry rather than a wall of text. #}
+        <section class="vm-detail-card-section vm-detail-rec-card" data-vm-detail-rec-card hidden>
+          <header class="vm-detail-section-head">
+            <h4>Recommendation</h4>
+          </header>
+          <div class="vm-detail-section-body">
+            <p class="vm-detail-text" data-vm-detail-rec></p>
+          </div>
+        </section>
+
+        <section class="vm-detail-card-section vm-detail-cmp-card" data-vm-detail-cmp-card hidden>
+          <header class="vm-detail-section-head">
+            <h4>Comparison</h4>
+            <span class="vm-detail-section-sub" data-vm-detail-operator>
+              {# "actual must equal expected" — built by JS, lives in the
+                 head row as a quiet sub-label so the comparison block
+                 below stays purely about values. #}
+            </span>
+          </header>
+          <div class="vm-detail-section-body">
+            <div class="vm-detail-cmp">
+              <div class="vm-detail-cmp-side vm-detail-cmp-expected">
+                <span class="vm-detail-cmp-label">Expected</span>
+                <pre class="vm-detail-cmp-value" data-vm-detail-expected></pre>
+              </div>
+              <div class="vm-detail-cmp-arrow" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+                     stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                  <polyline points="13 6 19 12 13 18"/>
+                </svg>
+              </div>
+              <div class="vm-detail-cmp-side vm-detail-cmp-actual">
+                <span class="vm-detail-cmp-label">Actual</span>
+                <pre class="vm-detail-cmp-value" data-vm-detail-actual></pre>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {# How-to-fix steps from RULES_KNOWLEDGEBASE.md — populated by JS
+           ONLY when the rule is Non-Compliant AND a knowledgebase entry
+           exists for the rule_number. Same parsing logic as the standalone
+           HTML report (numbered/bulleted lines become <li>; backtick spans
+           become <code>). The viewmodel ships only FAIL entries to keep
+           the JSON payload small. #}
+        <section class="vm-detail-card-section vm-detail-fix-card vm-detail-fix"
+                 data-vm-detail-fix hidden>
+          <header class="vm-detail-section-head">
+            <h4>How to fix</h4>
+          </header>
+          <div class="vm-detail-section-body vm-detail-fix-body" data-vm-detail-fix-body></div>
+        </section>
+
+        <div class="vm-detail-empty" data-vm-detail-empty hidden>
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          <span>This rule is configured correctly — no action required.</span>
+        </div>
+      </div>
+
+      <footer class="vm-detail-nav">
+        <button type="button" class="vm-detail-nav-btn" data-vm-detail-prev>
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Prev
+        </button>
+        <span class="vm-detail-nav-pos" data-vm-detail-pos></span>
+        <button type="button" class="vm-detail-nav-btn" data-vm-detail-next>
+          Next
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </footer>
+    </div>
+  </aside>
+
+{# anime.js v4 — vendored locally so the report works air-gapped. The
+   IIFE bundle exposes the global `window.anime` with `.animate`,
+   `.stagger`, etc. Loaded BEFORE viewmodel.js (no `defer` ordering
+   surprises) so the hydration script always sees `window.anime`. #}
+<script src="{{ url_for('static', path='js/anime.min.js') }}?v={{ asset_version }}" defer></script>
+{# Hydration script — runs on every navigation to this view (hx-boost
+   re-executes <body> scripts, and viewmodel.js is idempotent). #}
+<script src="{{ url_for('static', path='js/reports/viewmodel.js') }}?v={{ asset_version }}" defer></script>
+
+{% endblock %}

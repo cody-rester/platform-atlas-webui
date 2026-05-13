@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Jobs — Platform Atlas{% endblock %}
+{% block crumb %}Jobs{% endblock %}
+{% block content %}
+
+<header class="flex items-end justify-between gap-6 pb-5 border-b border-line mb-6">
+  <div>
+    <div class="eyebrow"><span class="dot"></span> Background jobs</div>
+    <h1 class="text-[36px] leading-[1.05] font-semibold tracking-[-0.038em] mt-2 mb-1.5">
+      Job activity, <em class="not-italic text-text-3">live progress</em>
+    </h1>
+    <p class="text-[14px] text-text-2 max-w-[64ch]">
+      Long-running operations (preflight, capture, validate, report) run in the background.
+      Open a job to see live SSE-streamed progress from the server.
+    </p>
+  </div>
+</header>
+
+{% if not jobs %}
+  <section class="flex flex-col items-center justify-center py-12 px-6 text-center bg-surface border border-line rounded-lg">
+    <div class="text-[32px] leading-none mb-2.5" aria-hidden="true">⚙️</div>
+    <strong class="mb-1.5">No jobs yet</strong>
+    <span class="text-text-3 max-w-[440px] text-[13px]">
+      Kick off a preflight, capture, or validate to see entries here. Jobs older than 7 days are cleaned up automatically.
+    </span>
+    <div class="mt-4 flex gap-2 justify-center">
+      <a class="btn primary" href="/preflight">Run preflight</a>
+      <a class="btn" href="/sessions/new">New session</a>
+    </div>
+  </section>
+{% else %}
+  <section class="card">
+    <div class="card-head">
+      <h3>All jobs</h3>
+      <span class="sub">{{ jobs|length }} total</span>
+    </div>
+    <div>
+      {% for j in jobs %}
+        <div class="flex items-center gap-3 px-4 py-3 text-[13px] border-b border-line last:border-b-0 hover:bg-surface-2">
+          <span class="status-dot
+            {%- if j.status == 'running' %} run
+            {%- elif j.status == 'succeeded' %} ok
+            {%- elif j.status == 'failed' %} fail
+            {%- else %} idle{% endif %}"></span>
+          <span class="font-medium truncate">
+            <a href="/jobs/{{ j.id }}" class="text-inherit font-mono text-[12px] hover:text-accent no-underline">{{ j.id }}</a>
+          </span>
+          <span class="text-text-3 truncate">{{ j.name }}</span>
+          <span class="ml-auto"><span class="job-status job-status--{{ j.status }}">{{ j.status }}</span></span>
+          <span class="text-text-3 w-[200px] text-right truncate">{{ j.started_at or '—' }}</span>
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+{% endif %}
+
+{% endblock %}

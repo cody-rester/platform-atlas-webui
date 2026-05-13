@@ -1,0 +1,526 @@
+<!doctype html>
+{# Mode is rendered as two attributes:
+     data-mode-pref — the persisted intent ("light" / "dark" / "auto").
+     data-mode      — the effective mode used by CSS ("light" / "dark").
+   When the intent is "auto", we render data-mode as "dark" by default
+   (server can't read prefers-color-scheme) and the inline script in
+   <head> below resolves it to the OS mode before paint. #}
+{% set _pref_mode = prefs.mode | default('dark') %}
+{% set _effective_mode = 'dark' if _pref_mode == 'auto' else _pref_mode %}
+<html lang="en"
+      data-theme="{{ prefs.theme | default('itential') }}"
+      data-mode="{{ _effective_mode }}"
+      data-mode-pref="{{ _pref_mode }}"
+      data-palette-enabled="{{ 'true' if prefs.palette_enabled is not defined or prefs.palette_enabled else 'false' }}"
+      data-radius="pill"
+      data-sidebar="full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  {# Pre-paint mode resolver — runs synchronously before stylesheets apply
+     so the page never paints with the wrong mode for "auto" users. Reads
+     data-mode-pref; if it's "auto", overwrites data-mode based on the OS
+     prefers-color-scheme query. Kept tiny and defensive — no listeners,
+     no console, no try-block beyond a guard so older browsers without
+     matchMedia just stay on the server-rendered default. #}
+  <script nonce="{{ csp_nonce }}">
+    (function () {
+      var html = document.documentElement;
+      if (html.getAttribute('data-mode-pref') !== 'auto') return;
+      if (!window.matchMedia) return;
+      var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      html.setAttribute('data-mode', prefersDark ? 'dark' : 'light');
+    })();
+  </script>
+  <title>{% block title %}Platform Atlas{% endblock %}</title>
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  {# htmx reads this meta tag at boot, before any swaps happen — sets the
+     View Transitions API on every boosted nav, hx-get fragment, etc.
+     Setting it via an htmx:load listener (the previous approach) had a
+     race: any swap that happened before the listener fired would miss
+     transitions. The meta tag is read synchronously on htmx init. #}
+  <meta name="htmx-config" content='{"globalViewTransitions": true}'>
+  <link rel="icon" type="image/png" href="{{ url_for('static', path='img/favicon.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', path='css/atlas.css') }}?v={{ asset_version }}">
+
+  {# ── Tailwind CSS v4 (pre-compiled, no runtime JIT) ──────────────────
+     Source: webui/src/platform_atlas_webui/static/css/atlas.tw.css
+     Built by: scripts/build-release.sh (uses ./bin/tailwindcss CLI)
+
+     The source defines @theme inline tokens (bg, surface, accent, text-*,
+     atlas brand palette, fonts, glow shadows), the @custom-variant for
+     [data-mode="dark"], and intentionally omits the preflight/base layer
+     so atlas.css's reset stays the source of truth.
+
+     Loaded AFTER atlas.css so utility classes win on equal specificity
+     against component-class defaults. The asset_version query param
+     busts caches when the compiled output changes between releases. #}
+  <link rel="stylesheet" href="{{ url_for('static', path='css/atlas.tw.compiled.css') }}?v={{ asset_version }}">
+
+  {# x-cloak hider — kept in <head> rather than <body>. body.innerHTML is
+     replaced on every hx-boost navigation; <head> is stable, so the rule
+     is always live and never flickers off mid-swap. #}
+  <style>[x-cloak] { display: none !important; }</style>
+
+  {# Alpine.js — defer so it boots after DOM parsing, then auto-inits all
+     x-data via MutationObserver. Used for local interactivity (dropdowns,
+     tabs, toasts, modals, accordions) that HTMX deliberately leaves alone. #}
+  <script src="{{ url_for('static', path='js/alpine.min.js') }}?v={{ asset_version }}" defer></script>
+
+  <script src="{{ url_for('static', path='js/htmx.min.js') }}?v={{ asset_version }}" defer></script>
+  <script src="{{ url_for('static', path='js/atlas.js') }}?v={{ asset_version }}" defer></script>
+  {# Command palette — vanilla IIFE. Loaded from <head> so it survives the
+     body-innerHTML swap that hx-boost performs on every internal nav; the
+     document-level keydown listener it installs stays attached for the
+     lifetime of the page session. #}
+  <script src="{{ url_for('static', path='js/palette.js') }}?v={{ asset_version }}" defer></script>
+</head>
+{# hx-boost on <body> turns every same-origin <a> click and form submission
+   into an HTMX request that swaps body.innerHTML — keeps the URL synced via
+   pushState, fades between pages via View Transitions (config above), and
+   skips the white flash of a full page load. Anchors with target="_blank",
+   download, or hx-boost="false" opt out. #}
+{# SHELL LAYOUT — Tailwind utilities for grid scaffold + sticky topbar/side.
+   The leaf widgets (.pill / .pill--state-* / .flash / .upgrade / .brand-mark
+   / .theme-toggle icon-swap) intentionally stay on atlas.css because they
+   have CSS-only theme switching, multiple modifier variants, animation
+   states, and pseudo-elements that don't translate cleanly to utilities. #}
+<body hx-boost="true"
+      class="grid min-h-screen text-text bg-bg"
+      style="grid-template-columns: var(--sidebar-w) 1fr; grid-template-rows: 52px 1fr; grid-template-areas: 'brand topbar' 'side main';">
+
+  <div class="flex items-center gap-2.5 px-4 border-r border-b border-line bg-bg-2 sticky top-0 z-[55]"
+       style="grid-area: brand;">
+    <a href="/" class="flex items-center gap-2.5 font-semibold tracking-[-0.01em] no-underline text-inherit">
+      <div class="brand-mark shrink-0" role="img" aria-label="Itential"></div>
+      <span class="text-[15px]">Platform Atlas</span>
+      <span class="font-mono text-[10.5px] text-text-3 ml-0.5">v{{ atlas_version | default('1.7.4') }}</span>
+    </a>
+  </div>
+
+  <header class="flex items-center gap-2 px-[18px] border-b border-line bg-bg-2 sticky top-0 z-[55]"
+          style="grid-area: topbar;">
+    <nav class="flex items-center gap-2 text-text-3 text-[12.5px]">
+      <span>Workspace</span>
+      <span class="text-text-4">/</span>
+      <span class="text-text font-medium">{% block crumb %}{{ self.title()|default('') }}{% endblock %}</span>
+    </nav>
+    <div class="flex-1"></div>
+
+    {% if organization_name %}
+      <span class="pill">
+        <span class="dot"></span>
+        <span class="label">Org</span>
+        <span class="val">{{ organization_name }}</span>
+      </span>
+    {% endif %}
+
+    {# Inline environment switcher. Click the pill → dropdown of all
+       environments → click one → activate via POST → page boost-reloads.
+       The "View details" link goes to /environments/<name> as a Detail row
+       inside the dropdown so the previous click-to-detail behavior is
+       preserved (it just costs one extra click now). #}
+    <div x-data="{ open: false }" class="relative inline-flex">
+      {% if active_environment %}
+        <button type="button" @click="open = !open" @click.outside="open = false"
+                class="pill pill--env-link cursor-pointer"
+                title="Switch environment">
+          <span class="label">Env</span>
+          <span class="val mono">{{ active_environment }}</span>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+               class="opacity-60 transition-transform" :class="open && 'rotate-180'"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+      {% else %}
+        <button type="button" @click="open = !open" @click.outside="open = false"
+                class="pill pill--env-warn cursor-pointer text-warn"
+                title="No active environment — click to switch or create"
+                style="border-color: var(--warn); background: var(--warn-soft);">
+          <span class="dot" style="background: var(--warn); box-shadow: 0 0 0 3px var(--warn-soft);"></span>
+          <span class="label text-warn">Env</span>
+          <span class="val text-warn font-semibold">No active environment</span>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+               class="opacity-60 transition-transform" :class="open && 'rotate-180'"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+      {% endif %}
+
+      <div x-show="open" x-cloak
+           x-transition:enter="transition ease-out duration-150"
+           x-transition:enter-start="opacity-0 -translate-y-1"
+           x-transition:enter-end="opacity-100 translate-y-0"
+           class="absolute right-0 top-[34px] z-50 min-w-[260px] rounded-md bg-surface border border-line shadow-2xl overflow-hidden">
+        <div class="px-3 py-2 text-[10.5px] font-semibold uppercase tracking-[0.07em] text-text-3 border-b border-line">
+          Switch environment
+        </div>
+        {% if env_dropdown %}
+          {% for e in env_dropdown %}
+            <form action="/environments/{{ e.name }}/activate" method="post" class="block">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button type="submit" data-loading-label="Activating…"
+                      class="w-full text-left px-3 py-2 text-[13px] flex items-center gap-2 hover:bg-surface-2 transition-colors
+                             {% if e.is_active %}bg-accent-soft text-accent{% else %}text-text-2{% endif %}">
+                <span class="w-1.5 h-1.5 rounded-full {% if e.is_active %}bg-ok{% else %}bg-text-4{% endif %}"></span>
+                <span class="font-mono truncate">{{ e.name }}</span>
+                {% if e.is_active %}<span class="ml-auto text-[10px] uppercase tracking-wider opacity-70">Active</span>{% endif %}
+              </button>
+            </form>
+          {% endfor %}
+        {% else %}
+          <div class="px-3 py-3 text-[12px] text-text-3">No environments yet.</div>
+        {% endif %}
+        <a href="/environments" class="block px-3 py-2 text-[12px] text-accent hover:bg-surface-2 border-t border-line">
+          Manage environments →
+        </a>
+        {% if active_environment %}
+          <a href="/environments/{{ active_environment }}"
+             class="block px-3 py-2 text-[12px] text-text-2 hover:bg-surface-2 border-t border-line">
+            View details for "{{ active_environment }}" →
+          </a>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if tier %}
+      {# Match the ORG / ENV pill structure so all three header pills read as one set.
+         Both Standard and Extended use the same neutral pill — the badge is a
+         state indicator, not a celebration of either choice. #}
+      <span class="pill" title="Active audit tier">
+        <span class="label">Tier</span>
+        <span class="val mono">{{ tier }}</span>
+      </span>
+    {% endif %}
+
+    {% if continuous and continuous.enabled %}
+      {# Always-on reminder that continuous audit is running. State drives a
+         CSS class so all the color values live in atlas.css next to the rest
+         of the design system, not inline. #}
+      {% set _state = continuous.state %}
+      <a class="pill pill--continuous pill--state-{{ _state | lower }}{% if _state == 'ON' %} pill--pulse{% endif %}"
+         href="/continuous"
+         title="Continuous audit · last run {{ continuous.last_age }}{% if continuous.next_in %} · next in {{ continuous.next_in }}{% endif %}{% if continuous.os_scheduler_active %} · OS scheduler active{% endif %}">
+        <span class="dot"></span>
+        <span class="label">{% if continuous.os_scheduler_active %}OS · {% endif %}Continuous</span>
+        <span class="val mono">{{ _state }} · {{ continuous.last_age }}{% if continuous.next_in %} · <span class="pill-next">next {{ continuous.next_in }}</span>{% endif %}</span>
+      </a>
+
+      <a href="/alerts" class="theme-toggle alerts-bell"
+         aria-label="Drift alerts" title="Drift alerts ({{ continuous.unacked }} unacked)">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        {% if continuous.unacked and continuous.unacked > 0 %}
+          <span class="alerts-bell-count">{{ continuous.unacked }}</span>
+        {% endif %}
+      </a>
+    {% endif %}
+
+    <button type="button" class="theme-toggle" data-atlas-theme-toggle
+            aria-label="Toggle light/dark theme" title="Toggle light/dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <svg class="icon-sun"  viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+    </button>
+
+    <a href="/config" class="theme-toggle no-underline{% if request.url.path == '/config' %} is-active text-accent border-accent{% endif %}"
+       aria-label="Settings" title="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </a>
+  </header>
+
+  <aside class="border-r border-line bg-bg-2 px-3 py-3.5 flex flex-col sticky top-[52px] overflow-y-auto"
+         style="grid-area: side; height: calc(100vh - 52px);">
+    <nav>
+      {# Nav-item macro — handles active state (background + accent ::before
+         indicator) and optional badge for unread counts. Keeps the 14
+         repeated nav rows DRY without sacrificing readability. #}
+      {% macro _nav_label(text) %}
+        <div class="text-[11px] tracking-[0.1em] uppercase font-semibold text-text-4 px-2.5 pt-1.5 pb-2 mb-1 flex items-center gap-1.5">
+          <span class="w-[5px] h-[5px] rounded-full bg-current opacity-65 shrink-0"></span>{{ text }}
+        </div>
+      {% endmacro %}
+      {% set _nav_base = "relative flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[14px] font-medium" %}
+      {% set _nav_idle = "text-text-2 hover:bg-surface hover:text-text [&>svg]:text-text-3" %}
+      {% set _nav_active = "bg-surface-2 text-text [&>svg]:text-accent before:content-[''] before:absolute before:left-[-12px] before:top-2 before:bottom-2 before:w-0.5 before:bg-accent before:rounded-xs" %}
+
+      <div class="mb-3.5 first:mt-0">
+        {{ _nav_label('Overview') }}
+        <a href="/" class="{{ _nav_base }} {% if request.url.path == '/' %}{{ _nav_active }}{% else %}{{ _nav_idle }}{% endif %}">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+          <span>Dashboard</span>
+        </a>
+        <a href="/fleet" class="{{ _nav_base }} {% if request.url.path.startswith('/fleet') %}{{ _nav_active }}{% else %}{{ _nav_idle }}{% endif %}">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          <span>Fleet</span>
+        </a>
+      </div>
+
+      <div class="mb-3.5">
+        {{ _nav_label('Audit') }}
+        <a href="/sessions" class="{{ _nav_base }} {% if request.url.path.startswith('/sessions') %}{{ _nav_active }}{% else %}{{ _nav_idle }}{% endif %}">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>
+          <span>Sessions</span>
+        </a>
+        <a href="/preflight" class="{{ _nav_base }} {% if request.url.path.startswith('/preflight') %}{{ _nav_active }}{% else %}{{ _nav_idle }}{% endif %}">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M3 12h3l2-6 4 12 2-6h7"/></svg>
+          <span>Preflight</span>
+        </a>
+        <a href="/diff" class="{{ _nav_base }} {% if request.url.path.startswith('/diff') %}{{ _nav_active }}{% else %}{{ _nav_idle }}{% endif %}">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M8 5h13M3 12h18M8 19h13"/><circle cx="4.5" cy="5" r="1.5"/><circle cx="4.5" cy="19" r="1.5"/></svg>
+          <span>Diff</span>
+        </a>
+        <a href="/reports" class="{{ _nav_base }} {% if request.url.path.startswith('/reports') %}{{ _nav_active }}{% else %}{{ _nav_idle }}{% endif %}">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <span>Reports</span>
+        </a>
+        <a href="/architecture" class="{{ _nav_base }} {% if request.url.path.startswith('/architecture') %}{{ _nav_active }}{% else %}{{ _nav_idle }}{% endif %}">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="3" y="3" width="7" height="5" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="3" y="13" width="7" height="8" rx="1"/><rect x="14" y="13" width="7" height="8" rx="1"/></svg>
+          <span>Architecture and Observability</span>
+        </a>
+      </div>
+
+      <div class="mb-3.5">
+        {{ _nav_label('Configuration') }}
+        <a href="/environments" class="{{ _nav_base }} {% if request.url.path.startswith('/environments') %}{{ _nav_active }}{% else %}{{ _nav_idle }}{% endif %}">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 12l9 4 9-4"/><path d="M3 17l9 4 9-4"/></svg>
+          <span>Environments</span>
+        </a>
+        <a href="/rulesets" class="{{ _nav_base }} {% if request.url.path.startswith('/rulesets') %}{{ _nav_active }}{% else %}{{ _nav_idle }}{% endif %}">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          <span>Rulesets</span>
+        </a>
+        <a href="/config/credentials" class="{{ _nav_base }} {% if request.url.path.startswith('/config/credentials') %}{{ _nav_active }}{% else %}{{ _nav_idle }}{% endif %}">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <span>Credentials</span>
+        </a>
+        <a href="/config/doctor" class="{{ _nav_base }} {% if request.url.path.startswith('/config/doctor') %}{{ _nav_active }}{% else %}{{ _nav_idle }}{% endif %}">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          <span>Doctor</span>
+        </a>
+        <a href="/tier" class="{{ _nav_base }} {% if request.url.path.startswith('/tier') %}{{ _nav_active }}{% else %}{{ _nav_idle }}{% endif %}">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M12 2 4 6v6c0 5 3.5 9 8 10 4.5-1 8-5 8-10V6l-8-4z"/></svg>
+          <span>Tier</span>
+        </a>
+      </div>
+
+      {# Platform API — DISABLED. Re-enable by un-commenting; structure is the
+         same as the other nav sections. See routes/platform_api.py. #}
+
+      <div class="mb-3.5">
+        {{ _nav_label('Continuous') }}
+        <a href="/continuous" class="{{ _nav_base }} {% if request.url.path.startswith('/continuous') %}{{ _nav_active }}{% else %}{{ _nav_idle }}{% endif %}">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>
+          <span>Continuous Audit</span>
+        </a>
+        <a href="/alerts" class="{{ _nav_base }} {% if request.url.path.startswith('/alerts') %}{{ _nav_active }}{% else %}{{ _nav_idle }}{% endif %}">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span>Alerts{% if continuous and continuous.unacked and continuous.unacked > 0 %} <span class="ml-auto font-mono text-[10px] py-px px-1.5 rounded-full bg-surface-3 text-text-3">{{ continuous.unacked }}</span>{% endif %}</span>
+        </a>
+        <a href="/notifications" class="{{ _nav_base }} {% if request.url.path.startswith('/notifications') %}{{ _nav_active }}{% else %}{{ _nav_idle }}{% endif %}">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M4 4h16v12H5.17L4 17.17V4z"/><path d="M8 9h8M8 12h5"/></svg>
+          <span>Notifications</span>
+        </a>
+      </div>
+
+      <div class="mb-3.5">
+        {{ _nav_label('System') }}
+        <a href="/jobs" class="{{ _nav_base }} {% if request.url.path.startswith('/jobs') %}{{ _nav_active }}{% else %}{{ _nav_idle }}{% endif %}">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          <span>Jobs</span>
+        </a>
+      </div>
+    </nav>
+
+    <div class="mt-auto pt-3">
+      {% if is_standard and not upgrade_panel_dismissed %}
+        {# .upgrade panel keeps atlas.css styling — gradient + dismiss button
+           are intricate enough that translating to utilities loses clarity. #}
+        <div class="upgrade">
+          <button type="button" class="upgrade-dismiss" data-atlas-upgrade-dismiss
+                  aria-label="Dismiss upgrade panel" title="Dismiss">×</button>
+          <div class="upgrade-title"><span class="dot"></span> Upgrade to Extended</div>
+          <div class="upgrade-body">Adds SSH/Mongo/Redis/IAG audit and ~107 rules.</div>
+          <a class="upgrade-cta upgrade-cta--ghost" href="/tier">View modes <span>→</span></a>
+        </div>
+      {% endif %}
+      <div class="text-[11px] text-text-3 px-3.5 pt-2.5 pb-1.5 tracking-[0.02em]">
+        WebUI v{{ webui_version | default('') }}
+      </div>
+    </div>
+  </aside>
+
+  <main class="px-8 pt-6 pb-14 min-w-0" style="grid-area: main;">
+    {% block content %}{% endblock %}
+  </main>
+
+  {# ── Toaster ──────────────────────────────────────────────────────────
+     Single global toast region. Listens for the `atlas:toast` custom
+     event — fires from HTMX `HX-Trigger` response headers (live form
+     submits) or from window.dispatchEvent. On page load, the inline
+     atlas-flash-data JSON below seeds the queue so existing server-side
+     flash() calls become toasts without a code change at the call site. #}
+  {% if flash %}
+    <script id="atlas-flash-data" type="application/json" nonce="{{ csp_nonce }}">{{ {
+      "kind": flash.kind | default('info'),
+      "msg": flash.message,
+    } | tojson }}</script>
+  {% endif %}
+  <div x-data="atlasToaster"
+       @atlas:toast.window="add($event.detail)"
+       x-init="
+         const el = document.getElementById('atlas-flash-data');
+         if (el) { try { add(JSON.parse(el.textContent)); } catch (e) {} }
+       "
+       class="atlas-toaster"
+       aria-live="polite" aria-atomic="false">
+    <template x-for="t in toasts" :key="t.id">
+      <div :class="`toast toast--${t.kind || 'info'}`"
+           role="status"
+           x-transition:enter="transition ease-out duration-150"
+           x-transition:enter-start="opacity-0 translate-x-2"
+           x-transition:enter-end="opacity-100 translate-x-0"
+           x-transition:leave="transition ease-in duration-100"
+           x-transition:leave-start="opacity-100"
+           x-transition:leave-end="opacity-0">
+        <span x-text="t.msg"></span>
+        <button type="button" class="toast-close"
+                @click="dismiss(t.id)"
+                aria-label="Dismiss notification">&times;</button>
+      </div>
+    </template>
+  </div>
+
+  {# ── Themed confirm dialog ─────────────────────────────────────────────
+     Replaces every browser-native confirm() across the WebUI. Driven by
+     the `data-confirm-action` attribute on a <form> + optional
+     `data-confirm-message`, `data-confirm-kind` (primary | danger),
+     `data-confirm-label`. atlas.js intercepts the form submit, opens this
+     modal, awaits the user choice, and resubmits if confirmed. Falls back
+     to window.confirm() if Alpine is unavailable.
+
+     The x-show guard checks for content, not just `open`: if a caller
+     opens the modal without populating title/confirmLabel, we refuse to
+     render an empty modal (which previously showed a lone "Cancel"
+     button after CSP-blocked Alpine evals stripped x-cloak before
+     evaluating x-text). #}
+  <div x-data="atlasConfirm"
+       x-show="open && (title || confirmLabel)"
+       x-cloak
+       @keydown.escape.window="cancel"
+       class="fixed inset-0 z-50 grid place-items-center p-4 backdrop-blur-xs"
+       style="background: oklch(0% 0 0 / 0.55);">
+    <div @click.outside="cancel"
+         x-transition:enter="transition ease-out duration-150"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100"
+         class="w-full max-w-md rounded-lg bg-surface border border-line p-5 shadow-2xl">
+      <h3 class="text-[15px] font-semibold mb-2" x-text="title"></h3>
+      <p class="text-[13px] text-text-2 leading-relaxed mb-5 whitespace-pre-line" x-text="message"></p>
+      <div class="flex gap-2 justify-end">
+        <button type="button" @click="cancel" class="btn">Cancel</button>
+        <button type="button" @click="confirm"
+                :class="kind === 'danger' ? 'btn danger' : 'btn primary'"
+                x-text="confirmLabel"
+                x-ref="confirmBtn"></button>
+      </div>
+    </div>
+  </div>
+
+  {# (x-cloak hider lives in <head> so it's stable across hx-boost body
+     swaps — see the comment up there.) #}
+
+  <script>
+    // Register the Alpine component + expose a Promise-based global so
+    // atlas.js (and any future code) can do
+    //   window.atlasConfirm({...}).then(ok => ok && submit())
+    //
+    // The factory must be registered on EITHER `alpine:init` (cold start)
+    // OR immediately if Alpine is already running. hx-boost re-executes
+    // this <script> on every body swap, but `alpine:init` only fires once
+    // ever — so without the immediate-call branch, any page that doesn't
+    // include base.html's scripts on its initial cold load (impossible
+    // here since base.html is the shell, but a cheap defense regardless)
+    // could navigate to a page expecting atlasConfirm and find it
+    // unregistered. Same fix pattern applies to all body-resident
+    // Alpine.data() registrations — see environments/form.html.
+    function _registerAtlasConfirm() {
+      if (!window.Alpine || typeof window.Alpine.data !== 'function') return;
+      window.Alpine.data('atlasConfirm', () => ({
+        open: false,
+        title: 'Are you sure?',
+        message: '',
+        confirmLabel: 'Continue',
+        kind: 'primary',
+        _resolve: null,
+        ask(opts) {
+          opts = opts || {};
+          this.title        = opts.title        || 'Are you sure?';
+          this.message      = opts.message      || '';
+          this.confirmLabel = opts.confirmLabel || 'Continue';
+          this.kind         = opts.kind         || 'primary';
+          this.open = true;
+          // Move keyboard focus to the confirm button after the transition.
+          this.$nextTick(() => { this.$refs.confirmBtn && this.$refs.confirmBtn.focus(); });
+          return new Promise((resolve) => { this._resolve = resolve; });
+        },
+        confirm() { this.open = false; this._settle(true); },
+        cancel()  { this.open = false; this._settle(false); },
+        _settle(value) { if (this._resolve) { this._resolve(value); this._resolve = null; } },
+      }));
+    }
+    if (window.Alpine && typeof window.Alpine.data === 'function') {
+      _registerAtlasConfirm();
+    } else {
+      document.addEventListener('alpine:init', _registerAtlasConfirm);
+    }
+
+    // Promise<boolean>. Falls back to window.confirm() if Alpine isn't ready.
+    window.atlasConfirm = function (opts) {
+      var el = document.querySelector('[x-data="atlasConfirm"]');
+      if (!el || !window.Alpine) {
+        return Promise.resolve(window.confirm((opts && opts.message) || 'Are you sure?'));
+      }
+      return Alpine.$data(el).ask(opts);
+    };
+
+    // Toaster — Alpine.data registration mirrors the atlasConfirm pattern
+    // (immediate-call branch for warm Alpine + alpine:init for cold start).
+    // The component owns a small queue of active toasts. Auto-dismiss is
+    // capped at 5 visible at once so a burst of HX-Trigger events doesn't
+    // build a tower that occludes content.
+    function _registerAtlasToaster() {
+      if (!window.Alpine || typeof window.Alpine.data !== 'function') return;
+      window.Alpine.data('atlasToaster', () => ({
+        toasts: [],
+        nextId: 1,
+        add(detail) {
+          if (!detail) return;
+          const msg = detail.msg || detail.message || '';
+          if (!msg) return;
+          const id = this.nextId++;
+          this.toasts.push({
+            id: id,
+            kind: detail.kind || 'info',
+            msg: msg,
+          });
+          // Cap visible count — drop the oldest so a burst doesn't tower.
+          while (this.toasts.length > 5) this.toasts.shift();
+          const ms = Number(detail.duration) || 5000;
+          setTimeout(() => this.dismiss(id), ms);
+        },
+        dismiss(id) {
+          this.toasts = this.toasts.filter(t => t.id !== id);
+        },
+      }));
+    }
+    if (window.Alpine && typeof window.Alpine.data === 'function') {
+      _registerAtlasToaster();
+    } else {
+      document.addEventListener('alpine:init', _registerAtlasToaster);
+    }
+
+    // Convenience global so other JS can fire toasts without poking at
+    // Alpine internals. Same shape as the HX-Trigger payload:
+    //   atlasToast({ kind: 'success', msg: 'Saved!' })
+    window.atlasToast = function (detail) {
+      window.dispatchEvent(new CustomEvent('atlas:toast', { detail: detail || {} }));
+    };
+  </script>
+
+</body>
+</html>

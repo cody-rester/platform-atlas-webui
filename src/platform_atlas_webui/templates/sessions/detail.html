@@ -1,0 +1,445 @@
+{% extends "base.html" %}
+{% block title %}{{ session.name }} — Platform Atlas{% endblock %}
+{% block crumb %}<a href="/sessions" class="text-inherit hover:text-accent">Sessions</a> <span class="sep">›</span> {{ session.name }}{% endblock %}
+{% block content %}
+
+{% set all_done = session.capture_completed and session.validation_completed and session.report_completed %}
+{% set tier_label = session.tier | capitalize %}
+{% set _tlk = session.tier_lock | default({}) %}
+{% set _locked = _tlk.locked %}
+
+<header class="flex items-end justify-between gap-6 pb-5 border-b border-line mb-6">
+  <div>
+    <div class="eyebrow"><span class="dot"></span> Session</div>
+    <h1 class="text-[36px] leading-[1.05] font-semibold tracking-[-0.038em] mt-2 mb-1.5">{{ session.name }}</h1>
+    <p class="text-[14px] text-text-2 max-w-[64ch]">
+      {% if session.environment %}<b>{{ session.environment }}</b> environment · {% endif %}
+      <b>{{ tier_label }}</b> tier
+      {% if session.ruleset_id %} · ruleset <b>{{ session.ruleset_id }}</b>{% if session.ruleset_profile %} <small class="text-text-3">({{ session.ruleset_profile }})</small>{% endif %}{% endif %}
+    </p>
+  </div>
+  <div class="flex items-center gap-2">
+    {% if all_done %}
+      <a class="btn primary" href="/reports/{{ session.name }}" target="_blank" rel="noopener">View report ↗</a>
+    {% elif not _locked %}
+      <form id="hero-run-all" action="/sessions/{{ session.name }}/run/all" method="post"
+            class="flex flex-col items-end gap-1.5">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="btn primary" type="submit">Run full pipeline</button>
+      </form>
+    {% else %}
+      {# Tier-locked + incomplete shouldn't actually reach this page (route
+         redirects view_blocked sessions away) — but be defensive. #}
+      <a class="btn" href="/tier" title="{{ _tlk.fix }}">Switch tier →</a>
+    {% endif %}
+  </div>
+</header>
+
+{# Tier-lock banner — appears whenever the session's tier doesn't match the
+   active tier. Reaching this page implies the session is complete (incomplete
+   ones are redirected away), so we can frame this as "view-only, not runnable". #}
+{% if _locked %}
+  <div class="flash flash--warn mb-4 flex items-start gap-3"
+       style="background:oklch(82% .13 75 / .08); border:1px solid oklch(82% .13 75 / .35); color:var(--warn);">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mt-1 shrink-0">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+    </svg>
+    <div class="flex-1">
+      <div class="text-text font-semibold mb-1">View only — tier mismatch locks all run actions</div>
+      <div class="text-text-2 text-[13px]">
+        {{ _tlk.reason }} You can still read the existing capture, validation, and report
+        artifacts below, but capture/validate/report buttons are disabled until the active
+        tier matches <b>{{ _tlk.session_tier | capitalize }}</b> again.
+      </div>
+    </div>
+    <a class="btn sm" href="/tier">Switch tier →</a>
+  </div>
+{% endif %}
+
+{# Run-blocked flash — shown only when the user just tried to POST a run and
+   was bounced here. Distinct from the persistent locked-banner so a re-render
+   without `?lock_run=1` doesn't double up the messaging. #}
+{% if run_lock_flash and _locked %}
+  <div class="flash flash--error mb-4 flex items-center gap-3"
+       style="background:oklch(72% .16 25 / .08); border:1px solid oklch(72% .16 25 / .35); color:var(--bad);">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
+      <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+    </svg>
+    <span class="text-[13px]">
+      That run was rejected because of the tier mismatch above. Switch the active tier
+      back to <b>{{ _tlk.session_tier | capitalize }}</b> first.
+    </span>
+  </div>
+{% endif %}
+
+<div class="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 items-start">
+
+  {# ── Pipeline steps ── #}
+  <section class="card">
+    <div class="card-head">
+      <h3>Audit pipeline</h3>
+      <span class="sub">3 steps to a complete report</span>
+    </div>
+
+    {# ── Step macro: bullet + connector ─────────────────────── #}
+    {% macro step_marker(num, done, active, last) %}
+      <div class="flex flex-col items-center shrink-0">
+        <div class="w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-semibold border-2
+          {% if done %}bg-ok-soft text-ok border-ok
+          {% elif active %}bg-accent-soft text-accent border-accent
+          {% else %}bg-surface-2 text-text-4 border-line{% endif %}">
+          {% if done %}✓{% else %}{{ num }}{% endif %}
+        </div>
+        {% if not last %}<div class="w-0.5 h-10 bg-line mt-1"></div>{% endif %}
+      </div>
+    {% endmacro %}
+
+    {# Step 1 — Capture #}
+    <div class="p-4 border-b border-line">
+      <div class="flex items-start gap-3.5">
+        {{ step_marker(1, session.capture_completed, true, all_done) }}
+        <div class="flex-1 min-w-0 pt-1">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-semibold text-[13px]">Capture</span>
+            {% if session.capture_completed %}
+              <span class="chip ok text-[10px]"><span class="dot"></span>Complete</span>
+            {% else %}
+              <span class="chip run text-[10px]"><span class="dot"></span>Next step</span>
+            {% endif %}
+          </div>
+          <p class="text-[12px] text-text-2 my-0 mb-2.5">
+            Connects to your deployment and collects configuration data — Platform, MongoDB, Redis, gateways, and system info (depending on tier).
+          </p>
+          {% if cm_reminder_cmd %}
+          <div class="flex items-start gap-2.5 px-3 py-2.5 mb-3 bg-surface-2 border border-line rounded-md text-[12px]">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                 class="shrink-0 mt-0.5 text-text-3">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <div class="flex-1 min-w-0">
+              <span class="text-text-2">Make sure your ControlMaster connection is open before running capture:</span>
+              <code class="block mt-1.5 font-mono text-[11px] text-text bg-bg border border-line rounded px-2 py-1.5 break-all select-all">{{ cm_reminder_cmd }}</code>
+            </div>
+          </div>
+          {% endif %}
+          <form action="/sessions/{{ session.name }}/run/capture" method="post" class="flex flex-col items-start gap-2">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <label class="inline-flex items-center gap-2 text-[12px] text-text-2
+                          {% if session.tier == 'standard' %}cursor-not-allowed{% else %}cursor-pointer{% endif %}">
+              <input type="checkbox" name="run_aggregations" value="1" id="agg-capture"
+                     {% if session.tier != 'standard' %}checked{% else %}disabled{% endif %} class="m-0">
+              <span>
+                Run MongoDB aggregation pipelines after capture
+                {% if session.tier == 'standard' %}
+                  <span class="text-text-3 italic">— Extended tier only</span>
+                {% else %}
+                  <span class="text-text-3">(default on; uncheck to skip)</span>
+                {% endif %}
+              </span>
+            </label>
+            {% if session.tier != 'standard' %}
+            <div id="ps-capture" class="hidden w-full px-3 py-2.5 bg-bg border border-line rounded-md">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-[10.5px] font-semibold uppercase tracking-wide text-text-3">Pipelines to run</span>
+                <span>
+                  <button type="button" class="ps-all-btn text-[11px] bg-transparent border-0 text-accent cursor-pointer px-1" data-target="ps-capture">All</button>
+                  <span class="text-text-4 text-[10px]">·</span>
+                  <button type="button" class="ps-none-btn text-[11px] bg-transparent border-0 text-accent cursor-pointer px-1" data-target="ps-capture">None</button>
+                </span>
+              </div>
+              {% if available_pipelines %}
+                {% for p in available_pipelines %}
+                <label class="flex items-start gap-1.5 py-1 cursor-pointer border-t border-line text-[12px]">
+                  <input type="checkbox" name="pipeline_names" value="{{ p.name }}" checked class="mt-0.5 shrink-0">
+                  <span>
+                    <span class="font-medium text-text">{{ p.name }}</span>
+                    {% if p.collection %}
+                      <code class="text-[10.5px] text-text-4 bg-surface-2 px-1 py-px rounded ml-1 font-mono">{{ p.collection }}</code>
+                    {% endif %}
+                    {% if p.desc %}<span class="block text-[11px] text-text-3 mt-0.5">{{ p.desc }}</span>{% endif %}
+                  </span>
+                </label>
+                {% endfor %}
+              {% else %}
+                <p class="text-[11px] text-text-4 m-0 italic">
+                  No pipeline files found in <code class="font-mono">~/.atlas/pipelines/</code> — place <code class="font-mono">.json</code> files there to enable selection.
+                </p>
+              {% endif %}
+            </div>
+            {% endif %}
+            <button class="btn sm{% if not session.capture_completed and not _locked %} primary{% endif %}"
+                    type="submit"
+                    {% if _locked %}disabled title="{{ _tlk.reason }} {{ _tlk.fix }}"{% endif %}>
+              {% if session.capture_completed %}Re-capture{% else %}Run capture{% endif %}
+            </button>
+          </form>
+
+          {# Log capture failures — surface a retry-with-custom-path UI for each
+             failed log module so the user can recover without re-running the
+             whole pipeline. Populated from the capture JSON's
+             _atlas.metadata.failed_modules entry. #}
+          {% if session.failed_log_modules %}
+            <div class="mt-4 p-3 bg-warn-soft border border-warn rounded-md"
+                 style="background:oklch(82% .13 75 / .08); border-color:oklch(82% .13 75 / .35);">
+              <div class="flex items-start gap-2 mb-3">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     class="shrink-0 mt-0.5 text-warn">
+                  <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                  <line x1="12" y1="9" x2="12" y2="13"/>
+                  <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                <div class="flex-1">
+                  <div class="text-[12.5px] font-semibold text-text">Log capture had failures</div>
+                  <div class="text-[11.5px] text-text-2 mt-0.5">
+                    Supply a custom path for each failed log module and retry — no need to re-run the full capture.
+                  </div>
+                </div>
+              </div>
+              <div class="flex flex-col gap-3">
+                {% for fm in session.failed_log_modules %}
+                  <div class="log-retry-card p-2.5 bg-bg border border-line rounded">
+                    <div class="text-[12px] font-medium text-text mb-1">{{ fm.label }}</div>
+                    {% if fm.error_message %}
+                      <div class="text-[11px] font-mono text-text-3 mb-2 break-all">{{ fm.error_message }}</div>
+                    {% endif %}
+                    <form hx-post="/sessions/{{ session.name }}/retry-log-capture"
+                          hx-target="closest .log-retry-card"
+                          hx-swap="innerHTML"
+                          class="flex flex-col gap-2">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                      <input type="hidden" name="module" value="{{ fm.name }}">
+                      <label class="block text-[11px] uppercase tracking-wide text-text-3">
+                        Custom {{ fm.kind_label }}
+                      </label>
+                      <input type="text" name="custom_path" required
+                             autocomplete="off" spellcheck="false"
+                             placeholder="{{ fm.instruction }}"
+                             pattern="/.*" title="Absolute path required (must start with /)"
+                             class="w-full text-[12px] font-mono px-2 py-1.5 bg-surface-2 border border-line rounded-md focus:border-accent focus:outline-none">
+                      <p class="text-[11px] text-text-3 m-0">
+                        Successful paths are saved to the active environment automatically.
+                      </p>
+                      <button class="btn sm" type="submit"
+                              {% if _locked %}disabled title="{{ _tlk.reason }} {{ _tlk.fix }}"{% endif %}>
+                        Retry {{ fm.name }}
+                      </button>
+                    </form>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {# Step 2 — Validate #}
+    <div class="p-4 border-b border-line">
+      <div class="flex items-start gap-3.5">
+        {{ step_marker(2, session.validation_completed, session.capture_completed and not session.validation_completed, all_done) }}
+        <div class="flex-1 min-w-0 pt-1">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-semibold text-[13px]">Validate</span>
+            {% if session.validation_completed %}
+              <span class="chip ok text-[10px]"><span class="dot"></span>Complete</span>
+            {% elif session.capture_completed %}
+              <span class="chip run text-[10px]"><span class="dot"></span>Next step</span>
+            {% else %}
+              <span class="chip text-[10px] text-text-3">Waiting for capture</span>
+            {% endif %}
+          </div>
+          <p class="text-[12px] text-text-2 my-0 mb-2.5">
+            Evaluates the captured data against all ruleset checks and produces pass/fail/skip results.
+            {% if session.validation_completed and session.total_rules %}
+              <strong class="text-ok">{{ session.pass_count }} passed</strong>,
+              <strong class="text-bad">{{ session.fail_count }} failed</strong>,
+              <span class="text-text-3">{{ session.skip_count }} skipped</span>
+              out of {{ session.total_rules }} rules.
+            {% endif %}
+          </p>
+          <form action="/sessions/{{ session.name }}/run/validate" method="post" class="inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="btn sm{% if session.capture_completed and not session.validation_completed and not _locked %} primary{% endif %}"
+                    type="submit"
+                    {% if _locked %}disabled title="{{ _tlk.reason }} {{ _tlk.fix }}"
+                    {% elif not session.capture_completed %}disabled title="Run capture first"{% endif %}>
+              {% if session.validation_completed %}Re-validate{% else %}Run validate{% endif %}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    {# Step 3 — Report #}
+    <div class="p-4">
+      <div class="flex items-start gap-3.5">
+        {{ step_marker(3, session.report_completed, session.validation_completed and not session.report_completed, true) }}
+        <div class="flex-1 min-w-0 pt-1">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-semibold text-[13px]">Report</span>
+            {% if session.report_completed %}
+              <span class="chip ok text-[10px]"><span class="dot"></span>Complete</span>
+            {% elif session.validation_completed %}
+              <span class="chip run text-[10px]"><span class="dot"></span>Next step</span>
+            {% else %}
+              <span class="chip text-[10px] text-text-3">Waiting for validation</span>
+            {% endif %}
+          </div>
+          <p class="text-[12px] text-text-2 my-0 mb-2.5">
+            Renders the compliance report, operational metrics, and architecture overview as HTML files you can share with stakeholders.
+          </p>
+          <div class="flex gap-2 items-center flex-wrap">
+            <form action="/sessions/{{ session.name }}/run/report" method="post" class="inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button class="btn sm{% if session.validation_completed and not session.report_completed and not _locked %} primary{% endif %}"
+                      type="submit"
+                      {% if _locked %}disabled title="{{ _tlk.reason }} {{ _tlk.fix }}"
+                      {% elif not session.validation_completed %}disabled title="Run validate first"{% endif %}>
+                {% if session.report_completed %}Re-generate report{% else %}Generate report{% endif %}
+              </button>
+            </form>
+            {% if session.report_file %}
+              <a class="btn sm primary" href="/reports/{{ session.name }}" target="_blank" rel="noopener">Open report ↗</a>
+              <a class="btn sm" href="/sessions/{{ session.name }}/export/json" download="{{ session.name }}_report.json" title="Download a JSON version of the compliance results">Export JSON ↓</a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {# ── Right sidebar ─── #}
+  <div class="flex flex-col gap-3.5">
+
+    {% if session.validation_completed and session.total_rules %}
+    <div class="card">
+      <div class="card-head"><h3>Results</h3><span class="sub">{{ session.total_rules }} rules</span></div>
+      <div class="card-body">
+        {% set pass_pct = ((session.pass_count / session.total_rules) * 100) | int if session.total_rules else 0 %}
+        <div class="flex gap-4 mb-3">
+          {% for label, val, cls in [
+            ('Pass', session.pass_count, 'text-ok'),
+            ('Fail', session.fail_count, 'text-bad'),
+            ('Skip', session.skip_count, 'text-text-3'),
+          ] %}
+            <div class="text-center">
+              <div class="text-[28px] font-semibold tracking-[-0.04em] {{ cls }}">{{ val }}</div>
+              <div class="text-[10px] uppercase tracking-wider text-text-3">{{ label }}</div>
+            </div>
+          {% endfor %}
+        </div>
+        <div class="mb-1.5"><div class="progress"><i style="width:{{ pass_pct }}%;"></i></div></div>
+        <div class="text-[11px] text-text-3 text-right">{{ pass_pct }}% pass rate</div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="card">
+      <div class="card-head"><h3>Details</h3></div>
+      <div class="card-body flex flex-col gap-2">
+        <div class="flex justify-between text-[12px]">
+          <span class="text-text-3">Environment</span>
+          <span class="font-mono">{{ session.environment or '—' }}</span>
+        </div>
+        <div class="flex justify-between text-[12px]">
+          <span class="text-text-3">Tier</span>
+          <span>
+            {% if session.tier == 'standard' %}
+              <span class="font-medium" style="color:oklch(60% 0.18 220);">Standard</span>
+            {% else %}
+              <span class="font-medium" style="color:oklch(70% 0.18 30);">Extended</span>
+            {% endif %}
+          </span>
+        </div>
+        <div class="flex justify-between text-[12px]">
+          <span class="text-text-3">Ruleset</span>
+          <span class="font-mono">{{ session.ruleset_id or '—' }}</span>
+        </div>
+        {% if session.ruleset_profile %}
+        <div class="flex justify-between text-[12px]">
+          <span class="text-text-3">Profile</span>
+          <span class="font-mono">{{ session.ruleset_profile }}</span>
+        </div>
+        {% endif %}
+        {% if session.description %}
+        <div class="pt-1 border-t border-line text-[12px] text-text-2">{{ session.description }}</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card" style="border-color:oklch(72% .16 25/.2);">
+      <div class="card-head"><h3 class="text-bad">Danger zone</h3></div>
+      <div class="card-body">
+        <p class="text-[12px] text-text-3 m-0 mb-2.5">
+          Deleting a session permanently removes all captured data, validation results, and reports.
+        </p>
+        <form action="/sessions/{{ session.name }}/delete" method="post"
+              data-confirm-action data-confirm-kind="danger"
+              data-confirm-title="Delete session?"
+              data-confirm-message="Permanently delete session '{{ session.name }}'?&#10;&#10;All captured data and reports will be removed. This cannot be undone."
+              data-confirm-label="Delete session">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button class="btn sm danger" type="submit">Delete session</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+(function () {
+  'use strict';
+
+  var pairs = [
+    { chk: document.getElementById('agg-capture'), panel: document.getElementById('ps-capture') },
+  ];
+  pairs.forEach(function (pair) {
+    if (!pair.chk || !pair.panel) return;
+    function sync() { pair.panel.style.display = pair.chk.checked ? 'block' : 'none'; }
+    pair.chk.addEventListener('change', sync);
+    sync();
+  });
+
+  document.querySelectorAll('.ps-all-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var panel = document.getElementById(btn.dataset.target);
+      if (panel) panel.querySelectorAll('input[type="checkbox"]').forEach(function (cb) { cb.checked = true; });
+    });
+  });
+  document.querySelectorAll('.ps-none-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var panel = document.getElementById(btn.dataset.target);
+      if (panel) panel.querySelectorAll('input[type="checkbox"]').forEach(function (cb) { cb.checked = false; });
+    });
+  });
+
+  var heroForm = document.getElementById('hero-run-all');
+  if (heroForm) {
+    heroForm.addEventListener('submit', function () {
+      heroForm.querySelectorAll('[data-mirrored="1"]').forEach(function (n) { n.remove(); });
+      function addHidden(name, value) {
+        var i = document.createElement('input');
+        i.type = 'hidden'; i.name = name; i.value = value; i.dataset.mirrored = '1';
+        heroForm.appendChild(i);
+      }
+      var aggChk = document.getElementById('agg-capture');
+      if (aggChk && !aggChk.disabled) {
+        addHidden('run_aggregations', aggChk.checked ? '1' : '0');
+        if (aggChk.checked) {
+          var panel = document.getElementById('ps-capture');
+          if (panel) {
+            panel.querySelectorAll('input[name="pipeline_names"]:checked').forEach(function (cb) {
+              addHidden('pipeline_names', cb.value);
+            });
+          }
+        }
+      }
+    });
+  }
+}());
+</script>
+
+{% endblock %}

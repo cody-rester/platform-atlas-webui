@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+{% block title %}Diff — Platform Atlas{% endblock %}
+{% block crumb %}Diff{% endblock %}
+{% block content %}
+
+<header class="flex items-end justify-between gap-6 pb-5 border-b border-line mb-6">
+  <div>
+    <div class="eyebrow"><span class="dot"></span> Audit</div>
+    <h1 class="text-[36px] leading-[1.05] font-semibold tracking-[-0.038em] mt-2 mb-1.5">
+      Compare sessions, <em class="not-italic text-text-3">side-by-side</em>
+    </h1>
+    <p class="text-[14px] text-text-2 max-w-[64ch]">
+      Pick a baseline and a latest session. Both must have completed validation. The diff
+      classifies changes (added / removed / changed) and flags cross-tier comparisons.
+    </p>
+  </div>
+</header>
+
+{% if not sessions %}
+  <section class="flex flex-col items-center justify-center py-12 px-6 text-center bg-surface border border-line rounded-lg">
+    <strong class="mb-1.5">No validated sessions yet</strong>
+    <span class="text-text-3 max-w-[440px] text-[13px]">
+      Run <code>capture → validate</code> on at least two sessions before you can diff them.
+    </span>
+    <div class="mt-4 flex gap-1.5">
+      <a class="btn primary" href="/sessions/new">+ New session</a>
+      <a class="btn" href="/sessions">View sessions</a>
+    </div>
+  </section>
+{% else %}
+  <section class="card">
+    <div class="card-head">
+      <h3>Pick two sessions</h3>
+      <span class="sub">{{ sessions|length }} validated</span>
+    </div>
+    <div class="card-body">
+      <form class="form" id="diff-form" method="get" action="/diff/render" target="_blank">
+        <fieldset>
+          <div class="field">
+            <label for="baseline">1. Baseline session <span class="text-text-3 font-normal">(before)</span></label>
+            <select id="baseline" name="baseline" required>
+              <option value="" disabled selected>— Pick a baseline session —</option>
+              {% for s in sessions %}
+                {% set ts = s.updated_at[:16].replace('T', ' ') if s.updated_at else '—' %}
+                <option value="{{ s.name }}">{{ s.name }} — {{ s.tier|capitalize }} · {{ s.environment or '—' }} · {{ ts }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label for="latest">2. Latest session <span class="text-text-3 font-normal">(after)</span></label>
+            <select id="latest" name="latest" required disabled
+                    style="opacity:0.55; cursor:not-allowed;">
+              <option value="" disabled selected>— Choose a baseline first —</option>
+              {% for s in sessions %}
+                {% set ts = s.updated_at[:16].replace('T', ' ') if s.updated_at else '—' %}
+                <option value="{{ s.name }}" data-name="{{ s.name }}">{{ s.name }} — {{ s.tier|capitalize }} · {{ s.environment or '—' }} · {{ ts }}</option>
+              {% endfor %}
+            </select>
+            <span class="hint hidden" id="latest-hint">
+              The selected baseline is filtered out — you can't diff a session against itself.
+            </span>
+          </div>
+        </fieldset>
+      </form>
+    </div>
+  </section>
+
+  {# Sessions data — embedded JSON the mini-diff JS reads on selection
+     change. Avoids a follow-up fetch to compute headline numbers. #}
+  <script id="diff-sessions-data" type="application/json">
+    {{ sessions | tojson }}
+  </script>
+
+  {# Mini-diff preview (design #09) — appears once both selects are filled.
+     Numbers tween between the baseline and latest values; the delta arrow
+     fades in last. The "Open full diff" CTA submits the form in a new tab. #}
+  <section class="card mini-diff" id="mini-diff" hidden>
+    <div class="card-head">
+      <h3>Mini-diff preview</h3>
+      <span class="sub">live snapshot · open the full diff for evidence + per-rule changes</span>
+    </div>
+    <div class="card-body">
+      <div class="md-grid">
+        <div class="md-col">
+          <h5>BASELINE · <span id="md-base-name">—</span></h5>
+          <div class="md-big" id="md-base-pct">0%</div>
+          <div class="md-meta" id="md-base-meta">— pass · — fail · — skip</div>
+          <div class="md-rows">
+            <div class="md-row"><span>environment</span><span id="md-base-env">—</span></div>
+            <div class="md-row"><span>ruleset</span>    <span id="md-base-rs">—</span></div>
+            <div class="md-row"><span>tier</span>       <span id="md-base-tier">—</span></div>
+            <div class="md-row"><span>captured</span>   <span id="md-base-when">—</span></div>
+          </div>
+        </div>
+        <div class="md-arrow">
+          <div class="md-delta" id="md-delta">±0</div>
+          <div class="md-delta-lab" id="md-delta-lab">change</div>
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" id="md-delta-arrow" style="margin-top:6px">
+            <path d="M5 12h14M13 6l6 6-6 6"/>
+          </svg>
+        </div>
+        <div class="md-col current">
+          <h5>LATEST · <span id="md-curr-name">—</span></h5>
+          <div class="md-big" id="md-curr-pct">0%</div>
+          <div class="md-meta" id="md-curr-meta">— pass · — fail · — skip</div>
+          <div class="md-rows">
+            <div class="md-row"><span>environment</span><span id="md-curr-env">—</span></div>
+            <div class="md-row"><span>ruleset</span>    <span id="md-curr-rs">—</span></div>
+            <div class="md-row"><span>tier</span>       <span id="md-curr-tier">—</span></div>
+            <div class="md-row"><span>captured</span>   <span id="md-curr-when">—</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="md-banner" id="md-banner" hidden></div>
+      <div class="md-actions">
+        <button type="submit" form="diff-form" class="btn primary" id="md-open-full">Open full diff ↗</button>
+        <span class="md-hint">opens in a new tab · evidence · per-rule changes · cross-tier flag</span>
+      </div>
+    </div>
+  </section>
+
+  <script src="{{ url_for('static', path='js/anime.min.js') }}?v={{ asset_version }}" defer></script>
+  <script nonce="{{ csp_nonce }}" defer>
+    (function () {
+      // Existing form gating: rebuild the "latest" dropdown to exclude the
+      // chosen baseline, gate the open-full button on having two distinct
+      // selections.
+      const baseline = document.getElementById('baseline');
+      const latest = document.getElementById('latest');
+      const openFullBtn = document.getElementById('md-open-full');
+      const hint = document.getElementById('latest-hint');
+      const miniDiff = document.getElementById('mini-diff');
+      if (!baseline || !latest || !openFullBtn) return;
+
+      const lockedStyle = 'opacity:0.55; cursor:not-allowed;';
+      const unlockedStyle = '';
+
+      const allLatestOptions = Array.from(latest.querySelectorAll('option[data-name]'))
+        .map(o => ({ value: o.value, label: o.textContent }));
+
+      // Index sessions by name for O(1) lookup on selection change.
+      const sessionsRaw = document.getElementById('diff-sessions-data');
+      const sessionsById = {};
+      try {
+        const arr = JSON.parse(sessionsRaw.textContent);
+        arr.forEach(s => { sessionsById[s.name] = s; });
+      } catch (_) { /* mini-diff just won't populate; selection still works */ }
+
+      function rebuildLatest() {
+        const chosen = baseline.value;
+        latest.innerHTML = '<option value="" disabled selected>— Pick a session to compare —</option>';
+        allLatestOptions.forEach(({ value, label }) => {
+          if (value === chosen) return;
+          const o = document.createElement('option');
+          o.value = value; o.textContent = label; o.dataset.name = value;
+          latest.appendChild(o);
+        });
+        const hasBaseline = !!chosen;
+        latest.disabled = !hasBaseline;
+        latest.style.cssText = hasBaseline ? unlockedStyle : lockedStyle;
+        hint.classList.toggle('hidden', !hasBaseline);
+        updateMiniDiff();
+      }
+
+      function compliance(s) {
+        if (!s) return 0;
+        const evaluated = (s.pass_count || 0) + (s.fail_count || 0);
+        return evaluated ? Math.round((s.pass_count / evaluated) * 100) : 0;
+      }
+      function fmtTs(ts) { return ts ? ts.slice(0, 16).replace('T', ' ') : '—'; }
+      function lerp(a, b, t) { return Math.round(a + (b - a) * t); }
+
+      function tweenNumber(el, from, to, suffix) {
+        suffix = suffix || '';
+        if (window.anime && typeof anime.animate === 'function') {
+          const proxy = { v: from };
+          anime.animate(proxy, {
+            v: to, duration: 900, ease: 'outCubic',
+            onUpdate: function () { el.textContent = Math.round(proxy.v) + suffix; },
+          });
+        } else {
+          // rAF fallback
+          const start = performance.now();
+          const dur = 900;
+          (function step(now) {
+            const t = Math.min(1, (now - start) / dur);
+            const e = 1 - Math.pow(1 - t, 3);
+            el.textContent = lerp(from, to, e) + suffix;
+            if (t < 1) requestAnimationFrame(step);
+          })(start);
+        }
+      }
+
+      function updateMiniDiff() {
+        openFullBtn.disabled = !(baseline.value && latest.value && baseline.value !== latest.value);
+        openFullBtn.style.cssText = openFullBtn.disabled ? lockedStyle : unlockedStyle;
+
+        if (!baseline.value || !latest.value || baseline.value === latest.value) {
+          miniDiff.setAttribute('hidden', '');
+          return;
+        }
+        const b = sessionsById[baseline.value];
+        const l = sessionsById[latest.value];
+        if (!b || !l) return;
+
+        // Capture the previous values so we can tween from them, not from 0
+        // every time. Stored on the element for cross-call persistence.
+        const prevBasePct = parseFloat(miniDiff.dataset.basePct || '0');
+        const prevCurrPct = parseFloat(miniDiff.dataset.currPct || '0');
+
+        // Static fields populate immediately
+        document.getElementById('md-base-name').textContent = b.name;
+        document.getElementById('md-curr-name').textContent = l.name;
+        document.getElementById('md-base-env').textContent  = b.environment || '—';
+        document.getElementById('md-curr-env').textContent  = l.environment || '—';
+        document.getElementById('md-base-rs').textContent   = (b.ruleset_id || '—') + (b.ruleset_profile ? ' · ' + b.ruleset_profile : '');
+        document.getElementById('md-curr-rs').textContent   = (l.ruleset_id || '—') + (l.ruleset_profile ? ' · ' + l.ruleset_profile : '');
+        document.getElementById('md-base-tier').textContent = (b.tier || 'extended');
+        document.getElementById('md-curr-tier').textContent = (l.tier || 'extended');
+        document.getElementById('md-base-when').textContent = fmtTs(b.updated_at);
+        document.getElementById('md-curr-when').textContent = fmtTs(l.updated_at);
+        document.getElementById('md-base-meta').textContent =
+          (b.pass_count || 0) + ' pass · ' + (b.fail_count || 0) + ' fail · ' + (b.skip_count || 0) + ' skip';
+        document.getElementById('md-curr-meta').textContent =
+          (l.pass_count || 0) + ' pass · ' + (l.fail_count || 0) + ' fail · ' + (l.skip_count || 0) + ' skip';
+
+        const bp = compliance(b);
+        const lp = compliance(l);
+        const delta = lp - bp;
+
+        miniDiff.dataset.basePct = String(bp);
+        miniDiff.dataset.currPct = String(lp);
+
+        miniDiff.removeAttribute('hidden');
+
+        tweenNumber(document.getElementById('md-base-pct'), prevBasePct, bp, '%');
+        tweenNumber(document.getElementById('md-curr-pct'), prevCurrPct, lp, '%');
+
+        // Delta + arrow direction/color
+        const deltaEl = document.getElementById('md-delta');
+        const deltaLab = document.getElementById('md-delta-lab');
+        const arrow = document.getElementById('md-delta-arrow');
+        const sign = delta >= 0 ? '+' : '';
+        deltaEl.textContent = sign + delta;
+        if (delta > 0) {
+          deltaEl.style.color = 'var(--ok)';
+          deltaLab.textContent = 'improvement';
+          arrow.setAttribute('stroke', 'var(--ok)');
+          arrow.style.transform = 'rotate(0deg)';
+        } else if (delta < 0) {
+          deltaEl.style.color = 'var(--bad)';
+          deltaLab.textContent = 'regression';
+          arrow.setAttribute('stroke', 'var(--bad)');
+          arrow.style.transform = 'rotate(180deg)';
+        } else {
+          deltaEl.style.color = 'var(--text-3)';
+          deltaLab.textContent = 'no change';
+          arrow.setAttribute('stroke', 'var(--text-3)');
+          arrow.style.transform = 'rotate(90deg)';
+        }
+
+        // Cross-tier banner — flag if the user is comparing different tiers
+        // since rule sets won't be 1:1. Doesn't block the diff (the engine
+        // handles the mismatch) but the user should know.
+        const banner = document.getElementById('md-banner');
+        if ((b.tier || '') !== (l.tier || '')) {
+          banner.removeAttribute('hidden');
+          banner.textContent = 'Cross-tier comparison: baseline is ' + (b.tier || 'extended') +
+            ', latest is ' + (l.tier || 'extended') +
+            '. Some rules from one side may not exist on the other.';
+        } else {
+          banner.setAttribute('hidden', '');
+        }
+      }
+
+      baseline.addEventListener('change', rebuildLatest);
+      latest.addEventListener('change', updateMiniDiff);
+    })();
+  </script>
+{% endif %}
+
+{% endblock %}

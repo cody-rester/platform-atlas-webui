@@ -1,0 +1,114 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   atlas.tw.css — Tailwind v4 source for the Platform Atlas WebUI.
+
+   This file is COMPILED by the Tailwind v4 standalone CLI into
+   atlas.tw.compiled.css. The compiled output is what base.html links;
+   nothing on the live site loads this source directly.
+
+   Build:   ./bin/tailwindcss \
+              -i  webui/src/platform_atlas_webui/static/css/atlas.tw.css \
+              -o  webui/src/platform_atlas_webui/static/css/atlas.tw.compiled.css \
+              --minify
+
+   The CLI is downloaded by scripts/tailwind-install.sh; the full release
+   pipeline lives in scripts/build-release.sh.
+   ─────────────────────────────────────────────────────────────────────── */
+
+/* Layer ordering with `base` deliberately omitted — atlas.css owns the
+   global reset (font-face, body bg/color, h1/p/button defaults, hidden
+   attribute, prefers-reduced-motion globals). Importing
+   `tailwindcss/preflight.css` would steamroll all of that. This is the
+   v4-native equivalent of the v3 `corePlugins.preflight: false` flag. */
+@layer theme, components, utilities;
+
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/* ─── Dark mode ─────────────────────────────────────────────────────────
+   Replaces v3's `darkMode: ['selector', '[data-mode="dark"]']`. The
+   :where() wrapper keeps specificity at 0 so atlas.css component rules
+   still win on equal grounds. */
+@custom-variant dark (&:where([data-mode="dark"], [data-mode="dark"] *));
+
+/* ─── Source globs ──────────────────────────────────────────────────────
+   v4 doesn't auto-discover content; we point it at the templates and JS
+   files that author Tailwind classes. Paths are relative to THIS file. */
+@source "../../templates/**/*.html";
+@source "../js/atlas.js";
+@source "../js/job-stream.js";
+
+/* ─── Safelist for Jinja-interpolated class names ──────────────────────
+   Tailwind v4's source scanner reads files literally — patterns like
+   `border-l-{{ accent }}` (rulesets/active.html) never match because
+   the `{{` is part of the regex. List the resolved names here so they
+   survive into the compiled output. Keep this minimal: only add classes
+   that are produced by Jinja interpolation and confirmed missing from
+   atlas.tw.compiled.css. */
+@source inline("border-l-ok border-l-warn border-l-bad border-l-info border-l-accent");
+
+/* ─── Theme tokens ──────────────────────────────────────────────────────
+   IMPORTANT: this is `@theme inline`, not bare `@theme`. The `inline`
+   modifier preserves the var() reference at the utility's call site
+   instead of freezing the variable's compile-time value. That's what
+   makes runtime theme switching work — toggling :root or [data-theme]
+   variables in atlas.css updates every Tailwind utility automatically.
+
+   Tokens marked "FIXED" use concrete hex literals because they're brand-
+   identity (logos, badges, marketing surfaces) — they should look the
+   same across every theme. Per CLAUDE.md.
+
+   Opacity modifiers (e.g. bg-surface/50, border-accent/30) finally work
+   in v4 thanks to color-mix(in oklab, ...) — we no longer need the
+   *-soft fallback dance the v3 config had to use. */
+@theme inline {
+  /* ── Theme-aware surfaces ──────────────────────────────────────── */
+  --color-bg:           var(--bg);
+  --color-bg-2:         var(--bg-2);
+  --color-surface:      var(--surface);
+  --color-surface-2:    var(--surface-2);
+  --color-surface-3:    var(--surface-3);
+  --color-line:         var(--line);
+  --color-line-2:       var(--line-2);
+
+  /* ── Theme-aware foregrounds ───────────────────────────────────── */
+  --color-text:         var(--text);
+  --color-text-2:       var(--text-2);
+  --color-text-3:       var(--text-3);
+  --color-text-4:       var(--text-4);
+
+  /* ── Accent + state colors ─────────────────────────────────────── */
+  --color-accent:       var(--accent);
+  --color-accent-ink:   var(--accent-ink);
+  --color-accent-soft:  var(--accent-soft);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-muted: var(--accent-muted);
+  --color-ok:           var(--ok);
+  --color-warn:         var(--warn);
+  --color-bad:          var(--bad);
+  --color-info:         var(--info);
+  --color-ok-soft:      var(--ok-soft);
+  --color-warn-soft:    var(--warn-soft);
+  --color-bad-soft:     var(--bad-soft);
+
+  /* ── FIXED brand palette ───────────────────────────────────────── */
+  --color-atlas-navy:   #101625;
+  --color-atlas-blue:   #1B93D2;
+  --color-atlas-orange: #FF6633;
+  --color-atlas-green:  #99CA3C;
+  --color-atlas-pink:   #C5258F;
+
+  /* ── Fonts ─────────────────────────────────────────────────────────
+     The actual @font-face declarations live in atlas.css. These are
+     just the font-family stacks — Tailwind generates `font-sans`,
+     `font-display`, `font-mono`, `font-serif` utilities from them. */
+  --font-sans:    Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono:    "JetBrains Mono", "SF Mono", ui-monospace, Consolas, monospace;
+  --font-serif:   "Instrument Serif", ui-serif, Georgia, serif;
+
+  /* ── Custom glow shadows (matches v3 config) ───────────────────── */
+  --shadow-glow-blue:   0 0 0 1px rgba(27,147,210,0.35), 0 8px 30px rgba(27,147,210,0.18);
+  --shadow-glow-pink:   0 0 0 1px rgba(197,37,143,0.35), 0 8px 30px rgba(197,37,143,0.20);
+  --shadow-glow-orange: 0 0 0 1px rgba(255,102,51,0.35), 0 8px 30px rgba(255,102,51,0.22);
+  --shadow-glow-green:  0 0 0 1px rgba(153,202,60,0.35), 0 8px 30px rgba(153,202,60,0.20);
+}

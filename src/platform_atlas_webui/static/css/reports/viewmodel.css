@@ -1,0 +1,2307 @@
+/*
+ * Atlas WebUI report — Frosted style.
+ *
+ * Applies the "Frosted" visual direction to the WebUI's three-tab report
+ * (Compliance / Operational / Architecture). The recipe — calm "Fortune-100"
+ * surface, very-low-alpha frosted panels on a soft dual-wash backdrop, color
+ * reserved for status only — comes from frosted-style-guide.md.
+ *
+ * THEME-AWARE: the spec uses tuned Dracula values, but every color here is
+ * resolved from atlas.css's per-theme tokens (--accent, --ok, --bad, --warn,
+ * --info, --text, --surface, --bg, --line). Switching theme/mode in the
+ * topbar re-themes the whole report for free. The white-on-white frost
+ * fills are derived from --text via color-mix, which automatically inverts
+ * to dark-on-light in light mode.
+ *
+ * SCOPED: every selector lives under .vm-root so the report cannot bleed
+ * into the global sidebar or topbar (those follow base.html / atlas.css
+ * and are deliberately untouched).
+ */
+
+/* ──────────────────────────────────────────────────────────────────
+ * Tokens — frosted recipe, mapped to theme variables
+ * ────────────────────────────────────────────────────────────────── */
+.vm-root {
+  --vm-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --vm-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Frost surfaces — pure-white-on-dark / pure-dark-on-light alpha overlays.
+     Spec calls for 3.5–4.5% white on Dracula. We derive from --text so the
+     overlay sign flips correctly in light mode. */
+  --vm-panel-bg:        color-mix(in oklab, var(--text) 4%,  transparent);
+  --vm-panel-bg-raised: color-mix(in oklab, var(--text) 5%,  transparent);
+  --vm-panel-border:    color-mix(in oklab, var(--text) 7%,  transparent);
+  --vm-divider:         color-mix(in oklab, var(--text) 6%,  transparent);
+  --vm-divider-2:       color-mix(in oklab, var(--text) 10%, transparent);
+
+  /* Inset highlight (the "edge of glass") + 1px contact shadow. */
+  --vm-edge-light:      color-mix(in oklab, var(--text) 6%,  transparent);
+  --vm-contact-shadow:  0 1px 2px color-mix(in oklab, #000 25%, transparent);
+
+  --vm-blur:            blur(28px) saturate(140%);
+  --vm-blur-sm:         blur(20px) saturate(135%);
+
+  /* Text */
+  --vm-fg:        var(--text);
+  --vm-fg-dim:    var(--text-2);
+  --vm-fg-mute:   var(--text-3);
+  --vm-comment:   var(--text-4);
+
+  /* Easing */
+  --vm-ease:      cubic-bezier(.2,.7,.2,1);
+  --vm-ease-emph: cubic-bezier(.16, 1, .3, 1);
+
+  /* Radius */
+  --vm-r-pill: 999px;
+  --vm-r-pill-sm: 4px;     /* status pills */
+  --vm-r-input: 8px;
+  --vm-r-panel: 12px;      /* panels max */
+
+  /* Layout
+     `display: block` (not flex) so position: sticky on the .vm-tabs
+     child works reliably across browsers. The `> * + *` margin is the
+     gap-replacement for the children; vm-tabs gets margin-top: 6px
+     (defined on the element itself) so it overrides this default. */
+  display: block;
+  position: relative;
+  font-family: var(--vm-sans);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'cv01', 'cv02', 'cv03', 'cv04', 'tnum';
+  color: var(--vm-fg-dim);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.vm-root > * + * { margin-top: 14px; }
+
+.vm-root .mono { font-family: var(--vm-mono); }
+
+/* ──────────────────────────────────────────────────────────────────
+ * Backdrop — two soft washes + faint grid, scoped inside .vm-root
+ *
+ * `position: absolute` (not fixed) keeps the wash bound to the report.
+ * The sidebar and topbar live outside .vm-root, so they stay untouched.
+ * The washes use --accent and --info so they pick up the active theme:
+ *   aurora    → blue + blue
+ *   horizon   → orange + slate
+ *   carbon    → purple + purple   (closest to the original Dracula)
+ *   meadow    → terracotta + slate
+ *   itential  → brand blue
+ * ────────────────────────────────────────────────────────────────── */
+.vm-backdrop {
+  position: absolute; inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: inherit;
+}
+.vm-backdrop__wash {
+  position: absolute;
+  width: 700px; height: 700px;
+  filter: blur(60px);
+  opacity: 1;
+}
+.vm-backdrop__wash--accent {
+  top: -200px; left: -100px;
+  background: radial-gradient(circle,
+    color-mix(in oklab, var(--accent) 18%, transparent),
+    transparent 60%);
+}
+.vm-backdrop__wash--info {
+  bottom: -200px; right: -100px;
+  background: radial-gradient(circle,
+    color-mix(in oklab, var(--info) 12%, transparent),
+    transparent 60%);
+}
+/* Light mode dials the washes back so the frost doesn't read as muddy. */
+html[data-mode="light"] .vm-backdrop__wash--accent { opacity: 0.55; }
+html[data-mode="light"] .vm-backdrop__wash--info   { opacity: 0.5; }
+
+/* Backdrop sits behind everything via z-index: -1. The previous
+   approach (`.vm-root > *:not(.vm-backdrop) { position: relative }`)
+   silently broke `.vm-tabs { position: sticky }` because the broader
+   selector won on specificity and demoted the tabs to relative. */
+
+/* ──────────────────────────────────────────────────────────────────
+ * Panel recipe — the foundation
+ *
+ * .card is the L1 panel (inner / nested surfaces — stat tiles, log
+ * cards, etc.). Adding `[data-vm-hero]` or relying on .vm-hero gives
+ * us the L2 "raised" variant where needed. The recipe is the same
+ * material at slightly higher alpha for L2 outer containers.
+ * ────────────────────────────────────────────────────────────────── */
+.vm-root .card {
+  position: relative;
+  background: var(--vm-panel-bg);
+  border: 1px solid var(--vm-panel-border);
+  border-radius: var(--vm-r-panel);
+  box-shadow:
+    inset 0 1px 0 var(--vm-edge-light),
+    var(--vm-contact-shadow);
+  backdrop-filter: var(--vm-blur);
+  -webkit-backdrop-filter: var(--vm-blur);
+  overflow: hidden;
+  transition: background .25s ease, border-color .25s ease;
+}
+.vm-root .card-head {
+  display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  padding: 16px 22px 14px;
+  border-bottom: 1px solid var(--vm-divider);
+}
+.vm-root .card-head h3 {
+  margin: 0;
+  font-size: 17px; font-weight: 600;
+  letter-spacing: -0.018em;
+  color: var(--vm-fg);
+}
+.vm-root .card-head .sub {
+  margin-left: auto;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--vm-fg-mute);
+}
+/* JS-written counts ("17 rules", "3 pipelines") — kept lowercase mono
+   so the numerals read clearly. Sits in the same slot as .sub. */
+.vm-root .card-head .vm-count {
+  margin-left: auto;
+  font-family: var(--vm-mono);
+  font-size: 11.5px;
+  color: var(--vm-fg-mute);
+  font-variant-numeric: tabular-nums;
+}
+
+/* L2 (outer) — slightly more frosted so it reads as the container of
+   the L1 panels nested inside (e.g. the hero panel holds 4 stat tiles). */
+.vm-root .vm-hero {
+  background: var(--vm-panel-bg-raised);
+}
+
+/* ──────────────────────────────────────────────────────────────────
+ * Action bar — thin row, right-aligned export shortcuts.
+ * The session name + tier already live in the topbar (breadcrumb +
+ * pill) so the report doesn't repeat them — pulls the content up to
+ * the top of the available space.
+ * ────────────────────────────────────────────────────────────────── */
+.vm-actionbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.vm-smallcap {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--vm-fg-mute);
+}
+
+/* Top-level ghost button (Standalone HTML / Session) — narrow, frosted. */
+.vm-root .btn.sm,
+.vm-root .btn--ghost {
+  font-size: 12.5px;
+  padding: 6px 12px;
+  border-radius: var(--vm-r-input);
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--vm-divider-2);
+  background: var(--vm-panel-bg);
+  color: var(--vm-fg-dim);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background .2s ease, color .2s ease, border-color .2s ease;
+}
+.vm-root .btn.sm:hover,
+.vm-root .btn--ghost:hover {
+  background: var(--vm-panel-bg-raised);
+  color: var(--vm-fg);
+  border-color: color-mix(in oklab, var(--text) 16%, transparent);
+}
+
+/* ──────────────────────────────────────────────────────────────────
+ * Identity strip — sits at the bottom as the report footer
+ * ────────────────────────────────────────────────────────────────── */
+.vm-identity {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1px;
+  background: var(--vm-divider);
+  border: 1px solid var(--vm-panel-border);
+  border-radius: var(--vm-r-panel);
+  overflow: hidden;
+}
+.vm-identity-cell {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 12px 16px;
+  background: var(--vm-panel-bg);
+  backdrop-filter: var(--vm-blur-sm);
+  -webkit-backdrop-filter: var(--vm-blur-sm);
+  min-width: 0;
+}
+.vm-identity-cell .lbl {
+  font-size: 10px; font-weight: 600;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--vm-fg-mute);
+}
+.vm-identity-cell .val {
+  font-size: 13px; color: var(--vm-fg);
+  font-weight: 500;
+  text-overflow: ellipsis; overflow: hidden; white-space: nowrap;
+}
+.vm-identity-cell .val.mono {
+  font-family: var(--vm-mono); font-size: 12px; font-weight: 400;
+}
+
+/* ──────────────────────────────────────────────────────────────────
+ * Tabs — underline + count badge that inverts on active
+ * Sticky to the top of the viewport so the user always knows where
+ * they are in the report. Frosted background so the page peeks through.
+ * ────────────────────────────────────────────────────────────────── */
+.vm-tabs {
+  position: sticky; top: 52px; z-index: 50;
+  display: flex; gap: 2px;
+  border-bottom: 1px solid var(--vm-divider);
+  /* Solid background (not transparent) so the tabs don't disappear
+     into whatever's behind them when scrolled. backdrop-filter was
+     also dropped — combining sticky + backdrop-filter has been
+     reported to flicker on some Chromium versions. */
+  background: var(--bg);
+}
+/* Sliding underline indicator — JS positions it under the active tab and
+   animates between positions on tab change. The CSS-only border-bottom on
+   .is-active is dropped (this element replaces it) so we don't get a
+   double underline during the elastic settle. */
+.vm-tab-indicator {
+  position: absolute;
+  left: 0; bottom: -1px;
+  width: 0; height: 2px;
+  background: var(--accent);
+  border-radius: 2px;
+  pointer-events: none;
+  will-change: transform, width;
+  /* Initial CSS fade-in — JS overrides the transform/width on first paint. */
+  transition: opacity .25s var(--vm-ease);
+  opacity: 0;
+}
+.vm-tab-indicator.is-ready { opacity: 1; }
+.vm-tab {
+  display: inline-flex; align-items: center; gap: 9px;
+  padding: 12px 18px;
+  background: transparent; border: 0;
+  margin-bottom: -1px;
+  font-family: inherit; font-size: 14px; font-weight: 500;
+  color: var(--vm-fg-mute);
+  cursor: pointer;
+  transition: color .2s ease;
+}
+.vm-tab:hover { color: var(--vm-fg-dim); }
+.vm-tab.is-active {
+  color: var(--vm-fg); font-weight: 600;
+}
+.vm-tab.is-active svg { color: var(--accent); }
+.vm-tab-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 22px; height: 18px;
+  padding: 0 8px;
+  font-family: var(--vm-mono);
+  font-size: 11px; font-weight: 500;
+  color: var(--vm-fg-mute);
+  background: var(--vm-panel-bg);
+  border: 1px solid var(--vm-divider-2);
+  border-radius: var(--vm-r-pill);
+  transition: background .2s ease, color .2s ease, border-color .2s ease;
+}
+.vm-tab.is-active .vm-tab-count {
+  background: color-mix(in oklab, var(--accent) 15%, transparent);
+  color: var(--accent);
+  border-color: color-mix(in oklab, var(--accent) 30%, transparent);
+}
+
+.vm-panel { display: flex; flex-direction: column; gap: 18px; }
+
+/* Panel crossfade — Alpine.js x-transition uses these classes when
+   the user switches tabs. Opacity-only (no transform) so the panel
+   doesn't briefly create a CSS containing block during the transition,
+   which would interfere with sticky tabs and fixed-positioned descendants. */
+.vm-panel-enter        { transition: opacity .3s var(--vm-ease); }
+.vm-panel-enter-start  { opacity: 0; }
+.vm-panel-enter-end    { opacity: 1; }
+
+/* ──────────────────────────────────────────────────────────────────
+ * Hero — health rating + lede + 4 stat tiles + score ring
+ * ────────────────────────────────────────────────────────────────── */
+.vm-hero {
+  padding: 32px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 36px;
+  align-items: center;
+}
+.vm-hero-text { min-width: 0; }
+.vm-hero-title {
+  margin-top: 6px;
+  font-family: var(--vm-sans);
+  font-size: clamp(56px, 8vw, 96px);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--vm-fg);
+}
+.vm-hero-lede {
+  margin: 14px 0 0;
+  max-width: 560px;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--vm-fg-dim);
+}
+.vm-hero-lede strong {
+  color: var(--vm-fg); font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.vm-stat-grid {
+  margin-top: 24px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  max-width: 720px;
+}
+.vm-stat-grid--3 {
+  margin-top: 0;
+  grid-template-columns: repeat(3, 1fr);
+  max-width: none;
+}
+.vm-stat {
+  padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 6px;
+  transition: transform .25s var(--vm-ease),
+              background .2s ease,
+              border-color .2s ease,
+              box-shadow .2s ease;
+}
+.vm-stat:hover {
+  transform: translateY(-3px);
+  background: color-mix(in oklab, var(--text) 5.5%, transparent);
+  border-color: color-mix(in oklab, var(--accent) 38%, transparent);
+  box-shadow: 0 8px 22px color-mix(in oklab, var(--accent) 8%, transparent);
+}
+.vm-stat-value {
+  font-family: var(--vm-sans);
+  font-size: 32px; font-weight: 600;
+  line-height: 1.1; letter-spacing: -0.02em;
+  color: var(--vm-fg);
+  font-variant-numeric: tabular-nums;
+}
+.vm-stat-value.text-ok    { color: var(--ok); }
+.vm-stat-value.text-bad   { color: var(--bad); }
+.vm-stat-value.text-warn  { color: var(--warn); }
+.vm-stat-value.text-mute  { color: var(--vm-fg-mute); }
+
+@media (max-width: 980px) {
+  .vm-hero { grid-template-columns: 1fr; gap: 28px; padding: 24px; }
+  .vm-stat-grid { grid-template-columns: repeat(2, 1fr); max-width: none; }
+}
+
+/* Score ring — flat single-stroke, accent-colored, no gradient. */
+.vm-hero-ring {
+  position: relative;
+  width: 220px; height: 220px;
+  flex-shrink: 0;
+}
+.vm-hero-ring svg { display: block; width: 100%; height: 100%; }
+.vm-ring-track {
+  fill: none;
+  stroke: color-mix(in oklab, var(--text) 6%, transparent);
+  stroke-width: 6;
+}
+.vm-ring-arc {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+.vm-ring-label {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  pointer-events: none;
+}
+/* Number + % glyph share a single baseline-aligned row so the
+   percent sits to the immediate right of the digits, not on a
+   separate line below them. The parent .vm-ring-label is flex-column
+   which would otherwise stack them vertically. */
+.vm-ring-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0;
+  line-height: 1;
+}
+.vm-ring-num {
+  font-family: var(--vm-sans);
+  font-size: 50px; font-weight: 500;
+  line-height: 1; letter-spacing: -0.02em;
+  color: var(--vm-fg);
+  font-variant-numeric: tabular-nums;
+}
+.vm-ring-pct {
+  font-size: 22px;
+  color: var(--vm-comment);
+  margin-left: 2px;
+  line-height: 1;
+}
+.vm-ring-sub {
+  margin-top: 6px;
+  font-size: 9.5px;
+}
+
+/* ──────────────────────────────────────────────────────────────────
+ * Compliance split — All Rules on the wider left column; the right
+ * rail stacks Priority Actions, By Category, By Severity, and
+ * Audit Metadata top-to-bottom.
+ *
+ * Sizing strategy: the right rail's natural height (≈4 cards + gaps)
+ * usually exceeds the All Rules card's intrinsic height. We let the
+ * grid stretch the left column to match (default `align-items: stretch`)
+ * and have .vm-rules-card flex-grow inside it so the table reveals
+ * more rows when there's extra vertical room. The 580px floor on
+ * .vm-rules-table-wrap (set further down) keeps the table comfortable
+ * even when the right rail is short (e.g. empty Priority Actions).
+ * ────────────────────────────────────────────────────────────────── */
+.vm-split {
+  display: grid;
+  grid-template-columns: 1.25fr 1fr;
+  gap: 18px;
+  align-items: stretch;
+}
+.vm-split-left  { min-width: 0; display: flex; flex-direction: column; }
+.vm-split-left > .vm-rules-card { flex: 1; }
+.vm-split-right { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+@media (max-width: 980px) {
+  .vm-split { grid-template-columns: 1fr; }
+}
+
+/* ──────────────────────────────────────────────────────────────────
+ * Priority Actions — list of L1 items inside the L2 card
+ *
+ * Each item gets a 2.5px-wide accent strip on the left edge that
+ * carries the severity color (red / yellow / cyan).
+ * ────────────────────────────────────────────────────────────────── */
+.vm-priority {
+  list-style: none;
+  display: flex; flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 16px 14px;
+}
+.vm-priority-item {
+  position: relative;
+  padding: 9px 14px 9px 18px;
+  border: 1px solid var(--vm-panel-border);
+  background: var(--vm-panel-bg);
+  border-radius: var(--vm-r-panel);
+  transition: background .2s ease, border-color .2s ease;
+}
+.vm-priority-item:hover {
+  background: color-mix(in oklab, var(--text) 5.5%, transparent);
+  border-color: color-mix(in oklab, var(--text) 10%, transparent);
+}
+.vm-priority-item::before {
+  content: ''; position: absolute;
+  left: 0; top: 9px; bottom: 9px;
+  width: 2.5px; border-radius: 2px;
+  background: var(--vm-fg-mute);
+}
+.vm-priority-item.vm-sev-critical::before { background: var(--bad); }
+.vm-priority-item.vm-sev-warning::before,
+.vm-priority-item.vm-sev-high::before     { background: var(--warn); }
+.vm-priority-item.vm-sev-info::before,
+.vm-priority-item.vm-sev-medium::before,
+.vm-priority-item.vm-sev-low::before      { background: var(--info); }
+
+/* JS still emits a separate dot — hide it; the strip is the primary cue. */
+.vm-priority-dot { display: none; }
+
+.vm-priority-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.vm-priority-title-row {
+  display: flex; align-items: center; gap: 10px;
+  min-width: 0;
+}
+.vm-priority-title {
+  flex: 1; min-width: 0;
+  font-size: 12.5px; font-weight: 600;
+  color: var(--vm-fg); line-height: 1.3;
+  letter-spacing: -0.005em;
+  margin: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.vm-priority-title-row .vm-sev-tag { flex-shrink: 0; }
+.vm-priority-meta {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--vm-mono); font-size: 10px;
+}
+.vm-priority-rule { color: var(--accent); }
+.vm-priority-cat  { color: var(--vm-fg-mute); }
+.vm-priority-rule + .vm-priority-cat::before {
+  content: '·';
+  color: var(--vm-fg-mute);
+  margin-right: 6px;
+  opacity: 0.55;
+}
+/* Recommendations clamp to a single line so item height stays uniform —
+   the rule-detail slide-over panel always shows the full text. */
+.vm-priority-rec {
+  margin: 0;
+  font-size: 11px; color: var(--vm-fg-dim);
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vm-priority-empty {
+  display: flex; gap: 14px; align-items: center;
+  padding: 24px 22px;
+}
+.vm-priority-empty svg { color: var(--ok); flex-shrink: 0; }
+.vm-priority-empty strong {
+  display: block;
+  color: var(--vm-fg);
+  font-size: 14.5px; font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.vm-priority-empty span { color: var(--vm-fg-mute); font-size: 13px; }
+
+/* ──────────────────────────────────────────────────────────────────
+ * By Category — single accent bar over a faint track. No gradient.
+ *
+ * The painted markup ships 4 colored segments (compliant / non /
+ * skipped / errors) for richer detail; the spec wants a single accent
+ * fill. Hybrid approach: keep the segments but flat-color them so the
+ * row reads as a stacked bar of status colors instead of a gradient.
+ * ────────────────────────────────────────────────────────────────── */
+.vm-bars {
+  padding: 8px 22px 18px;
+  display: flex; flex-direction: column;
+}
+.vm-bar-row {
+  padding: 9px 0;
+}
+.vm-bar-row + .vm-bar-row { border-top: 1px dashed var(--vm-divider); }
+.vm-bar-label {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+.vm-bar-name { color: var(--vm-fg); font-weight: 500; }
+.vm-bar-count {
+  font-family: var(--vm-mono);
+  font-size: 11.5px; color: var(--vm-fg-mute);
+  font-variant-numeric: tabular-nums;
+}
+.vm-bar-count b { color: var(--vm-fg); font-weight: 600; }
+.vm-bar-track {
+  position: relative;
+  height: 6px;
+  width: var(--bar-width, 100%);
+  background: color-mix(in oklab, var(--text) 4%, transparent);
+  border-radius: 3px;
+  overflow: hidden;
+  display: flex;
+}
+.vm-bar-seg {
+  height: 100%;
+  width: var(--w, 0%);
+  transition: width .9s var(--vm-ease-emph);
+}
+.vm-bar-pass { background: var(--ok); }
+.vm-bar-fail { background: var(--bad); }
+.vm-bar-skip { background: var(--vm-fg-mute); opacity: 0.55; }
+.vm-bar-err  { background: var(--warn); }
+.vm-bars-empty {
+  padding: 18px 22px; color: var(--vm-fg-mute);
+  font-size: 13px;
+}
+
+/* ──────────────────────────────────────────────────────────────────
+ * By Severity — segmented stacked bar + legend
+ * ────────────────────────────────────────────────────────────────── */
+.vm-severity {
+  padding: 18px 22px 22px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.vm-sev-stack {
+  display: flex;
+  height: 8px;
+  width: 100%;
+  border-radius: 4px;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--text) 4%, transparent);
+}
+.vm-sev-seg {
+  height: 100%;
+  width: var(--w, 0%);
+  opacity: 0.85;
+  transition: width .9s var(--vm-ease-emph);
+}
+/* Severity color only paints the *segments* and *swatches* — never
+   tagged elements (.vm-sev-tag uses color, no background) or priority
+   items (those use a 2.5px ::before strip). Scoping here is the whole
+   point: an unscoped `.vm-sev-critical { background: var(--bad) }`
+   would paint every element that carries the severity class. */
+.vm-sev-seg.vm-sev-critical,
+.vm-sev-swatch.vm-sev-critical                  { background: var(--bad); }
+.vm-sev-seg.vm-sev-warning,
+.vm-sev-seg.vm-sev-high,
+.vm-sev-swatch.vm-sev-warning,
+.vm-sev-swatch.vm-sev-high                      { background: var(--warn); }
+.vm-sev-seg.vm-sev-info,
+.vm-sev-seg.vm-sev-medium,
+.vm-sev-seg.vm-sev-low,
+.vm-sev-swatch.vm-sev-info,
+.vm-sev-swatch.vm-sev-medium,
+.vm-sev-swatch.vm-sev-low                       { background: var(--info); }
+
+.vm-sev-legend {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: 8px;
+  font-size: 12.5px;
+}
+.vm-sev-legend li { display: flex; align-items: center; gap: 10px; }
+.vm-sev-swatch {
+  width: 7px; height: 7px;
+  border-radius: 2px;
+  display: inline-block; flex-shrink: 0;
+}
+.vm-sev-name {
+  color: var(--vm-fg); font-weight: 500;
+  text-transform: capitalize; min-width: 64px;
+}
+.vm-sev-counts {
+  margin-left: auto;
+  font-family: var(--vm-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Severity tag ("● TEXT") — no border, no fill, just colored text. */
+.vm-sev-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  font-family: var(--vm-mono);
+}
+.vm-sev-tag::before {
+  content: '●';
+  font-size: 9px;
+  line-height: 1;
+}
+.vm-sev-tag.vm-sev-critical { color: var(--bad); }
+.vm-sev-tag.vm-sev-warning,
+.vm-sev-tag.vm-sev-high     { color: var(--warn); }
+.vm-sev-tag.vm-sev-info,
+.vm-sev-tag.vm-sev-medium,
+.vm-sev-tag.vm-sev-low      { color: var(--info); }
+
+/* ──────────────────────────────────────────────────────────────────
+ * Audit metadata — provenance card on the right rail.
+ * Mirrors the identity footer at the bottom of the page so readers
+ * see who/where/when without scrolling. Each row is a (label, value)
+ * pair; labels are uppercase smallcaps, values are mono when the
+ * source field is an identifier (env, tier, ruleset, host, etc.).
+ * ────────────────────────────────────────────────────────────────── */
+.vm-meta-card .vm-meta-rows { padding: 4px 18px 14px; }
+.vm-meta-r {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 14px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--vm-divider);
+  align-items: center;
+}
+.vm-meta-r:last-child { border-bottom: 0; }
+.vm-meta-r .k {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--vm-fg-mute);
+}
+.vm-meta-r .v {
+  font-size: 12.5px;
+  color: var(--vm-fg);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vm-meta-r .v.mono { font-family: var(--vm-mono); }
+
+/* ──────────────────────────────────────────────────────────────────
+ * Rules table — table proper + chrome (search + filter + count)
+ * ────────────────────────────────────────────────────────────────── */
+.vm-rules-head { padding: 16px 22px; gap: 10px; align-items: center; flex-wrap: wrap; }
+.vm-rules-head h3 { margin-right: 6px; }
+.vm-rules-head .sub { font-family: var(--vm-mono); font-size: 11px; }
+.vm-rules-controls {
+  margin-left: auto;
+  display: flex; align-items: center; gap: 10px;
+}
+.vm-search {
+  padding: 6px 12px;
+  border: 1px solid var(--vm-divider-2);
+  background: var(--vm-panel-bg);
+  border-radius: 7px;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--vm-fg);
+  min-width: 220px;
+  transform: scale(1);
+  transition: border-color .18s ease,
+              background .18s ease,
+              box-shadow .18s ease,
+              transform .18s var(--vm-ease);
+}
+.vm-search::placeholder { color: var(--vm-fg-mute); }
+.vm-search:focus {
+  outline: none;
+  border-color: color-mix(in oklab, var(--accent) 60%, transparent);
+  background: color-mix(in oklab, var(--accent) 5%, transparent);
+  box-shadow:
+    0 0 0 2px color-mix(in oklab, var(--accent) 14%, transparent),
+    0 0 14px 0   color-mix(in oklab, var(--accent) 22%, transparent);
+  transform: scale(1.012);
+}
+.vm-filter-chips {
+  position: relative;          /* anchor for .vm-filter-pill */
+  display: flex; gap: 2px;
+  padding: 3px;
+  border-radius: 7px;
+  background: var(--vm-panel-bg);
+  border: 1px solid var(--vm-divider-2);
+}
+/* Sliding pill that paints the active-chip background. JS positions it
+   to the active chip and tweens between positions on click. */
+.vm-filter-pill {
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 0; height: calc(100% - 6px);
+  background: color-mix(in oklab, var(--accent) 14%, transparent);
+  border-radius: 5px;
+  pointer-events: none;
+  z-index: 0;
+  will-change: transform, width;
+  opacity: 0;
+  transition: opacity .25s var(--vm-ease);
+}
+.vm-filter-pill.is-ready { opacity: 1; }
+.vm-chip {
+  position: relative;          /* sit above .vm-filter-pill */
+  z-index: 1;
+  padding: 4px 10px;
+  font-family: inherit;
+  font-size: 11.5px; font-weight: 500;
+  background: transparent;
+  border: 0;
+  color: var(--vm-fg-dim);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: color .15s ease;
+}
+.vm-chip:hover { color: var(--vm-fg); }
+.vm-chip.is-active {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.vm-rules-table-wrap {
+  /* Flex-grow inside .vm-rules-card so the table fills whatever extra
+     vertical space the right rail forces on the left column. The
+     min-height floor keeps things comfortable when the right rail is
+     short, and (just like the previous fixed height) prevents filter
+     chips from shrinking the card when rows are hidden — that resize
+     would push the surrounding layout upward and read as the "page
+     jumping" on every chip click. */
+  flex: 1;
+  min-height: 580px;
+  overflow-y: scroll;        /* always-visible scrollbar */
+  border-top: 1px solid var(--vm-divider);
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--text) 25%, transparent) transparent;
+}
+.vm-rules-table-wrap::-webkit-scrollbar { width: 10px; }
+.vm-rules-table-wrap::-webkit-scrollbar-track {
+  background: var(--vm-panel-bg);
+  border-left: 1px solid var(--vm-divider-2);
+}
+.vm-rules-table-wrap::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--text) 25%, transparent);
+  border: 2px solid var(--vm-panel-bg);
+  border-radius: 6px; min-height: 32px;
+}
+.vm-rules-table-wrap::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklab, var(--text) 40%, transparent);
+}
+
+/* Card-level layout — the rules card lives inside .vm-split-left, so
+   width is driven by the parent grid column. Flex column lets
+   .vm-rules-table-wrap grow to fill the column when the right rail is
+   taller than the table's min-height. */
+.vm-rules-card { display: flex; flex-direction: column; }
+
+/* Fixed layout — every column has an explicit width so the View
+   buttons line up vertically across rows. Name takes the leftover.
+   Column widths are deliberately tight (no wasted whitespace) so the
+   View column ends up close to the row content, matching the
+   standalone HTML report's compact look. */
+.vm-rules-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.vm-rules-table .vm-col-rule     { width: 112px; }
+.vm-rules-table .vm-col-status   { width: 130px; }
+.vm-rules-table .vm-col-severity { width: 110px; }
+.vm-rules-table .vm-col-category { width: 110px; }
+.vm-rules-table .vm-col-name     { width: auto; }
+.vm-rules-table .vm-col-view     { width: 88px; text-align: right; }
+.vm-rules-table thead th.vm-col-view { text-align: right; padding-right: 18px; }
+.vm-rules-table tbody td.vm-col-view { text-align: right; padding-right: 18px; }
+.vm-rules-table tbody td.vm-col-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vm-rules-table thead th {
+  position: sticky; top: 0;
+  text-align: left;
+  padding: 12px 14px;
+  background: color-mix(in oklab, var(--bg) 86%, transparent);
+  backdrop-filter: var(--vm-blur-sm);
+  -webkit-backdrop-filter: var(--vm-blur-sm);
+  font-size: 9.5px; font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--vm-fg-mute);
+  border-bottom: 1px solid var(--vm-divider);
+  z-index: 1;
+}
+.vm-rules-table tbody td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--vm-divider);
+  font-size: 13px;
+  color: var(--vm-fg-dim);
+  vertical-align: middle;
+}
+.vm-rules-table tbody tr:last-child td { border-bottom: 0; }
+.vm-rules-table tbody tr { transition: background .15s ease; }
+.vm-rules-table tbody tr:hover td {
+  background: color-mix(in oklab, var(--text) 2.5%, transparent);
+}
+.vm-rules-table .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vm-rules-table td.vm-col-rule {
+  font-family: var(--vm-mono);
+  color: var(--accent);
+  font-weight: 500; font-size: 12.5px;
+  /* Belt-and-suspenders against future longer rule numbers — keep
+     "IAG-001"-style identifiers on a single line. */
+  white-space: nowrap;
+}
+.vm-rules-table td.vm-col-category {
+  font-family: var(--vm-mono);
+  color: var(--vm-fg-mute);
+  font-size: 12px;
+}
+.vm-rules-table td.vm-col-name { color: var(--vm-fg); font-size: 13.5px; }
+
+.vm-view-btn {
+  position: relative;          /* anchor for .vm-ripple */
+  overflow: hidden;
+  font-family: inherit;
+  font-size: 11.5px;
+  padding: 4px 11px;
+  border-radius: 6px;
+  border: 1px solid var(--vm-divider-2);
+  background: var(--vm-panel-bg);
+  color: var(--vm-fg-dim);
+  cursor: pointer;
+  display: inline-flex; align-items: center; gap: 5px;
+  transition: background .15s ease, color .15s ease;
+}
+.vm-view-btn:hover {
+  background: var(--vm-panel-bg-raised);
+  color: var(--vm-fg);
+}
+.vm-view-btn svg { opacity: 0.85; }
+/* Ripple — JS spawns a span at the click point inside the button. The
+   span is positioned via inline left/top and sized via inline width/height
+   so the ripple radiates from where the user actually clicked. */
+.vm-ripple {
+  position: absolute;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--accent) 50%, transparent);
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(0);
+  opacity: 0.55;
+}
+
+/* Status pill — 1px border + low-alpha tint of its accent. */
+.vm-status {
+  display: inline-block;
+  padding: 3px 9px;
+  font-family: var(--vm-mono);
+  font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: var(--vm-r-pill-sm);
+  white-space: nowrap;
+}
+.vm-status-PASS,
+.vm-status-COMPLIANT {
+  color: var(--ok);
+  background: color-mix(in oklab, var(--ok) 12%, transparent);
+  border: 1px solid color-mix(in oklab, var(--ok) 25%, transparent);
+}
+.vm-status-FAIL,
+.vm-status-NONCOMPLIANT {
+  color: var(--bad);
+  background: color-mix(in oklab, var(--bad) 12%, transparent);
+  border: 1px solid color-mix(in oklab, var(--bad) 28%, transparent);
+}
+.vm-status-SKIP, .vm-status-SKIPPED {
+  color: var(--vm-fg-mute);
+  background: color-mix(in oklab, var(--text) 4%, transparent);
+  border: 1px solid var(--vm-divider-2);
+}
+.vm-status-ERROR {
+  color: var(--warn);
+  background: color-mix(in oklab, var(--warn) 12%, transparent);
+  border: 1px solid color-mix(in oklab, var(--warn) 28%, transparent);
+}
+.vm-status-WARN {
+  color: var(--warn);
+  background: color-mix(in oklab, var(--warn) 12%, transparent);
+  border: 1px solid color-mix(in oklab, var(--warn) 28%, transparent);
+}
+.vm-status-INFO {
+  color: var(--info);
+  background: color-mix(in oklab, var(--info) 12%, transparent);
+  border: 1px solid color-mix(in oklab, var(--info) 28%, transparent);
+}
+
+/* ──────────────────────────────────────────────────────────────────
+ * Sub-tab bar (MongoDB pipelines, Extended-checks-by-category)
+ *
+ * Visually echoes the top-level tabs but scoped inside a card. Active
+ * gets the same 2px accent underline.
+ * ────────────────────────────────────────────────────────────────── */
+.vm-subtab-bar {
+  display: flex; gap: 2px;
+  padding: 10px 16px 0;
+  border-bottom: 1px solid var(--vm-divider);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.vm-subtab-bar::-webkit-scrollbar { display: none; }
+.vm-subtab {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 9px 14px;
+  background: transparent; border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  font-family: inherit; font-size: 12.5px; font-weight: 500;
+  color: var(--vm-fg-mute);
+  cursor: pointer;
+  white-space: nowrap;
+  border-radius: 6px 6px 0 0;
+  transition: color .15s ease, border-color .15s ease, background .15s ease;
+}
+.vm-subtab:hover {
+  color: var(--vm-fg);
+  background: color-mix(in oklab, var(--text) 3%, transparent);
+}
+.vm-subtab.is-active {
+  color: var(--vm-fg); font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+.vm-subtab.is-error { color: var(--bad); }
+.vm-subtab.is-error.is-active { border-bottom-color: var(--bad); }
+.vm-subtab-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 20px; height: 16px;
+  padding: 0 6px;
+  font-family: var(--vm-mono);
+  font-size: 9.5px; font-weight: 600;
+  background: color-mix(in oklab, var(--text) 4%, transparent);
+  color: var(--vm-fg-mute);
+  border-radius: var(--vm-r-pill);
+}
+.vm-subtab.is-active .vm-subtab-count {
+  background: color-mix(in oklab, var(--accent) 18%, transparent);
+  color: var(--accent);
+}
+.vm-subtab.is-error .vm-subtab-count {
+  background: color-mix(in oklab, var(--bad) 14%, transparent);
+  color: var(--bad);
+}
+
+/* ──────────────────────────────────────────────────────────────────
+ * MongoDB pane (after the sub-tab bar)
+ * ────────────────────────────────────────────────────────────────── */
+.vm-mongo-pane {
+  padding: 22px;
+  display: flex; flex-direction: column; gap: 14px;
+  min-height: 180px;
+}
+.vm-mongo-summary {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+  font-size: 12.5px; color: var(--vm-fg-mute);
+}
+.vm-mongo-summary strong {
+  color: var(--vm-fg); font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.vm-mongo-desc {
+  margin: 0;
+  font-size: 13.5px; line-height: 1.6;
+  color: var(--vm-fg-dim);
+}
+
+/* ──────────────────────────────────────────────────────────────────
+ * Extended validation card list (one per check, by category)
+ * ────────────────────────────────────────────────────────────────── */
+.vm-extended-pane {
+  padding: 16px 18px 22px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.vm-extended-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 14px; align-items: start;
+  padding: 14px 16px;
+  border: 1px solid var(--vm-panel-border);
+  background: var(--vm-panel-bg);
+  border-radius: var(--vm-r-panel);
+  transition: background .2s ease, border-color .2s ease;
+}
+.vm-extended-card:hover {
+  background: color-mix(in oklab, var(--text) 5.5%, transparent);
+}
+.vm-extended-card-status { padding-top: 1px; }
+.vm-extended-card-title {
+  margin: 0 0 4px;
+  font-size: 14.5px; font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--vm-fg);
+}
+.vm-extended-card-msg {
+  margin: 4px 0 0;
+  font-size: 13px; line-height: 1.6;
+  color: var(--vm-fg-dim);
+}
+.vm-extended-card-rem {
+  margin: 10px 0 0;
+  padding: 10px 14px;
+  background: color-mix(in oklab, var(--accent) 8%, transparent);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--vm-r-pill-sm);
+  font-size: 12.5px; line-height: 1.6;
+  color: var(--vm-fg-dim);
+}
+.vm-extended-card-rem strong { color: var(--accent); font-weight: 600; }
+.vm-extended-card-details { margin: 12px 0 0; }
+.vm-extended-card-cat {
+  font-family: var(--vm-mono);
+  font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--vm-fg-mute);
+  white-space: nowrap;
+}
+
+/* ──────────────────────────────────────────────────────────────────
+ * Log analysis cards (operational tab)
+ * ────────────────────────────────────────────────────────────────── */
+.vm-log-sections {
+  padding: 6px 18px 18px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.vm-log-card {
+  border: 1px solid var(--vm-panel-border);
+  background: var(--vm-panel-bg);
+  border-radius: var(--vm-r-panel);
+  overflow: hidden;
+}
+.vm-log-card-head {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 14px;
+  padding: 14px 18px;
+  align-items: center;
+}
+.vm-log-card-head-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.vm-log-card-eyebrow {
+  font-family: var(--vm-mono);
+  font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--vm-fg-mute);
+}
+.vm-log-card-title {
+  margin: 0;
+  font-size: 14.5px; font-weight: 600;
+  letter-spacing: -0.012em;
+  color: var(--vm-fg);
+}
+.vm-log-card-body {
+  padding: 0 18px 16px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.vm-log-card-msg {
+  margin: 0;
+  font-size: 13.5px; line-height: 1.65;
+  color: var(--vm-fg-dim);
+}
+.vm-log-card-rem {
+  margin: 0;
+  padding: 12px 14px;
+  background: color-mix(in oklab, var(--accent) 8%, transparent);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--vm-r-pill-sm);
+  font-size: 12.5px; line-height: 1.6;
+  color: var(--vm-fg-dim);
+}
+.vm-log-card-rem strong { color: var(--accent); font-weight: 600; }
+
+/* ──────────────────────────────────────────────────────────────────
+ * Architecture sections — collapsibles with green "captured" bullet
+ * ────────────────────────────────────────────────────────────────── */
+.vm-arch-sections { padding: 0; display: flex; flex-direction: column; }
+.vm-collapse { border-bottom: 1px solid var(--vm-divider); }
+.vm-collapse:last-child { border-bottom: 0; }
+.vm-collapse-summary {
+  list-style: none; cursor: pointer;
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center; gap: 14px;
+  padding: 14px 22px;
+  outline: none;
+  transition: background .15s ease;
+}
+.vm-collapse-summary::-webkit-details-marker { display: none; }
+.vm-collapse-summary:hover { background: color-mix(in oklab, var(--text) 2.5%, transparent); }
+.vm-collapse-summary:focus-visible {
+  background: color-mix(in oklab, var(--accent) 6%, transparent);
+  box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--accent) 50%, transparent);
+}
+.vm-collapse-title {
+  font-size: 14.5px; font-weight: 600;
+  letter-spacing: -0.012em;
+  color: var(--vm-fg);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.vm-collapse-meta {
+  display: inline-flex; gap: 14px; align-items: center;
+  font-family: var(--vm-mono); font-size: 11.5px;
+  color: var(--vm-fg-mute);
+}
+.vm-collapse-chev {
+  color: var(--vm-fg-mute);
+  transition: transform .25s var(--vm-ease);
+}
+.vm-collapse[open] > .vm-collapse-summary > .vm-collapse-chev {
+  transform: rotate(180deg);
+}
+.vm-collapse-body {
+  padding: 6px 22px 22px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.vm-section-bullet {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--ok);
+  flex-shrink: 0;
+  box-shadow: 0 0 8px color-mix(in oklab, var(--ok) 40%, transparent);
+}
+
+.vm-error-inline {
+  font-family: var(--vm-mono);
+  font-size: 12px;
+  padding: 12px 14px;
+  color: var(--bad);
+  background: color-mix(in oklab, var(--bad) 10%, transparent);
+  border: 1px solid color-mix(in oklab, var(--bad) 25%, transparent);
+  border-radius: var(--vm-r-pill-sm);
+  line-height: 1.55;
+}
+
+/* ──────────────────────────────────────────────────────────────────
+ * Key/Value renderer (architecture sections, extended-check details)
+ * ────────────────────────────────────────────────────────────────── */
+.vm-kv {
+  display: grid;
+  grid-template-columns: minmax(160px, 220px) 1fr;
+  gap: 8px 22px;
+  margin: 0;
+  font-size: 13px;
+}
+.vm-kv > dt {
+  padding: 7px 0;
+  border-bottom: 1px dashed var(--vm-divider);
+  font-family: var(--vm-mono);
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--vm-fg-mute);
+}
+.vm-kv > dd {
+  margin: 0;
+  padding: 7px 0;
+  border-bottom: 1px dashed var(--vm-divider);
+  color: var(--vm-fg);
+  font-size: 13px; line-height: 1.55;
+  min-width: 0; word-break: break-word;
+}
+.vm-kv > dd.mono { font-family: var(--vm-mono); font-size: 12px; }
+.vm-kv-leaf {
+  font-family: var(--vm-mono);
+  font-size: 13px; line-height: 1.55;
+  color: var(--vm-fg);
+}
+.vm-kv-list { display: flex; flex-direction: column; gap: 10px; }
+.vm-kv-list-item {
+  padding: 12px 14px;
+  background: var(--vm-panel-bg);
+  border: 1px solid var(--vm-panel-border);
+  border-radius: var(--vm-r-pill-sm);
+}
+
+/* Inline chips inside the KV body */
+.vm-root .chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px;
+  background: var(--vm-panel-bg);
+  border: 1px solid var(--vm-divider-2);
+  border-radius: var(--vm-r-pill);
+  font-family: var(--vm-mono);
+  font-size: 11.5px; font-weight: 500;
+  color: var(--vm-fg-dim);
+}
+.vm-root .chip.ok {
+  color: var(--ok);
+  border-color: color-mix(in oklab, var(--ok) 25%, transparent);
+  background: color-mix(in oklab, var(--ok) 10%, transparent);
+}
+
+/* ──────────────────────────────────────────────────────────────────
+ * Sortable data tables (inside MongoDB pipeline pane)
+ * ────────────────────────────────────────────────────────────────── */
+.vm-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--vm-panel-border);
+  background: var(--vm-panel-bg);
+  border-radius: var(--vm-r-panel);
+}
+.vm-data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--vm-sans);
+  font-size: 12.5px;
+}
+.vm-data-table thead th {
+  position: sticky; top: 0;
+  text-align: left;
+  padding: 11px 14px;
+  background: color-mix(in oklab, var(--bg) 90%, transparent);
+  backdrop-filter: var(--vm-blur-sm);
+  -webkit-backdrop-filter: var(--vm-blur-sm);
+  font-size: 9.5px; font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--vm-fg-mute);
+  border-bottom: 1px solid var(--vm-divider);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: color .15s ease, background .15s ease;
+}
+.vm-data-table thead th:hover {
+  color: var(--vm-fg-dim);
+  background: color-mix(in oklab, var(--accent) 6%, transparent);
+}
+.vm-data-table thead th .vm-sort-arrow {
+  display: inline-block; margin-left: 6px;
+  width: 0; height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  vertical-align: middle;
+  opacity: 0;
+  transition: opacity .15s ease;
+}
+.vm-data-table thead th.is-sort-asc .vm-sort-arrow {
+  opacity: 1;
+  border-bottom: 6px solid var(--accent);
+}
+.vm-data-table thead th.is-sort-desc .vm-sort-arrow {
+  opacity: 1;
+  border-top: 6px solid var(--accent);
+}
+.vm-data-table thead th.is-sort-asc,
+.vm-data-table thead th.is-sort-desc { color: var(--accent); }
+.vm-data-table tbody td {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--vm-divider);
+  font-family: var(--vm-mono);
+  font-size: 11.5px;
+  color: var(--vm-fg);
+  white-space: nowrap;
+}
+.vm-data-table tbody tr:last-child td { border-bottom: 0; }
+.vm-data-table tbody tr:hover td {
+  background: color-mix(in oklab, var(--accent) 5%, transparent);
+}
+
+/* ──────────────────────────────────────────────────────────────────
+ * Empty state
+ * ────────────────────────────────────────────────────────────────── */
+.vm-empty {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 10px;
+  padding: 40px 22px;
+  color: var(--vm-fg-mute);
+  font-size: 13.5px;
+  text-align: center;
+}
+.vm-empty svg {
+  color: var(--vm-fg-mute);
+  padding: 14px;
+  border-radius: 50%;
+  background: var(--vm-panel-bg);
+  border: 1px solid var(--vm-panel-border);
+  width: 50px; height: 50px;
+  box-sizing: content-box;
+}
+
+/* ──────────────────────────────────────────────────────────────────
+ * Loading skeleton
+ * ────────────────────────────────────────────────────────────────── */
+.vm-loading { display: flex; flex-direction: column; gap: 14px; }
+.vm-skel-card {
+  height: 130px;
+  background: var(--vm-panel-bg);
+  border: 1px solid var(--vm-panel-border);
+  border-radius: var(--vm-r-panel);
+  background-image: linear-gradient(90deg,
+    transparent 0,
+    color-mix(in oklab, var(--text) 5%, transparent) 40%,
+    transparent 80%);
+  background-size: 200% 100%;
+  animation: vm-skel-shimmer 1.6s ease-in-out infinite;
+}
+.vm-skel-tall { height: 280px; }
+.vm-skel-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.vm-skel-grid .vm-skel-card { height: 96px; }
+.vm-skel-line {
+  display: inline-block;
+  height: 12px; border-radius: 6px;
+  background: var(--vm-panel-bg);
+  animation: vm-skel-shimmer 1.6s ease-in-out infinite;
+}
+@keyframes vm-skel-shimmer {
+  0%, 100% { background-position: 0 0; }
+  50%      { background-position: -200% 0; }
+}
+@media (max-width: 760px) { .vm-skel-grid { grid-template-columns: repeat(2, 1fr); } }
+
+/* ──────────────────────────────────────────────────────────────────
+ * Error state
+ * ────────────────────────────────────────────────────────────────── */
+.vm-error {
+  display: flex; gap: 14px; align-items: flex-start;
+  padding: 18px 20px;
+  background: color-mix(in oklab, var(--bad) 10%, transparent);
+  border: 1px solid color-mix(in oklab, var(--bad) 28%, transparent);
+  border-radius: var(--vm-r-panel);
+  color: var(--vm-fg);
+}
+.vm-error svg { color: var(--bad); flex-shrink: 0; margin-top: 1px; }
+.vm-error strong { color: var(--vm-fg); font-size: 14.5px; }
+
+/* ──────────────────────────────────────────────────────────────────
+ * Helpers
+ * ────────────────────────────────────────────────────────────────── */
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); border: 0;
+}
+.vm-root .text-ok    { color: var(--ok); }
+.vm-root .text-bad   { color: var(--bad); }
+.vm-root .text-warn  { color: var(--warn); }
+.vm-root .text-info  { color: var(--info); }
+.vm-root .text-mute  { color: var(--vm-fg-mute); }
+.vm-root .text-text-3 { color: var(--vm-fg-mute); }
+.vm-root .text-text-4 { color: var(--vm-comment); }
+
+/* ──────────────────────────────────────────────────────────────────
+ * Rule-detail slide-over (per spec §18) — right-edge panel on a
+ * dimmed-and-blurred backdrop.
+ *
+ * IMPORTANT: the panel is positioned to cover only the *main content
+ * area* — top: 52px (under the topbar) and left: var(--sidebar-w) —
+ * so the sidebar nav and topbar pills stay visible and interactive.
+ * Painting the whole viewport felt aggressive and broke the user's
+ * sense of place; this scoped version reads as a contextual drawer.
+ * ────────────────────────────────────────────────────────────────── */
+.vm-detail-panel {
+  position: fixed;
+  top: 52px;                           /* below topbar */
+  right: 0;
+  bottom: 0;
+  left: var(--sidebar-w, 248px);       /* right of sidebar */
+  z-index: 60;
+  display: grid;
+  grid-template-columns: 1fr min(560px, 92vw);
+  grid-template-rows: 1fr;             /* explicit so backdrop fills height */
+  pointer-events: none;
+}
+.vm-detail-panel[hidden] { display: none; }
+.vm-detail-backdrop {
+  grid-column: 1; grid-row: 1;
+  background: color-mix(in oklab, #000 50%, transparent);
+  opacity: 0;
+  transition: opacity .28s var(--vm-ease);
+  backdrop-filter: blur(4px) saturate(110%);
+  -webkit-backdrop-filter: blur(4px) saturate(110%);
+  pointer-events: none;
+}
+.vm-detail-panel.is-open .vm-detail-backdrop {
+  opacity: 1;
+  pointer-events: auto;
+}
+.vm-detail-card {
+  grid-column: 2; grid-row: 1;
+  position: relative;
+  /* Heavy blur (more than the rest of the page) + slightly higher opaque
+     fill so the page underneath softens into a colored wash. The glass
+     look survives at the panel edges, but text/UI behind the card stops
+     competing with the panel's own copy for the reader's attention. */
+  background: color-mix(in oklab, var(--surface) 96%, transparent);
+  backdrop-filter: blur(56px) saturate(140%);
+  -webkit-backdrop-filter: blur(56px) saturate(140%);
+  border-left: 1px solid var(--vm-divider-2);
+  box-shadow: -16px 0 48px color-mix(in oklab, #000 32%, transparent);
+  transform: translateX(100%);
+  transition: transform .38s var(--vm-ease-emph);
+  display: flex; flex-direction: column;
+  pointer-events: auto;
+  overflow: hidden;
+}
+.vm-detail-panel.is-open .vm-detail-card { transform: translateX(0); }
+.vm-detail-head {
+  display: grid; grid-template-columns: 1fr auto;
+  gap: 14px;
+  padding: 22px 24px 18px;
+  border-bottom: 1px solid var(--vm-divider);
+  align-items: start;
+}
+.vm-detail-head-main {
+  display: flex; flex-direction: column; gap: 6px;
+  min-width: 0;
+}
+.vm-detail-rule-id {
+  font-family: var(--vm-mono);
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--accent);
+}
+.vm-detail-name {
+  margin: 0;
+  font-size: 19px; font-weight: 600;
+  line-height: 1.3; letter-spacing: -0.018em;
+  color: var(--vm-fg);
+}
+.vm-detail-close {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px;
+  background: var(--vm-panel-bg);
+  border: 1px solid var(--vm-divider-2);
+  color: var(--vm-fg-mute);
+  border-radius: var(--vm-r-pill);
+  cursor: pointer;
+  transition: color .15s ease, background .15s ease, border-color .15s ease;
+}
+.vm-detail-close:hover {
+  color: var(--vm-fg);
+  background: var(--vm-panel-bg-raised);
+  border-color: color-mix(in oklab, var(--text) 24%, transparent);
+}
+
+/* Status-coloured stripe across the top of the slide-over card. The
+   bar inherits the rule's outcome colour so the panel's status is
+   readable at a glance even before the pill row registers. */
+.vm-detail-stripe {
+  height: 3px;
+  flex-shrink: 0;
+  background: var(--vm-fg-mute);
+  transition: background .25s var(--vm-ease);
+}
+.vm-detail-stripe.vm-stripe-pass  { background: var(--ok); }
+.vm-detail-stripe.vm-stripe-fail  { background: var(--bad); }
+.vm-detail-stripe.vm-stripe-skip  { background: color-mix(in oklab, var(--vm-fg-mute) 70%, transparent); }
+.vm-detail-stripe.vm-stripe-error { background: var(--warn); }
+.vm-detail-stripe.vm-stripe-unknown { background: var(--vm-fg-mute); }
+
+/* Header — breadcrumb (rule ID · category) above the rule name, then
+   a row of status + severity pills. Replaces the old separate meta
+   strip below the header so the entire identity reads as one block. */
+.vm-detail-crumb {
+  display: flex; align-items: center; gap: 8px;
+  min-width: 0;
+}
+.vm-detail-crumb-sep {
+  color: var(--vm-fg-mute);
+  opacity: 0.55;
+  font-size: 11px;
+}
+.vm-detail-crumb-cat {
+  font-family: var(--vm-mono);
+  font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--vm-fg-mute);
+}
+.vm-detail-pills {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  margin-top: 4px;
+}
+
+/* Body — vertical stack of L1 card sections. Each section gets its
+   own bordered surface so the panel reads as a structured runbook
+   entry rather than a flat sequence of paragraphs. */
+.vm-detail-body {
+  flex: 1; min-height: 0; overflow-y: auto;
+  padding: 18px 22px 22px;
+  display: flex; flex-direction: column; gap: 14px;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--text) 24%, transparent) transparent;
+}
+.vm-detail-body::-webkit-scrollbar { width: 8px; }
+.vm-detail-body::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--text) 24%, transparent);
+  border-radius: 4px;
+}
+
+.vm-detail-card-section {
+  background: var(--vm-panel-bg);
+  border: 1px solid var(--vm-panel-border);
+  border-radius: var(--vm-r-panel);
+  overflow: hidden;
+}
+.vm-detail-section-head {
+  display: flex; align-items: baseline; gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--vm-divider);
+  background: color-mix(in oklab, var(--text) 2%, transparent);
+}
+.vm-detail-section-head h4 {
+  margin: 0;
+  font-size: 12px; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--vm-fg);
+}
+.vm-detail-section-sub {
+  margin-left: auto;
+  font-family: var(--vm-mono);
+  font-size: 11px;
+  color: var(--vm-fg-mute);
+  font-style: normal;
+}
+.vm-detail-section-sub .op-label {
+  color: var(--accent);
+  font-weight: 600;
+}
+.vm-detail-section-body {
+  padding: 14px 16px 16px;
+}
+
+/* Recommendation card — long-form prose. */
+.vm-detail-text {
+  margin: 0;
+  font-size: 13.5px; line-height: 1.6;
+  color: var(--vm-fg-dim);
+  letter-spacing: -0.005em;
+}
+
+/* Comparison card — Expected → Actual with a centred arrow.
+   On narrow widths the grid collapses to a single column so the
+   panel never scrolls horizontally. */
+.vm-detail-cmp {
+  display: grid; grid-template-columns: 1fr auto 1fr;
+  gap: 12px;
+  align-items: stretch;
+}
+.vm-detail-cmp-side {
+  display: flex; flex-direction: column; gap: 6px;
+  min-width: 0;
+}
+.vm-detail-cmp-label {
+  font-size: 9.5px; font-weight: 600;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--vm-fg-mute);
+}
+.vm-detail-cmp-value {
+  margin: 0;
+  padding: 10px 12px;
+  background: color-mix(in oklab, var(--text) 3%, transparent);
+  border: 1px solid var(--vm-divider-2);
+  border-radius: 8px;
+  font-family: var(--vm-mono);
+  font-size: 12.5px; line-height: 1.55;
+  color: var(--vm-fg);
+  white-space: pre-wrap; word-break: break-word;
+  max-height: 200px; overflow: auto;
+  flex: 1;
+}
+.vm-detail-cmp-arrow {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px;
+  color: var(--vm-fg-mute);
+  align-self: center;
+}
+.vm-detail-panel[data-status="pass"] .vm-detail-cmp-actual .vm-detail-cmp-value {
+  color: var(--ok);
+  background: color-mix(in oklab, var(--ok) 8%, transparent);
+  border-color: color-mix(in oklab, var(--ok) 25%, transparent);
+}
+.vm-detail-panel[data-status="fail"] .vm-detail-cmp-actual .vm-detail-cmp-value {
+  color: var(--bad);
+  background: color-mix(in oklab, var(--bad) 8%, transparent);
+  border-color: color-mix(in oklab, var(--bad) 28%, transparent);
+}
+@media (max-width: 540px) {
+  .vm-detail-cmp { grid-template-columns: 1fr; }
+  .vm-detail-cmp-arrow { transform: rotate(90deg); width: auto; height: 22px; }
+}
+
+/* How-to-fix card — section head label tinted with the warn accent
+   so the actionable section is the most legible thing in the panel
+   for FAIL rules. Steps are a normal ordered list with backtick
+   spans rendered as inline code chips. */
+.vm-detail-fix-card .vm-detail-section-head h4 { color: var(--warn); }
+.vm-detail-fix-body { min-width: 0; }
+.vm-fix-steps {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--vm-fg-dim);
+}
+.vm-fix-steps li { margin-bottom: 6px; }
+.vm-fix-steps li:last-child { margin-bottom: 0; }
+.vm-fix-steps code {
+  font-family: var(--vm-mono);
+  font-size: 11.5px;
+  background: color-mix(in oklab, var(--text) 5%, transparent);
+  border: 1px solid var(--vm-divider-2);
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: var(--vm-fg);
+}
+.vm-fix-fallback {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--vm-fg-dim);
+  white-space: pre-wrap;
+}
+
+.vm-detail-empty {
+  display: flex; gap: 12px; align-items: center;
+  padding: 14px 16px;
+  background: color-mix(in oklab, var(--ok) 10%, transparent);
+  border: 1px solid color-mix(in oklab, var(--ok) 25%, transparent);
+  border-radius: var(--vm-r-panel);
+  color: var(--ok);
+  font-size: 13.5px; font-weight: 500;
+}
+.vm-detail-empty svg { color: var(--ok); flex-shrink: 0; }
+
+.vm-detail-nav {
+  display: grid; grid-template-columns: auto 1fr auto;
+  gap: 10px; align-items: center;
+  padding: 14px 24px;
+  border-top: 1px solid var(--vm-divider);
+  background: color-mix(in oklab, var(--text) 1.5%, transparent);
+}
+.vm-detail-nav-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px;
+  background: var(--vm-panel-bg);
+  border: 1px solid var(--vm-divider-2);
+  border-radius: var(--vm-r-pill);
+  color: var(--vm-fg-dim);
+  font-family: inherit;
+  font-size: 12px; font-weight: 500;
+  cursor: pointer;
+  transition: color .15s ease, background .15s ease, border-color .15s ease;
+}
+.vm-detail-nav-btn:hover:not(:disabled) {
+  color: var(--vm-fg);
+  background: var(--vm-panel-bg-raised);
+  border-color: color-mix(in oklab, var(--text) 24%, transparent);
+}
+.vm-detail-nav-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.vm-detail-nav-pos {
+  text-align: center;
+  font-family: var(--vm-mono);
+  font-size: 11.5px;
+  color: var(--vm-fg-mute);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ──────────────────────────────────────────────────────────────────
+ * Sortable rules-table header
+ * Click to sort; arrow indicates direction. JS owns the FLIP animation.
+ * ────────────────────────────────────────────────────────────────── */
+.vm-rules-table thead th[data-sort] {
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  padding-right: 28px;
+  transition: color .15s ease;
+}
+.vm-rules-table thead th[data-sort]:hover { color: var(--vm-fg-dim); }
+.vm-rules-table thead th[data-sort]::after {
+  content: '';
+  position: absolute;
+  right: 18px; top: 50%;
+  width: 0; height: 0;
+  border-left: 3.5px solid transparent;
+  border-right: 3.5px solid transparent;
+  border-bottom: 4px solid currentColor;
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity .15s ease, transform .18s var(--vm-ease);
+}
+.vm-rules-table thead th.is-sort-asc {
+  color: var(--accent);
+}
+.vm-rules-table thead th.is-sort-asc::after {
+  opacity: 1;
+  transform: translateY(-50%);
+}
+.vm-rules-table thead th.is-sort-desc {
+  color: var(--accent);
+}
+.vm-rules-table thead th.is-sort-desc::after {
+  opacity: 1;
+  transform: translateY(-50%) rotate(180deg);
+}
+
+/* ──────────────────────────────────────────────────────────────────
+ * Reduced motion
+ * ────────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .vm-skel-card, .vm-skel-line { animation: none; }
+  .vm-bar-seg, .vm-sev-seg,
+  .vm-tab, .vm-subtab, .vm-chip,
+  .vm-search, .vm-stat,
+  .vm-detail-card, .vm-detail-backdrop,
+  .vm-priority-item, .vm-collapse-chev,
+  .vm-view-btn, .vm-detail-nav-btn,
+  .vm-tab-indicator, .vm-filter-pill { transition: none; }
+}
+
+/* ════════════════════════════════════════════════════════════════
+ * SPECIALIZED DETAIL RENDERERS — shared component surfaces used by
+ * the log analysis, webserver log, and adapter outdated renderers
+ * in viewmodel.js. Designed to look at home both inside an
+ * extended-card and inside a log-card.
+ * ════════════════════════════════════════════════════════════════ */
+
+/* Container for any specialized detail block. Gives consistent
+   vertical rhythm between stat strip → section → table → next. */
+.vm-detail-block {
+  display: flex; flex-direction: column;
+  gap: 14px;
+  margin: 4px 0 0;
+}
+
+/* Stat strip — KPI tiles for "Files parsed / Total lines / Matched".
+   Sits at the top of the detail block so the eye lands on counts. */
+.vm-stat-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+.vm-stat {
+  padding: 10px 14px;
+  background: var(--vm-panel-bg);
+  border: 1px solid var(--vm-panel-border);
+  border-left: 3px solid var(--vm-divider-2);
+  border-radius: var(--vm-r-pill-sm);
+}
+.vm-stat--ok   { border-left-color: var(--ok); }
+.vm-stat--warn { border-left-color: var(--warn); }
+.vm-stat--bad  { border-left-color: var(--bad); }
+.vm-stat-label {
+  display: block;
+  font-family: var(--vm-mono);
+  font-size: 10px; font-weight: 600;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--vm-fg-mute);
+  margin-bottom: 4px;
+}
+.vm-stat-value {
+  display: block;
+  font-family: var(--vm-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 18px; font-weight: 600;
+  color: var(--vm-fg);
+  line-height: 1.2;
+}
+.vm-stat--warn .vm-stat-value { color: var(--warn); }
+.vm-stat--bad  .vm-stat-value { color: var(--bad); }
+.vm-stat--ok   .vm-stat-value { color: var(--ok); }
+
+/* Section head — a labeled separator before each sub-table inside
+   a specialized detail block. */
+.vm-section-head {
+  display: flex; align-items: baseline;
+  gap: 10px; flex-wrap: wrap;
+  margin: 6px 0 -4px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--vm-divider);
+}
+.vm-section-head strong {
+  font-size: 12px; font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--vm-fg);
+}
+.vm-section-sub {
+  font-size: 11.5px; color: var(--vm-fg-mute);
+  line-height: 1.4;
+}
+
+/* ── Mini tables (renderLogAnalysisDetails, renderWebserverLogDetails,
+   renderAdapterTable). Compact, sortable on column-click. ── */
+.vm-mini-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--vm-panel-border);
+  background: var(--vm-panel-bg);
+  border-radius: var(--vm-r-pill-sm);
+}
+.vm-mini-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--vm-sans);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+.vm-mini-table thead th {
+  text-align: left;
+  padding: 9px 12px;
+  font-family: var(--vm-mono);
+  font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--vm-fg-mute);
+  background: color-mix(in oklab, var(--bg) 92%, transparent);
+  border-bottom: 1px solid var(--vm-divider);
+  user-select: none;
+  transition: color .15s ease, background .15s ease;
+  white-space: nowrap;
+}
+.vm-mini-table thead th.num { text-align: right; }
+.vm-mini-table thead th:hover { color: var(--vm-fg); background: color-mix(in oklab, var(--accent) 8%, transparent); }
+.vm-mini-table thead th.is-sort-asc,
+.vm-mini-table thead th.is-sort-desc { color: var(--accent); }
+.vm-mini-table thead th .vm-sort-arrow {
+  display: inline-block; margin-left: 6px;
+  width: 0; height: 0; opacity: 0.35;
+  border-left: 3px solid transparent;
+  border-right: 3px solid transparent;
+  border-bottom: 4px solid currentColor;
+  transition: transform .15s ease, opacity .15s ease;
+}
+.vm-mini-table thead th.is-sort-asc  .vm-sort-arrow { opacity: 1; }
+.vm-mini-table thead th.is-sort-desc .vm-sort-arrow { opacity: 1; transform: rotate(180deg); }
+.vm-mini-table tbody td {
+  padding: 8px 12px;
+  border-top: 1px dashed var(--vm-divider);
+  vertical-align: top;
+  color: var(--vm-fg);
+}
+.vm-mini-table tbody td.num { text-align: right; }
+.vm-mini-table tbody td.vm-arrow {
+  text-align: center;
+  color: var(--vm-fg-mute);
+  font-family: var(--vm-mono);
+  font-weight: 600;
+}
+.vm-mini-table tbody tr:hover {
+  background: color-mix(in oklab, var(--accent) 5%, transparent);
+}
+.vm-group-name,
+.vm-adapter-name {
+  color: var(--vm-fg); font-weight: 600;
+}
+.vm-mini-empty {
+  padding: 12px 14px;
+  border: 1px dashed var(--vm-panel-border);
+  border-radius: var(--vm-r-pill-sm);
+  font-size: 12.5px;
+  color: var(--vm-fg-dim);
+}
+
+/* ── Inline value chips/pills produced by renderInlineValue ── */
+.vm-faint     { color: var(--vm-fg-mute); font-size: 12.5px; }
+.vm-leaf      { color: var(--vm-fg); }
+.vm-num       { font-family: var(--vm-mono); font-variant-numeric: tabular-nums; color: var(--vm-fg); }
+.vm-ts {
+  font-family: var(--vm-mono); font-size: 12px;
+  color: var(--vm-fg-dim); cursor: help;
+  border-bottom: 1px dashed var(--vm-divider-2);
+}
+.vm-path {
+  font-family: var(--vm-mono); font-size: 11.5px;
+  color: var(--vm-fg-dim);
+  background: color-mix(in oklab, var(--accent) 6%, transparent);
+  padding: 1px 6px; border-radius: 3px;
+  max-width: 100%;
+  display: inline-block;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  vertical-align: bottom;
+}
+
+/* Boolean ✓ / × pills */
+.vm-bool {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 8px;
+  border-radius: var(--vm-r-pill);
+  font-size: 11.5px; font-weight: 600;
+}
+.vm-bool--true  { color: var(--ok);  background: color-mix(in oklab, var(--ok)  12%, transparent); }
+.vm-bool--false { color: var(--bad); background: color-mix(in oklab, var(--bad) 10%, transparent); }
+
+/* Version pills — installed (old) vs latest (new) */
+.vm-version-pill {
+  display: inline-flex; align-items: center;
+  padding: 2px 9px;
+  border-radius: var(--vm-r-pill);
+  font-family: var(--vm-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11.5px; font-weight: 600;
+  background: var(--vm-panel-bg);
+  border: 1px solid var(--vm-divider-2);
+  color: var(--vm-fg-dim);
+}
+.vm-version-pill--old {
+  color: var(--warn);
+  border-color: color-mix(in oklab, var(--warn) 35%, transparent);
+  background: color-mix(in oklab, var(--warn) 10%, transparent);
+}
+.vm-version-pill--new {
+  color: var(--ok);
+  border-color: color-mix(in oklab, var(--ok) 35%, transparent);
+  background: color-mix(in oklab, var(--ok) 10%, transparent);
+}
+
+/* HTTP method pills */
+.vm-method {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: var(--vm-r-pill-sm);
+  font-family: var(--vm-mono);
+  font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.04em;
+  background: var(--vm-panel-bg);
+  border: 1px solid var(--vm-divider-2);
+  color: var(--vm-fg-dim);
+}
+.vm-method--get    { color: var(--ok);     border-color: color-mix(in oklab, var(--ok)     30%, transparent); background: color-mix(in oklab, var(--ok)     8%, transparent); }
+.vm-method--post   { color: var(--accent); border-color: color-mix(in oklab, var(--accent) 30%, transparent); background: color-mix(in oklab, var(--accent) 8%, transparent); }
+.vm-method--put,
+.vm-method--patch  { color: var(--warn);   border-color: color-mix(in oklab, var(--warn)   30%, transparent); background: color-mix(in oklab, var(--warn)   8%, transparent); }
+.vm-method--delete { color: var(--bad);    border-color: color-mix(in oklab, var(--bad)    30%, transparent); background: color-mix(in oklab, var(--bad)    8%, transparent); }
+
+/* Log level chips (error/warn/info/debug) — used inside the
+   renderLogMessageList stack. */
+.vm-level {
+  display: inline-flex; align-items: center;
+  padding: 1px 7px;
+  border-radius: var(--vm-r-pill-sm);
+  font-family: var(--vm-mono);
+  font-size: 9.5px; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  flex-shrink: 0;
+}
+.vm-level--error,
+.vm-level--e        { color: var(--bad);  background: color-mix(in oklab, var(--bad)  14%, transparent); }
+.vm-level--warning,
+.vm-level--warn,
+.vm-level--w        { color: var(--warn); background: color-mix(in oklab, var(--warn) 14%, transparent); }
+.vm-level--info,
+.vm-level--i        { color: var(--accent); background: color-mix(in oklab, var(--accent) 14%, transparent); }
+.vm-level--debug,
+.vm-level--d        { color: var(--vm-fg-mute); background: var(--vm-panel-bg); }
+
+/* Count chips (number badges) */
+.vm-count-chip {
+  display: inline-flex; align-items: center;
+  padding: 1px 7px;
+  border-radius: var(--vm-r-pill);
+  font-family: var(--vm-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px; font-weight: 600;
+  background: var(--vm-panel-bg);
+  border: 1px solid var(--vm-divider-2);
+  color: var(--vm-fg-dim);
+  flex-shrink: 0;
+}
+.vm-count-chip--ok   { color: var(--ok);   border-color: color-mix(in oklab, var(--ok)   30%, transparent); background: color-mix(in oklab, var(--ok)   10%, transparent); }
+.vm-count-chip--warn { color: var(--warn); border-color: color-mix(in oklab, var(--warn) 30%, transparent); background: color-mix(in oklab, var(--warn) 10%, transparent); }
+.vm-count-chip--bad  { color: var(--bad);  border-color: color-mix(in oklab, var(--bad)  30%, transparent); background: color-mix(in oklab, var(--bad)  10%, transparent); }
+
+/* Name chips (used for up-to-date adapter list) */
+.vm-name-chip {
+  display: inline-flex; align-items: center;
+  padding: 2px 9px;
+  border-radius: var(--vm-r-pill);
+  font-family: var(--vm-mono);
+  font-size: 11.5px;
+  background: var(--vm-panel-bg);
+  border: 1px solid var(--vm-divider-2);
+  color: var(--vm-fg-dim);
+}
+.vm-name-chip--ok { color: var(--ok); border-color: color-mix(in oklab, var(--ok) 28%, transparent); }
+.vm-chip-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.vm-summary-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.vm-uptodate { margin-top: 4px; }
+.vm-uptodate > summary {
+  cursor: pointer;
+  font-size: 12px; color: var(--vm-fg-dim);
+  padding: 6px 0;
+  border-top: 1px dashed var(--vm-divider);
+}
+.vm-uptodate > .vm-chip-list { padding-top: 8px; }
+
+/* Status chips for HTTP status code distribution */
+.vm-status-strip { display: flex; flex-wrap: wrap; gap: 8px; }
+.vm-status-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--vm-r-pill);
+  font-family: var(--vm-mono);
+  font-size: 11.5px;
+  background: var(--vm-panel-bg);
+  border: 1px solid var(--vm-divider-2);
+}
+.vm-status-chip .code { font-weight: 700; letter-spacing: 0.04em; }
+.vm-status-chip .count { font-variant-numeric: tabular-nums; opacity: 0.8; }
+.vm-status-chip--ok   { color: var(--ok);   border-color: color-mix(in oklab, var(--ok)   28%, transparent); background: color-mix(in oklab, var(--ok)   8%, transparent); }
+.vm-status-chip--warn { color: var(--warn); border-color: color-mix(in oklab, var(--warn) 28%, transparent); background: color-mix(in oklab, var(--warn) 8%, transparent); }
+.vm-status-chip--bad  { color: var(--bad);  border-color: color-mix(in oklab, var(--bad)  28%, transparent); background: color-mix(in oklab, var(--bad)  8%, transparent); }
+
+/* Latency bars (inline in webserver-log mini-table) */
+.vm-bar-row { display: inline-flex; align-items: center; gap: 8px; min-width: 130px; }
+.vm-bar {
+  flex: 1 0 60px;
+  height: 6px;
+  background: var(--vm-panel-bg);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.vm-bar-fill {
+  display: block; height: 100%;
+  background: var(--accent);
+  border-radius: inherit;
+  transition: width .25s ease;
+}
+.vm-bar--warn .vm-bar-fill { background: var(--warn); }
+.vm-bar--bad  .vm-bar-fill { background: var(--bad); }
+.vm-bar-label {
+  font-family: var(--vm-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11.5px;
+  color: var(--vm-fg);
+  min-width: 44px; text-align: right;
+}
+
+/* Log message + keyword stacks */
+.vm-log-msgs,
+.vm-kw-list { display: flex; flex-direction: column; gap: 5px; }
+.vm-log-msg {
+  display: flex; align-items: baseline;
+  gap: 8px; flex-wrap: wrap;
+  font-size: 12px; line-height: 1.45;
+}
+.vm-log-msg-text {
+  flex: 1; color: var(--vm-fg-dim);
+  word-break: break-word;
+}
+.vm-kw {
+  display: flex; align-items: center;
+  gap: 8px; flex-wrap: wrap;
+}
+.vm-kw-token {
+  font-family: var(--vm-mono);
+  font-size: 11.5px; font-weight: 600;
+  color: var(--vm-fg);
+  background: color-mix(in oklab, var(--warn) 12%, transparent);
+  border: 1px solid color-mix(in oklab, var(--warn) 28%, transparent);
+  padding: 1px 7px; border-radius: 3px;
+}
+.vm-kw-examples {
+  flex: 1 100%;
+  margin-top: 2px;
+  padding-left: 4px;
+  border-left: 2px solid var(--vm-divider-2);
+}
+.vm-kw-example {
+  font-family: var(--vm-mono);
+  font-size: 11px; line-height: 1.55;
+  color: var(--vm-fg-mute);
+  padding: 2px 0;
+  word-break: break-word;
+}
+
+/* Slow-endpoint inline examples */
+.vm-slow-examples { display: flex; flex-direction: column; gap: 5px; }
+.vm-slow-example {
+  display: flex; align-items: center;
+  gap: 8px; flex-wrap: wrap;
+}
+
+/* ════════════════════════════════════════════════════════════════
+ * Generic key/value (refactored from <dl> to flex rows)
+ * ════════════════════════════════════════════════════════════════ */
+.vm-rows {
+  display: flex; flex-direction: column;
+  gap: 0;
+  margin: 0;
+}
+.vm-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 200px) 1fr;
+  gap: 18px;
+  padding: 7px 0;
+  border-bottom: 1px dashed var(--vm-divider);
+  align-items: baseline;
+}
+.vm-rows > :last-child { border-bottom: 0; }
+.vm-row-key {
+  font-family: var(--vm-mono);
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--vm-fg-mute);
+  line-height: 1.55;
+  display: flex; align-items: center; gap: 6px;
+}
+.vm-row-val {
+  font-size: 13px; line-height: 1.55;
+  color: var(--vm-fg);
+  min-width: 0; word-break: break-word;
+}
+.vm-row-val--nested {
+  grid-column: 1 / -1;
+  margin-top: 6px;
+  padding: 8px 12px;
+  background: color-mix(in oklab, var(--bg) 70%, transparent);
+  border-left: 2px solid var(--vm-divider-2);
+  border-radius: var(--vm-r-pill-sm);
+}
+.vm-row--nested {
+  padding: 7px 0;
+  border-bottom: 1px dashed var(--vm-divider);
+}
+.vm-row--nested[open] .vm-row-chev { transform: rotate(180deg); }
+.vm-row-chev {
+  transition: transform .18s ease;
+  color: var(--vm-fg-mute);
+}
+.vm-row-meta {
+  margin-left: auto;
+  font-family: var(--vm-mono);
+  font-size: 10px;
+  color: var(--vm-fg-mute);
+  text-transform: none; letter-spacing: 0;
+}
+.vm-row--nested > summary { list-style: none; outline: none; }
+.vm-row--nested > summary::-webkit-details-marker { display: none; }
+
+/* ════════════════════════════════════════════════════════════════
+ * Card-head Copy-JSON button (used by log + extended cards)
+ * ════════════════════════════════════════════════════════════════ */
+.vm-copy-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 24px; padding: 0 9px;
+  background: var(--vm-panel-bg);
+  border: 1px solid var(--vm-divider-2);
+  border-radius: var(--vm-r-pill-sm);
+  color: var(--vm-fg-mute);
+  font-family: var(--vm-sans);
+  font-size: 11px; font-weight: 500;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.vm-copy-btn:hover {
+  color: var(--accent);
+  border-color: color-mix(in oklab, var(--accent) 35%, transparent);
+  background: color-mix(in oklab, var(--accent) 8%, transparent);
+}
+.vm-copy-btn .vm-copy-default { display: inline; }
+.vm-copy-btn .vm-copy-done    { display: none; color: var(--ok); }
+.vm-copy-btn.is-copied { color: var(--ok); border-color: color-mix(in oklab, var(--ok) 35%, transparent); }
+.vm-copy-btn.is-copied .vm-copy-default { display: none; }
+.vm-copy-btn.is-copied .vm-copy-done    { display: inline; }
+
+/* ════════════════════════════════════════════════════════════════
+ * Log-card severity stripe + head layout tweaks
+ * ════════════════════════════════════════════════════════════════ */
+.vm-log-card { position: relative; }
+.vm-log-card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--vm-divider-2);
+  border-top-left-radius: var(--vm-r-panel);
+  border-bottom-left-radius: var(--vm-r-panel);
+}
+.vm-log-card--PASS::before,
+.vm-log-card--COMPLIANT::before { background: var(--ok); }
+.vm-log-card--FAIL::before,
+.vm-log-card--NONCOMPLIANT::before { background: var(--bad); }
+.vm-log-card--WARN::before  { background: var(--warn); }
+.vm-log-card--INFO::before  { background: var(--accent); }
+.vm-log-card--SKIP::before,
+.vm-log-card--SKIPPED::before { background: var(--vm-divider-2); }
+.vm-log-card--ERROR::before { background: var(--bad); }
+
+.vm-log-card-head-right {
+  display: flex; align-items: center; gap: 8px;
+}
+
+/* Same severity stripe on extended cards for parity */
+.vm-extended-card { position: relative; }
+.vm-extended-card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--vm-divider-2);
+  border-top-left-radius: var(--vm-r-panel);
+  border-bottom-left-radius: var(--vm-r-panel);
+}
+.vm-extended-card--PASS::before,
+.vm-extended-card--COMPLIANT::before { background: var(--ok); }
+.vm-extended-card--FAIL::before,
+.vm-extended-card--NONCOMPLIANT::before { background: var(--bad); }
+.vm-extended-card--WARN::before  { background: var(--warn); }
+.vm-extended-card--INFO::before  { background: var(--accent); }
+.vm-extended-card--SKIP::before,
+.vm-extended-card--SKIPPED::before { background: var(--vm-divider-2); }
+.vm-extended-card--ERROR::before { background: var(--bad); }
+
+/* Title row on extended cards — fits the new inline Copy button */
+.vm-extended-card-titlerow {
+  display: flex; align-items: center; gap: 10px;
+}
+.vm-extended-card-titlerow .vm-extended-card-title { margin: 0; }
+.vm-extended-card-titlerow .vm-copy-btn { margin-left: auto; }

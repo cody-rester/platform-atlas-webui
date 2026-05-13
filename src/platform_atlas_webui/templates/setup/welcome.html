@@ -1,0 +1,1707 @@
+<!DOCTYPE html>
+{% set _pref_mode = prefs.mode | default('dark') %}
+{% set _effective_mode = 'dark' if _pref_mode == 'auto' else _pref_mode %}
+<html lang="en"
+      data-theme="{{ prefs.theme | default('itential') }}"
+      data-mode="{{ _effective_mode }}"
+      data-mode-pref="{{ _pref_mode }}"
+      data-radius="pill"
+      data-sidebar="full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  {# See base.html for the rationale on this pre-paint mode resolver. #}
+  <script nonce="{{ csp_nonce }}">
+    (function () {
+      var html = document.documentElement;
+      if (html.getAttribute('data-mode-pref') !== 'auto') return;
+      if (!window.matchMedia) return;
+      var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      html.setAttribute('data-mode', prefersDark ? 'dark' : 'light');
+    })();
+  </script>
+  <title>Welcome to Platform Atlas</title>
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <link rel="stylesheet" href="{{ url_for('static', path='css/atlas.css') }}">
+  <script src="{{ url_for('static', path='js/atlas.js') }}" defer></script>
+  <style>
+    /* ───────── Onboarding-only layout ───────── */
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 28px 24px 56px;
+      background:
+        radial-gradient(circle at 0% 0%, var(--accent-soft) 0%, transparent 35%),
+        radial-gradient(circle at 100% 100%, var(--accent-soft) 0%, transparent 35%),
+        var(--bg);
+    }
+    :root[data-theme="itential"] body {
+      background: var(--bg);
+    }
+
+    .ob-shell {
+      width: 100%;
+      max-width: 880px;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    /* ───────── Top bar ───────── */
+    .ob-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+    .ob-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text-2);
+      font-size: 12px;
+      letter-spacing: -0.01em;
+    }
+    .ob-brand-mark {
+      width: 26px; height: 26px;
+      border-radius: 6px;
+      background: url("/static/img/itential-logo-dark.png") center / contain no-repeat;
+    }
+    :root[data-mode="light"] .ob-brand-mark {
+      background-image: url("/static/img/itential-logo-light.png");
+    }
+    /* Itential theme always renders on a white background regardless
+       of data-mode, so the brand mark needs the light-bg logo too. */
+    :root[data-theme="itential"] .ob-brand-mark {
+      background-image: url("/static/img/itential-logo-light.png");
+    }
+    .ob-version { font-family: var(--mono); font-size: 11px; color: var(--text-3); }
+
+    /* ───────── Progress indicator ───────── */
+    .ob-progress {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .ob-step-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px 4px 4px;
+      border-radius: 999px;
+      background: var(--surface-2);
+      color: var(--text-3);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      transition: all .2s var(--ease-standard);
+    }
+    .ob-step-pill .ob-step-num {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--surface-3);
+      color: var(--text-2);
+      font-size: 10px;
+      font-weight: 600;
+    }
+    .ob-step-pill.is-current {
+      background: var(--accent-soft);
+      color: var(--text);
+    }
+    .ob-step-pill.is-current .ob-step-num {
+      background: var(--accent);
+      color: var(--accent-ink);
+    }
+    .ob-step-pill.is-done {
+      color: var(--text-2);
+    }
+    .ob-step-pill.is-done .ob-step-num {
+      background: var(--ok-soft);
+      color: var(--ok);
+    }
+    .ob-step-pill .ob-check {
+      width: 10px; height: 10px;
+    }
+
+    /* ───────── Card / panel ───────── */
+    .ob-panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--r-lg);
+      padding: 40px 44px;
+      box-shadow: 0 1px 0 rgba(0,0,0,.02), 0 8px 28px rgba(0,0,0,.06);
+      position: relative;
+      overflow: hidden;
+      /* #19 — wizard panel arrives blurred + slightly scaled, resolves to crisp.
+         Fires once per page load. `backwards` applies the from-frame before
+         the animation begins, killing any FOUC-style flash. */
+      animation: ob-panel-resolve .9s var(--ease-decel) backwards;
+    }
+    @media (max-width: 640px) { .ob-panel { padding: 28px 22px; } }
+    @keyframes ob-panel-resolve {
+      from { opacity: 0; filter: blur(14px); transform: scale(1.02); }
+      to   { opacity: 1; filter: blur(0);    transform: scale(1); }
+    }
+
+    /* #06 — Step transitions: directional horizontal slide.
+       The current step has .is-entering-fwd|back; the previous step is
+       briefly kept visible with .is-leaving-fwd|back. JS removes the
+       leaving step from the layout after the animation finishes. */
+    .ob-step { will-change: transform, opacity; }
+    .ob-step[hidden] { display: none; }
+    .ob-step.is-entering-fwd  { animation: ob-step-in-fwd  .42s var(--ease-decel) both; }
+    .ob-step.is-entering-back { animation: ob-step-in-back .42s var(--ease-decel) both; }
+    .ob-step.is-leaving-fwd   {
+      position: absolute; inset: 40px 44px auto;
+      animation: ob-step-out-fwd  .42s var(--ease-decel) forwards;
+    }
+    .ob-step.is-leaving-back  {
+      position: absolute; inset: 40px 44px auto;
+      animation: ob-step-out-back .42s var(--ease-decel) forwards;
+    }
+    @media (max-width: 640px) {
+      .ob-step.is-leaving-fwd, .ob-step.is-leaving-back { inset: 28px 22px auto; }
+    }
+    @keyframes ob-step-in-fwd  { from { transform: translateX(22px);  opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes ob-step-in-back { from { transform: translateX(-22px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes ob-step-out-fwd  { from { transform: translateX(0); opacity: 1; } to { transform: translateX(-22px); opacity: 0; } }
+    @keyframes ob-step-out-back { from { transform: translateX(0); opacity: 1; } to { transform: translateX(22px);  opacity: 0; } }
+
+    /* #04 — Word-by-word title stagger. Words start hidden; when their
+       step has `is-current` they fade up with an 80ms stagger. */
+    .ob-title .word {
+      display: inline-block;
+      opacity: 0;
+      transform: translateY(8px);
+      filter: blur(4px);
+    }
+    .ob-step.is-current .ob-title .word {
+      animation: ob-word .55s var(--ease-decel) forwards;
+    }
+    .ob-step.is-current .ob-title .word:nth-child(1) { animation-delay: .00s; }
+    .ob-step.is-current .ob-title .word:nth-child(2) { animation-delay: .06s; }
+    .ob-step.is-current .ob-title .word:nth-child(3) { animation-delay: .12s; }
+    .ob-step.is-current .ob-title .word:nth-child(4) { animation-delay: .18s; }
+    .ob-step.is-current .ob-title .word:nth-child(5) { animation-delay: .24s; }
+    .ob-step.is-current .ob-title .word:nth-child(6) { animation-delay: .30s; }
+    .ob-step.is-current .ob-title .word:nth-child(7) { animation-delay: .36s; }
+    .ob-step.is-current .ob-title .word:nth-child(8) { animation-delay: .42s; }
+    @keyframes ob-word {
+      to { opacity: 1; transform: translateY(0); filter: blur(0); }
+    }
+
+    .ob-eyebrow {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin: 0 0 10px;
+    }
+    .ob-title {
+      font-family: var(--ui);
+      font-size: 28px;
+      line-height: 1.18;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+      margin: 0 0 10px;
+      color: var(--text);
+    }
+    .ob-title em {
+      font-family: 'Instrument Serif', Georgia, serif;
+      font-style: italic;
+      font-weight: 400;
+      color: var(--accent);
+    }
+    .ob-sub {
+      font-size: 14px;
+      line-height: 1.55;
+      color: var(--text-2);
+      max-width: 60ch;
+      margin: 0 0 28px;
+    }
+
+    /* ───────── Step 1 — Welcome ───────── */
+    .ob-hero {
+      text-align: center;
+      padding: 8px 0;
+    }
+    .ob-hero .ob-hero-mark {
+      width: 80px; height: 80px;
+      border-radius: 22px;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 24px;
+      box-shadow: 0 8px 24px var(--accent-soft);
+    }
+    .ob-hero .ob-hero-mark svg {
+      width: 38px; height: 38px;
+      color: var(--accent-ink);
+    }
+    .ob-hero .ob-title { font-size: 34px; }
+    .ob-hero .ob-sub { margin-left: auto; margin-right: auto; }
+
+    .ob-pillars {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin: 28px 0 32px;
+    }
+    @media (max-width: 640px) { .ob-pillars { grid-template-columns: 1fr; } }
+    .ob-pillar {
+      background: var(--bg-2);
+      border: 1px solid var(--line);
+      border-radius: var(--r-sm);
+      padding: 16px 18px;
+      text-align: left;
+    }
+    .ob-pillar-icon {
+      width: 22px; height: 22px;
+      color: var(--accent);
+      margin-bottom: 10px;
+    }
+    .ob-pillar-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      margin: 0 0 4px;
+    }
+    .ob-pillar-body {
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--text-3);
+      margin: 0;
+    }
+    .ob-time-note {
+      font-size: 12px;
+      color: var(--text-3);
+      margin-top: 18px;
+    }
+    .ob-time-note .ob-dot {
+      display: inline-block;
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: var(--text-4);
+      vertical-align: middle;
+      margin: 0 6px;
+    }
+
+    /* ───────── Step 2 — Theme ─────────
+       4-col grid (was 3) so 7 tiles fit in two rows. On a 1080p viewport
+       this lands the whole picker above the fold without scroll. */
+    .ob-theme-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+    @media (max-width: 760px) { .ob-theme-grid { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 540px) { .ob-theme-grid { grid-template-columns: repeat(2, 1fr); } }
+
+    .ob-theme {
+      position: relative;
+      border-radius: var(--r-lg);
+      padding: 10px;
+      cursor: pointer;
+      border: 1px solid var(--line);
+      background: var(--bg-2);
+      /* #09 — theme tile lift on hover, deeper shadow + soft accent ring */
+      transition:
+        transform .25s var(--ease-emphasized, var(--ease-standard)),
+        box-shadow .25s var(--ease-standard),
+        border-color .15s var(--ease-standard);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .ob-theme input { position: absolute; opacity: 0; pointer-events: none; }
+    .ob-theme:hover {
+      transform: translateY(-4px);
+      border-color: var(--line-2);
+      box-shadow: 0 16px 28px rgba(0, 0, 0, .32), 0 0 0 1px var(--accent);
+    }
+    .ob-theme.is-active {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-soft);
+    }
+    .ob-theme-preview {
+      height: 38px;
+      border-radius: var(--r-sm);
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--line);
+    }
+    .ob-theme-preview::before,
+    .ob-theme-preview::after {
+      content: '';
+      position: absolute;
+      border-radius: 3px;
+    }
+    .ob-theme-preview::before {
+      top: 6px; left: 8px; right: 8px; height: 5px;
+      background: var(--ot-surface);
+    }
+    .ob-theme-preview::after {
+      top: 16px; left: 8px; width: 22px; height: 13px;
+      background: var(--ot-accent);
+      border-radius: 999px;
+    }
+    .ob-theme-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      min-width: 0;
+    }
+    .ob-theme-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .ob-theme-tag {
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-3);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .ob-theme-swatches {
+      display: flex;
+      gap: 3px;
+    }
+    .ob-theme-swatches span {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      border: 1px solid rgba(0,0,0,.08);
+    }
+    /* Checkmark indicator on active tile.
+       The ::before is ALWAYS rendered (transparent when inactive) so its
+       width is reserved in the row regardless of selection state — no
+       layout shift when toggling tiles. Only the color is animated. */
+    .ob-theme-tag::before {
+      content: '✓\00a0';
+      font-weight: 700;
+      color: transparent;
+      transition: color .25s var(--ease-decel);
+    }
+    .ob-theme.is-active .ob-theme-tag::before {
+      color: var(--accent);
+    }
+
+    /* Inline theme palettes — these tiles render their own colors
+       independent of the current root theme. */
+    .ob-theme[data-tile="itential"] { --ot-bg: #FFFFFF; --ot-surface: #101625; --ot-accent: #1B93D2; --ot-text: #101625; }
+    .ob-theme[data-tile="aurora"]   { --ot-bg: #0A1628; --ot-surface: #152944; --ot-accent: #4D9FFF; --ot-text: #E8EEF5; }
+    .ob-theme[data-tile="horizon"]  { --ot-bg: #1A1815; --ot-surface: #2C2823; --ot-accent: #E07B52; --ot-text: #E8DED0; }
+    .ob-theme[data-tile="obsidian"] { --ot-bg: #000000; --ot-surface: #161622; --ot-accent: #A78BFA; --ot-text: #ECEAFF; }
+    .ob-theme[data-tile="meadow"]   { --ot-bg: #0E1812; --ot-surface: #1B2A22; --ot-accent: #84A98C; --ot-text: #DCE8DD; }
+    .ob-theme[data-tile="carbon"]   { --ot-bg: #0F0F0F; --ot-surface: #1F1F1F; --ot-accent: #E0E0E0; --ot-text: #F0F0F0; }
+    .ob-theme[data-tile="dracula"]  { --ot-bg: #1E1F29; --ot-surface: #282A36; --ot-accent: #FF79C6; --ot-text: #F8F8F2; }
+    .ob-theme .ob-theme-preview { background: var(--ot-bg); }
+    .ob-theme .ob-theme-swatches span:nth-child(1) { background: var(--ot-bg); }
+    .ob-theme .ob-theme-swatches span:nth-child(2) { background: var(--ot-surface); }
+    .ob-theme .ob-theme-swatches span:nth-child(3) { background: var(--ot-accent); }
+    .ob-theme .ob-theme-swatches span:nth-child(4) { background: var(--ot-text); }
+
+    /* Mode segmented control */
+    .ob-mode-row {
+      margin-top: 18px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .ob-mode-label {
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--text-2);
+    }
+    /* #12 — Mode segmented control with a sliding accent pill.
+       The .ob-mode-indicator floats absolutely behind the labels and is
+       moved by JS on init (no transition) and on click (with transition).
+       Labels themselves stay transparent — the colour change is purely
+       label foreground vs. accent-ink. */
+    .ob-mode-seg {
+      display: inline-flex;
+      padding: 3px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--bg-2);
+      position: relative;
+    }
+    .ob-mode-seg label {
+      position: relative;
+      z-index: 2;
+      padding: 6px 16px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-3);
+      cursor: pointer;
+      transition: color .2s var(--ease-standard);
+    }
+    .ob-mode-seg label:has(input:checked) {
+      color: var(--accent-ink);
+    }
+    .ob-mode-seg .ob-mode-indicator {
+      position: absolute;
+      top: 3px;
+      bottom: 3px;
+      left: 0;
+      width: 0;
+      border-radius: 999px;
+      background: var(--accent);
+      z-index: 1;
+      transform: translateX(0);
+      transition:
+        transform .35s var(--ease-emphasized, var(--ease-standard)),
+        width     .35s var(--ease-emphasized, var(--ease-standard));
+      pointer-events: none;
+    }
+    .ob-mode-seg input { position: absolute; opacity: 0; pointer-events: none; }
+    .ob-mode-seg.is-disabled { opacity: 0.5; pointer-events: none; }
+    .ob-mode-note {
+      font-size: 11.5px;
+      color: var(--text-3);
+      margin-top: 6px;
+      flex-basis: 100%;
+    }
+    .ob-mode-note[hidden] { display: none; }
+
+    /* ───────── Step 3 — Audit mode ───────── */
+    .ob-tier-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    @media (max-width: 640px) { .ob-tier-grid { grid-template-columns: 1fr; } }
+    .ob-tier {
+      position: relative;
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: var(--r-lg);
+      background: var(--bg-2);
+      cursor: pointer;
+      transition: transform .15s var(--ease-standard), border-color .15s var(--ease-standard);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .ob-tier input { position: absolute; opacity: 0; pointer-events: none; }
+    .ob-tier:hover { transform: translateY(-1px); border-color: var(--line-2); }
+    .ob-tier.is-active {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+    /* #14 — tier card halo: an accent ring expands outward and fades on
+       loop only while the card is selected. Pure decoration; pointer-events
+       off so it doesn't trap clicks. */
+    .ob-tier.is-active::after {
+      content: '';
+      position: absolute;
+      inset: -2px;
+      border-radius: inherit;
+      border: 2px solid var(--accent);
+      pointer-events: none;
+      animation: ob-tier-halo 2.4s ease-out infinite;
+    }
+    @keyframes ob-tier-halo {
+      0%   { transform: scale(1);    opacity: .55; }
+      100% { transform: scale(1.04); opacity: 0; }
+    }
+
+    /* ── M5 — Liquid Morph Selection (T9 tuning, persistent state)
+       When a user clicks a tier card, the chosen card morphs its border-radius
+       into an asymmetric shape with an overshoot spring, plus a single sheen
+       sweep. The OTHER card just dims (opacity only — no blur, no scale)
+       so its text stays fully readable while the user compares modes.
+       The morph state persists until the OTHER card is clicked. */
+    .ob-tier {
+      transition:
+        transform .5s cubic-bezier(.34, 1.56, .64, 1),
+        border-color .15s var(--ease-standard),
+        border-radius .5s cubic-bezier(.34, 1.56, .64, 1),
+        opacity .35s ease,
+        box-shadow .25s ease;
+    }
+    .ob-tier.is-morphing {
+      border-radius: 28px 14px 28px 14px !important;
+      transform: scale(1.04);
+      box-shadow:
+        0 0 0 1px var(--accent),
+        0 16px 50px var(--accent-soft);
+      z-index: 2;
+    }
+    /* Sheen sweep — uses ::before because ::after is taken by the halo.
+       Plays once when the class is added; sticks at end-state (offscreen). */
+    .ob-tier.is-morphing::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: linear-gradient(110deg,
+        transparent 30%,
+        rgba(255,255,255,0.18) 50%,
+        transparent 70%);
+      background-size: 200% 100%;
+      background-position: -100% 0;
+      animation: ob-tier-shimmer .55s ease forwards;
+      pointer-events: none;
+      z-index: 1;
+    }
+    @keyframes ob-tier-shimmer { to { background-position: 200% 0; } }
+    /* Faded state — just dim. No blur, no scale change, no saturate —
+       text remains fully readable so users can compare modes mid-selection.
+       pointer-events stays auto so the card is still clickable. */
+    .ob-tier.is-faded { opacity: 0.55; }
+    @media (prefers-reduced-motion: reduce) {
+      .ob-tier.is-morphing,
+      .ob-tier.is-faded { transition: none; }
+      .ob-tier.is-morphing::before { animation: none; }
+    }
+    .ob-tier-head {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .ob-tier-icon {
+      width: 36px; height: 36px;
+      flex-shrink: 0;
+      border-radius: 10px;
+      background: var(--surface-2);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+    }
+    .ob-tier.is-active .ob-tier-icon { background: var(--accent); color: var(--accent-ink); }
+    .ob-tier-icon svg { width: 18px; height: 18px; }
+    .ob-tier-title {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--text);
+      margin: 0 0 2px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .ob-tier-rec {
+      font-size: 9.5px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: var(--ok-soft);
+      color: var(--ok);
+      font-weight: 700;
+    }
+    .ob-tier-best {
+      font-size: 11.5px;
+      color: var(--text-3);
+      margin: 0;
+    }
+    .ob-tier-bullets {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .ob-tier-bullets li {
+      font-size: 12.5px;
+      line-height: 1.45;
+      color: var(--text-2);
+      padding-left: 18px;
+      position: relative;
+    }
+    .ob-tier-bullets li::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 6px;
+      width: 10px; height: 6px;
+      border-left: 1.6px solid var(--accent);
+      border-bottom: 1.6px solid var(--accent);
+      transform: rotate(-45deg);
+    }
+    .ob-tier-needs {
+      font-size: 11.5px;
+      color: var(--text-3);
+      padding-top: 10px;
+      border-top: 1px dashed var(--line);
+    }
+    .ob-tier-needs strong { color: var(--text-2); font-weight: 600; }
+
+    /* ───────── Step 4/5 — Form fields ───────── */
+    .ob-form {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .ob-form .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      /* #15 — material underline anchors here. */
+      position: relative;
+      padding-bottom: 2px;
+    }
+    .ob-form .field label {
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--text);
+    }
+    .ob-form .field .hint {
+      font-size: 11.5px;
+      color: var(--text-3);
+    }
+    .ob-form .field .hint.is-secret::before {
+      content: '🔒';
+      margin-right: 4px;
+    }
+    /* #15 — Material-style: borderless input, transparent background,
+       underline drawn by the field's ::after on focus-within. The
+       underline collides with neither rounded corners nor an existing
+       border, since both are gone. */
+    .ob-form .field input[type="text"],
+    .ob-form .field input[type="password"],
+    .ob-form .field input[type="url"] {
+      border: 0;
+      border-bottom: 1px solid var(--line-2);
+      border-radius: 0;
+      background: transparent;
+      padding: 9px 2px;
+      color: var(--text);
+      font-family: var(--ui);
+      font-size: 13px;
+      width: 100%;
+      box-shadow: none;
+      transition: border-bottom-color .2s var(--ease-standard);
+    }
+    .ob-form .field input[type="text"]:focus,
+    .ob-form .field input[type="password"]:focus,
+    .ob-form .field input[type="url"]:focus {
+      outline: none;
+      border-bottom-color: transparent;
+      background: transparent;
+      box-shadow: none;
+    }
+    .ob-form .field::after {
+      content: '';
+      position: absolute;
+      left: 0; right: 0;
+      bottom: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent), var(--accent-hover));
+      border-radius: 2px;
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform .42s var(--ease-decel);
+      pointer-events: none;
+    }
+    .ob-form .field:focus-within::after { transform: scaleX(1); }
+    /* The underline only makes sense for text-style fields — drop the
+       pseudo-element on row layouts (checkbox + label) and on fields
+       that contain only hints / select dropdowns. */
+    .ob-form .field--row::after,
+    .ob-form .field:has(> select)::after,
+    .ob-form .field:has(> .hint:only-child)::after {
+      content: none;
+    }
+    .ob-form .field--row {
+      flex-direction: row;
+      align-items: center;
+      gap: 10px;
+    }
+    .ob-form .field-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    @media (max-width: 540px) { .ob-form .field-grid-2 { grid-template-columns: 1fr; } }
+
+    /* ───────── Disclosure (collapsed Advanced) ───────── */
+    .ob-disclose {
+      border: 1px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--bg-2);
+      overflow: hidden;
+    }
+    .ob-disclose summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      user-select: none;
+    }
+    .ob-disclose summary::-webkit-details-marker { display: none; }
+    .ob-disclose-head {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .ob-disclose-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .ob-disclose-tag {
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-3);
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: var(--surface-2);
+    }
+    .ob-disclose-sub {
+      font-size: 11.5px;
+      color: var(--text-3);
+    }
+    .ob-disclose-chev {
+      transition: transform .15s var(--ease-standard);
+      color: var(--text-3);
+    }
+    .ob-disclose[open] .ob-disclose-chev { transform: rotate(90deg); }
+    .ob-disclose-body {
+      padding: 4px 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      border-top: 1px solid var(--line);
+    }
+
+    /* Vault test result — reuses the same visual language as legacy welcome */
+    .ob-vault-result {
+      margin-top: 8px;
+      padding: 12px 14px;
+      border-radius: var(--r-sm);
+      border: 1px solid var(--line);
+      background: var(--surface);
+      font-size: 12.5px;
+    }
+    .ob-vault-result h4 {
+      margin: 0 0 6px;
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .ob-vault-result.is-ok h4   { color: var(--ok); }
+    .ob-vault-result.is-fail h4 { color: var(--bad); }
+    .ob-vault-keys {
+      list-style: none; margin: 8px 0 0; padding: 0;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .ob-vault-keys li {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 6px 10px; border-radius: var(--r-sm);
+      background: var(--bg-2); border: 1px solid var(--line);
+      font-family: var(--mono); font-size: 11.5px;
+    }
+    .ob-vault-keys .badge {
+      font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase;
+      padding: 2px 7px; border-radius: 3px;
+      font-family: var(--ui); font-weight: 600;
+    }
+    .ob-vault-keys .badge--ok       { background: var(--ok-soft);   color: var(--ok); }
+    .ob-vault-keys .badge--missing  { background: var(--bad-soft);  color: var(--bad); }
+    .ob-vault-keys .badge--optional { background: var(--surface-3); color: var(--text-3); }
+    .ob-vault-cmd {
+      margin-top: 10px; padding: 10px 12px;
+      background: var(--bg); border: 1px solid var(--line);
+      border-radius: var(--r-sm);
+      font-family: var(--mono); font-size: 11px;
+      white-space: pre; overflow-x: auto; color: var(--text);
+    }
+
+    /* ───────── Footer / nav ───────── */
+    .ob-actions {
+      margin-top: 32px;
+      padding-top: 22px;
+      border-top: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .ob-actions .ob-spacer { flex: 1; }
+    .ob-btn {
+      appearance: none;
+      border: 1px solid var(--line-2);
+      background: var(--surface-2);
+      color: var(--text);
+      font-family: var(--ui);
+      font-size: 13px;
+      font-weight: 500;
+      padding: 9px 16px;
+      border-radius: var(--r-md);
+      cursor: pointer;
+      transition: background .15s var(--ease-standard), border-color .15s var(--ease-standard);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .ob-btn:hover { background: var(--surface-3); }
+    .ob-btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+    .ob-btn.primary {
+      background: var(--accent);
+      color: var(--accent-ink);
+      border-color: transparent;
+    }
+    .ob-btn.primary:hover { filter: brightness(0.96); background: var(--accent); }
+    .ob-btn.ghost { background: transparent; border-color: transparent; color: var(--text-3); }
+    .ob-btn.ghost:hover { color: var(--text); background: var(--surface-2); }
+
+    .ob-flash {
+      padding: 12px 16px;
+      border-radius: var(--r-sm);
+      background: var(--bad-soft);
+      color: var(--bad);
+      font-size: 12.5px;
+      margin-bottom: 20px;
+      border: 1px solid var(--bad);
+    }
+
+  </style>
+</head>
+<body>
+<div class="ob-shell">
+
+  <div class="ob-top">
+    <div class="ob-brand">
+      <span class="ob-brand-mark" role="img" aria-label="Itential"></span>
+      <span>Platform Atlas</span>
+      <span class="ob-version">v{{ atlas_version }}</span>
+    </div>
+    <div class="ob-progress" data-ob-progress aria-label="Setup progress">
+      <span class="ob-step-pill" data-step-pill="1"><span class="ob-step-num">1</span><span class="ob-step-text">Welcome</span></span>
+      <span class="ob-step-pill" data-step-pill="2"><span class="ob-step-num">2</span><span class="ob-step-text">Theme</span></span>
+      <span class="ob-step-pill" data-step-pill="3"><span class="ob-step-num">3</span><span class="ob-step-text">Mode</span></span>
+      <span class="ob-step-pill" data-step-pill="4"><span class="ob-step-num">4</span><span class="ob-step-text">Connect</span></span>
+      <span class="ob-step-pill" data-step-pill="5"><span class="ob-step-num">5</span><span class="ob-step-text">Finish</span></span>
+    </div>
+  </div>
+
+  {% if error %}
+    <div class="ob-flash">{{ error }}</div>
+  {% endif %}
+
+  {% set chosen_backend = form.credential_backend or 'keyring' %}
+  {% set chosen_auth = form.vault_auth_method or 'token' %}
+
+  <form class="ob-panel" method="post" action="/setup" id="atlas-setup-form" autocomplete="off" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="webui_theme" value="{{ prefs.theme | default('itential') }}" data-ob-theme-input>
+    <input type="hidden" name="webui_mode"  value="{{ prefs.mode  | default('dark') }}"     data-ob-mode-input>
+
+    <!-- ────────── Step 1 — Welcome ────────── -->
+    <section class="ob-step ob-hero" data-step="1">
+      <div class="ob-hero-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2 3 6v6c0 5 3.5 9 9 10 5.5-1 9-5 9-10V6l-9-4z"/>
+          <path d="m9 12 2 2 4-4"/>
+        </svg>
+      </div>
+      <h1 class="ob-title"><span class="word">Audit</span> <span class="word">your</span> <span class="word">platform</span> <span class="word"><em>in</em></span> <span class="word"><em>minutes</em>,</span> <span class="word">not</span> <span class="word">days.</span></h1>
+      <p class="ob-sub">Platform Atlas captures your IAP configuration, validates it against versioned rulesets, and produces a professional compliance report you can hand to a customer or a CISO.</p>
+
+      <div class="ob-pillars">
+        <div class="ob-pillar">
+          <svg class="ob-pillar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+          <p class="ob-pillar-title">Capture</p>
+          <p class="ob-pillar-body">Pull config from Platform, MongoDB, Redis, and Gateways — automatically.</p>
+        </div>
+        <div class="ob-pillar">
+          <svg class="ob-pillar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><path d="M21 12c0 5-4 9-9 9s-9-4-9-9 4-9 9-9c2 0 4 .7 5.5 2"/></svg>
+          <p class="ob-pillar-title">Validate</p>
+          <p class="ob-pillar-body">Up to 107 rules check security, performance, and compliance posture.</p>
+        </div>
+        <div class="ob-pillar">
+          <svg class="ob-pillar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg>
+          <p class="ob-pillar-title">Report</p>
+          <p class="ob-pillar-body">Branded HTML report with diff, drift detection, and an architecture view.</p>
+        </div>
+      </div>
+
+      <p class="ob-time-note">Takes about 2 minutes <span class="ob-dot"></span> Everything stays on this machine</p>
+    </section>
+
+    <!-- ────────── Step 2 — Theme + Mode ────────── -->
+    <section class="ob-step" data-step="2" hidden>
+      <p class="ob-eyebrow">Step 2 of 5</p>
+      <h2 class="ob-title"><span class="word">Make</span> <span class="word">it</span> <span class="word"><em>yours</em>.</span></h2>
+      <p class="ob-sub">Pick a palette. We'll apply it everywhere — including the reports you generate. You can change it any time in Settings.</p>
+
+      <div class="ob-theme-grid" role="radiogroup" aria-label="Theme palette">
+        {%- set themes = [
+          ('itential', 'Itential',  'Brand'),
+          ('aurora',   'Aurora',    'Operations blue'),
+          ('horizon',  'Horizon',   'Editorial terracotta'),
+          ('obsidian', 'Obsidian',  'High-contrast violet'),
+          ('meadow',   'Meadow',    'Calming sage'),
+          ('carbon',   'Carbon',    'True grayscale'),
+          ('dracula',  'Dracula',   'Pink & cyan'),
+        ] -%}
+        {% for slug, name, tag in themes %}
+        <label class="ob-theme {% if (prefs.theme | default('itential')) == slug %}is-active{% endif %}" data-tile="{{ slug }}">
+          <input type="radio" name="ob_theme_choice" value="{{ slug }}" data-ob-theme
+                 {% if (prefs.theme | default('itential')) == slug %}checked{% endif %}>
+          <div class="ob-theme-preview" aria-hidden="true"></div>
+          <div class="ob-theme-row">
+            <span class="ob-theme-name">{{ name }}</span>
+            <span class="ob-theme-tag">{{ tag }}</span>
+          </div>
+          <div class="ob-theme-swatches" aria-hidden="true">
+            <span></span><span></span><span></span><span></span>
+          </div>
+        </label>
+        {% endfor %}
+      </div>
+
+      <div class="ob-mode-row">
+        <span class="ob-mode-label">Brightness</span>
+        <div class="ob-mode-seg" data-ob-mode-seg>
+          <span class="ob-mode-indicator" data-ob-mode-indicator aria-hidden="true"></span>
+          <label>
+            <input type="radio" name="ob_mode_choice" value="dark" data-ob-mode
+                   {% if (prefs.mode | default('dark')) != 'light' %}checked{% endif %}>
+            Dark
+          </label>
+          <label>
+            <input type="radio" name="ob_mode_choice" value="light" data-ob-mode
+                   {% if (prefs.mode | default('dark')) == 'light' %}checked{% endif %}>
+            Light
+          </label>
+        </div>
+        <p class="ob-mode-note" data-ob-mode-note hidden>Itential is brand-true white &amp; navy — light/dark is a no-op for this palette.</p>
+      </div>
+    </section>
+
+    <!-- ────────── Step 3 — Audit mode ────────── -->
+    <section class="ob-step" data-step="3" hidden>
+      <p class="ob-eyebrow">Step 3 of 5</p>
+      <h2 class="ob-title"><span class="word">What</span> <span class="word">do</span> <span class="word">you</span> <span class="word">want</span> <span class="word">to</span> <span class="word"><em>audit</em>?</span></h2>
+      <p class="ob-sub">Atlas runs in two modes. Most teams start with Standard — you can switch to Extended any time once your SSH and database access is ready.</p>
+
+      <div class="ob-tier-grid" role="radiogroup" aria-label="Audit tier">
+        <label class="ob-tier {% if (form.tier or 'standard') == 'standard' %}is-active{% endif %}">
+          <input type="radio" name="tier" value="standard" data-ob-tier
+                 {% if (form.tier or 'standard') == 'standard' %}checked{% endif %}>
+          <div class="ob-tier-head">
+            <span class="ob-tier-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m9 12 2 2 4-4"/></svg>
+            </span>
+            <div>
+              <h3 class="ob-tier-title">Standard <span class="ob-tier-rec">Recommended</span></h3>
+              <p class="ob-tier-best">Best for first-time audits, customer-facing checks, and CI runners.</p>
+            </div>
+          </div>
+          <ul class="ob-tier-bullets">
+            <li>Runs ~54 rules across Platform &amp; Gateway 4</li>
+            <li>Connects via Platform OAuth — no SSH or database access</li>
+            <li>Finishes in under a minute on most installs</li>
+          </ul>
+          <p class="ob-tier-needs"><strong>Needs:</strong> Platform URL + read-only OAuth client.</p>
+        </label>
+
+        <label class="ob-tier {% if form.tier == 'extended' %}is-active{% endif %}">
+          <input type="radio" name="tier" value="extended" data-ob-tier
+                 {% if form.tier == 'extended' %}checked{% endif %}>
+          <div class="ob-tier-head">
+            <span class="ob-tier-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h18v4H3zM3 10h18v4H3zM3 16h18v4H3z"/><circle cx="7" cy="6" r=".5" fill="currentColor"/><circle cx="7" cy="12" r=".5" fill="currentColor"/><circle cx="7" cy="18" r=".5" fill="currentColor"/></svg>
+            </span>
+            <div>
+              <h3 class="ob-tier-title">Extended</h3>
+              <p class="ob-tier-best">Full infrastructure audit — for deep health checks and quarterly reviews.</p>
+            </div>
+          </div>
+          <ul class="ob-tier-bullets">
+            <li>Runs ~107 rules across the full stack</li>
+            <li>Adds SSH, MongoDB, Redis, Kubernetes &amp; Gateway 5 collectors</li>
+            <li>Captures replica set state, log scans, and architecture data</li>
+          </ul>
+          <p class="ob-tier-needs"><strong>Needs:</strong> SSH keys + read-only DB users (configurable later).</p>
+        </label>
+      </div>
+    </section>
+
+    <!-- ────────── Step 4 — Connect ────────── -->
+    <section class="ob-step" data-step="4" hidden>
+      <p class="ob-eyebrow">Step 4 of 5</p>
+      <h2 class="ob-title"><span class="word">Connect</span> <span class="word">to</span> <span class="word">your</span> <span class="word"><em>platform</em>.</span></h2>
+      <p class="ob-sub">Atlas talks to your Itential platform with a read-only OAuth client. Secrets land in your OS keyring — never in a config file.</p>
+
+      <div class="ob-form">
+        <div class="field-grid-2">
+          <div class="field">
+            <label for="organization_name">Organization</label>
+            <input id="organization_name" name="organization_name" type="text" required
+                   value="{{ form.organization_name or organization_name or '' }}"
+                   placeholder="Acme Corp">
+            <span class="hint">Appears on every report header.</span>
+          </div>
+          <div class="field">
+            <label for="env_name">Environment name</label>
+            <input id="env_name" name="env_name" type="text" required
+                   value="{{ form.env_name or 'production' }}"
+                   placeholder="production">
+            <span class="hint">A short slug — <code>production</code>, <code>staging</code>, etc.</span>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="platform_uri">Platform URL</label>
+          <input id="platform_uri" name="platform_uri" type="url" required
+                 value="{{ form.platform_uri or '' }}"
+                 placeholder="https://platform.acme.com">
+        </div>
+
+        <div class="field-grid-2">
+          <div class="field">
+            <label for="platform_client_id">OAuth client ID</label>
+            <input id="platform_client_id" name="platform_client_id" type="text" required
+                   value="{{ form.platform_client_id or '' }}"
+                   placeholder="6926209b42103af06a1f0801">
+          </div>
+          <div class="field" data-ob-keyring-field>
+            <label for="platform_client_secret">OAuth client secret</label>
+            <input id="platform_client_secret" name="platform_client_secret" type="password"
+                   autocomplete="new-password"
+                   placeholder="••••••••">
+            <span class="hint is-secret">Stored in your OS keyring. Never written to disk.</span>
+          </div>
+        </div>
+
+        <div class="field field--row">
+          <input id="verify_ssl" name="verify_ssl" type="checkbox" value="1"
+                 {% if form.verify_ssl %}checked{% endif %}>
+          <label for="verify_ssl" style="font-weight: 400;">Verify SSL certificates against this Platform</label>
+        </div>
+      </div>
+    </section>
+
+    <!-- ────────── Step 5 — Optional + Submit ────────── -->
+    <section class="ob-step" data-step="5" hidden>
+      <p class="ob-eyebrow">Step 5 of 5</p>
+      <h2 class="ob-title"><span class="word">Anything</span> <span class="word"><em>else</em>?</span></h2>
+      <p class="ob-sub">All optional. Skip whatever you're not using and add it later from Settings — Atlas will still work.</p>
+
+      <div class="ob-form">
+        <details class="ob-disclose">
+          <summary>
+            <div class="ob-disclose-head">
+              <span class="ob-disclose-title">Gateway 4 <span class="ob-disclose-tag">Optional</span></span>
+              <span class="ob-disclose-sub">Add IAG4 API to capture Gateway runtime state.</span>
+            </div>
+            <svg class="ob-disclose-chev" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+          </summary>
+          <div class="ob-disclose-body">
+            <div class="field">
+              <label for="gateway4_uri">Gateway 4 URI</label>
+              <input id="gateway4_uri" name="gateway4_uri" type="url"
+                     value="{{ form.gateway4_uri or '' }}"
+                     placeholder="https://iag.acme.com">
+            </div>
+            <div class="field-grid-2">
+              <div class="field">
+                <label for="gateway4_username">Username</label>
+                <input id="gateway4_username" name="gateway4_username" type="text"
+                       value="{{ form.gateway4_username or '' }}">
+              </div>
+              <div class="field" data-ob-keyring-field>
+                <label for="gateway4_password">Password</label>
+                <input id="gateway4_password" name="gateway4_password" type="password"
+                       autocomplete="new-password" placeholder="••••••••">
+              </div>
+            </div>
+            <div class="field" data-ob-vault-field hidden>
+              <span class="hint">When using Vault, put the password under the <code>gateway4_password</code> key inside your KV path.</span>
+            </div>
+          </div>
+        </details>
+
+        <details class="ob-disclose">
+          <summary>
+            <div class="ob-disclose-head">
+              <span class="ob-disclose-title">Use HashiCorp Vault for secrets <span class="ob-disclose-tag">Advanced</span></span>
+              <span class="ob-disclose-sub">Default: OS keyring. Switch only if your team standardises on Vault.</span>
+            </div>
+            <svg class="ob-disclose-chev" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+          </summary>
+          <div class="ob-disclose-body">
+            <div class="field field--row">
+              <input id="ob_use_vault" type="checkbox" data-ob-use-vault
+                     {% if chosen_backend == 'vault' %}checked{% endif %}>
+              <label for="ob_use_vault" style="font-weight: 500;">Read secrets from Vault instead of the OS keyring</label>
+            </div>
+            <input type="hidden" name="credential_backend" value="{{ chosen_backend }}" data-ob-backend-input>
+
+            <div data-ob-vault-fields {% if chosen_backend != 'vault' %}hidden{% endif %}>
+              <div class="field">
+                <label for="vault_url">Vault URL</label>
+                <input id="vault_url" name="vault_url" type="url"
+                       value="{{ form.vault_url or '' }}"
+                       placeholder="https://vault.acme.com:8200">
+              </div>
+              <div class="field">
+                <label for="vault_auth_method">Auth method</label>
+                <select id="vault_auth_method" name="vault_auth_method" data-ob-vault-auth>
+                  <option value="token"            {% if chosen_auth == 'token' %}selected{% endif %}>Token — Static (entered now)</option>
+                  <option value="approle"          {% if chosen_auth == 'approle' %}selected{% endif %}>AppRole — role_id + secret_id</option>
+                  <option value="approle_wrapped"  {% if chosen_auth == 'approle_wrapped' %}selected{% endif %}>AppRole (wrapped)</option>
+                  <option value="token_file"       {% if chosen_auth == 'token_file' %}selected{% endif %}>Token (file) — Vault Agent sink</option>
+                  <option value="token_env"        {% if chosen_auth == 'token_env' %}selected{% endif %}>Token (env) — VAULT_TOKEN at runtime</option>
+                </select>
+              </div>
+
+              <div class="field" data-ob-vault-auth-field="token">
+                <label for="vault_token">Vault token</label>
+                <input id="vault_token" name="vault_token" type="password"
+                       autocomplete="new-password" placeholder="hvs.…">
+              </div>
+              <div class="field" data-ob-vault-auth-field="approle approle_wrapped">
+                <label for="vault_role_id">AppRole role_id</label>
+                <input id="vault_role_id" name="vault_role_id" type="text"
+                       value="{{ form.vault_role_id or '' }}">
+              </div>
+              <div class="field" data-ob-vault-auth-field="approle">
+                <label for="vault_secret_id">AppRole secret_id</label>
+                <input id="vault_secret_id" name="vault_secret_id" type="password"
+                       autocomplete="new-password">
+              </div>
+              <div class="field" data-ob-vault-auth-field="approle_wrapped">
+                <label for="vault_wrapping_token">Wrapping token</label>
+                <input id="vault_wrapping_token" name="vault_wrapping_token" type="password"
+                       autocomplete="new-password">
+              </div>
+              <div class="field" data-ob-vault-auth-field="token_file">
+                <label for="vault_token_file_path">Token file path</label>
+                <input id="vault_token_file_path" name="vault_token_file_path" type="text"
+                       value="{{ form.vault_token_file_path or '' }}"
+                       placeholder="/run/vault-agent/atlas.token">
+              </div>
+
+              <div class="field-grid-2">
+                <div class="field">
+                  <label for="vault_mount_point">KV v2 mount</label>
+                  <input id="vault_mount_point" name="vault_mount_point" type="text"
+                         value="{{ form.vault_mount_point or 'secret' }}">
+                </div>
+                <div class="field">
+                  <label for="vault_secret_path">Secret path</label>
+                  <input id="vault_secret_path" name="vault_secret_path" type="text"
+                         value="{{ form.vault_secret_path or 'platform-atlas' }}">
+                </div>
+              </div>
+              <div class="field">
+                <label for="vault_namespace">Namespace (Vault Enterprise — optional)</label>
+                <input id="vault_namespace" name="vault_namespace" type="text"
+                       value="{{ form.vault_namespace or '' }}">
+              </div>
+              <div class="field field--row">
+                <input id="vault_verify_ssl" name="vault_verify_ssl" type="checkbox" value="1"
+                       {% if form.vault_verify_ssl %}checked{% endif %}>
+                <label for="vault_verify_ssl" style="font-weight: 400;">Verify Vault TLS certificate</label>
+              </div>
+
+              <div style="display: flex; gap: 10px; align-items: center;">
+                <button type="button" class="ob-btn" data-ob-vault-test>Test connection &amp; verify keys</button>
+                <span class="hint" style="margin: 0;">We'll authenticate and confirm the secrets we need are present.</span>
+              </div>
+
+              <div class="ob-vault-result" id="ob-vault-result" hidden>
+                <h4 data-ob-vault-result-title>Vault check</h4>
+                <p data-ob-vault-result-message style="margin: 0 0 6px;"></p>
+                <ul class="ob-vault-keys" data-ob-vault-result-keys></ul>
+                <div class="ob-vault-cmd" data-ob-vault-cmd hidden></div>
+              </div>
+            </div>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <!-- ────────── Footer / nav ────────── -->
+    <div class="ob-actions">
+      <button type="button" class="ob-btn ghost" data-ob-back hidden>← Back</button>
+      <span class="ob-spacer"></span>
+      <button type="button" class="ob-btn primary" data-ob-next>Begin setup →</button>
+      <button type="submit"  class="ob-btn primary" data-ob-submit hidden>Create configuration ✓</button>
+    </div>
+
+  </form>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+(function () {
+  'use strict';
+
+  var form = document.getElementById('atlas-setup-form');
+  if (!form) return;
+  var root = document.documentElement;
+  var APPEARANCE_API = '/api/settings/appearance';
+  // NOTE: we do NOT hit the appearance API during onboarding — that
+  // would create config.json early and trip is_initialized() before
+  // the user finishes. Theme/mode are passed via the hidden form
+  // inputs and persisted server-side at bootstrap time.
+
+  // ───────── Step navigation ─────────
+  var steps = Array.prototype.slice.call(form.querySelectorAll('.ob-step'));
+  var pills = Array.prototype.slice.call(document.querySelectorAll('[data-step-pill]'));
+  var nextBtn = form.querySelector('[data-ob-next]');
+  var backBtn = form.querySelector('[data-ob-back]');
+  var submitBtn = form.querySelector('[data-ob-submit]');
+  var current = 1;
+  // Steps and pills with `data-tier-only="extended"` are only part of the
+  // flow when the user picks Extended on step 3. activeSteps / activePills
+  // resolve dynamically so back/next skip them in Standard mode.
+  function currentTier() {
+    var t = form.querySelector('[data-ob-tier]:checked');
+    return t ? t.value : 'standard';
+  }
+  function isStepActive(el) {
+    var only = el.getAttribute('data-tier-only');
+    return !only || only === currentTier();
+  }
+  function activeSteps() { return steps.filter(isStepActive); }
+  function activePills() { return pills.filter(isStepActive); }
+  function clamp(n) {
+    var idxs = activeSteps().map(function (el) { return parseInt(el.getAttribute('data-step'), 10); });
+    if (!idxs.length) return n;
+    return Math.max(idxs[0], Math.min(idxs[idxs.length - 1], n));
+  }
+  function nextActive(from, dir) {
+    // Walk through every step; return the next one that's tier-active.
+    var idxs = activeSteps().map(function (el) { return parseInt(el.getAttribute('data-step'), 10); }).sort(function (a, b) { return a - b; });
+    if (dir > 0) {
+      for (var i = 0; i < idxs.length; i++) if (idxs[i] > from) return idxs[i];
+      return idxs[idxs.length - 1];
+    } else {
+      for (var j = idxs.length - 1; j >= 0; j--) if (idxs[j] < from) return idxs[j];
+      return idxs[0];
+    }
+  }
+  function refreshPillVisibilityAndNumbers() {
+    pills.forEach(function (p) { p.hidden = !isStepActive(p); });
+    var visible = 0;
+    pills.forEach(function (p) {
+      if (p.hidden) return;
+      visible += 1;
+      var num = p.querySelector('.ob-step-num');
+      if (num) num.textContent = String(visible);
+    });
+  }
+
+  // Animation classes used by #06 step transitions and #04 word stagger.
+  var STEP_ANIM_CLASSES = [
+    'is-entering-fwd', 'is-entering-back',
+    'is-leaving-fwd',  'is-leaving-back',
+    'is-current'
+  ];
+  var STEP_ANIM_MS = 420;
+  var leaveTimer = null;
+
+  function applyStep(n, animate) {
+    var prev = current;
+    current = clamp(n);
+    if (animate === undefined) animate = true;
+    var dir = current >= prev ? 'fwd' : 'back';
+
+    // Cancel any pending "leave finished" cleanup so a fast double-click
+    // doesn't strand a previous step in absolute-positioned limbo.
+    if (leaveTimer) { clearTimeout(leaveTimer); leaveTimer = null; }
+
+    steps.forEach(function (el) {
+      var idx = parseInt(el.getAttribute('data-step'), 10);
+      STEP_ANIM_CLASSES.forEach(function (c) { el.classList.remove(c); });
+      if (idx === current) {
+        el.hidden = false;
+        el.classList.add('is-current');
+        if (animate && prev !== current) {
+          // Force reflow so re-adding the class restarts the animation
+          // — same trick the showcase replay buttons use.
+          void el.offsetWidth;
+          el.classList.add('is-entering-' + dir);
+          setTimeout(function () { el.classList.remove('is-entering-' + dir); }, STEP_ANIM_MS);
+        }
+      } else if (idx === prev && prev !== current && animate) {
+        // Outgoing — animate it leaving before hiding.
+        el.hidden = false;
+        el.classList.add('is-leaving-' + dir);
+        leaveTimer = setTimeout(function () {
+          el.classList.remove('is-leaving-' + dir);
+          el.hidden = true;
+          leaveTimer = null;
+        }, STEP_ANIM_MS);
+      } else {
+        el.hidden = true;
+      }
+    });
+
+    pills.forEach(function (pill) {
+      var idx = parseInt(pill.getAttribute('data-step-pill'), 10);
+      pill.classList.toggle('is-current', idx === current);
+      pill.classList.toggle('is-done', idx < current);
+    });
+    // Step 2's sliding mode-pill indicator measures its labels via
+    // getBoundingClientRect, which returns zero rects while step 2 is
+    // still hidden. Re-measure on entrance so the accent pill snaps
+    // into place the moment the user lands here.
+    if (current === 2 && typeof moveModeIndicator === 'function') {
+      requestAnimationFrame(function () { moveModeIndicator(false); });
+    }
+    backBtn.hidden = current === activeSteps()[0] && true;  // hide on the very first active step
+    var lastActive = parseInt(activeSteps()[activeSteps().length - 1].getAttribute('data-step'), 10);
+    var atEnd = current === lastActive;
+    nextBtn.hidden = atEnd;
+    submitBtn.hidden = !atEnd;
+    nextBtn.textContent = current === 1 ? 'Begin setup →' : 'Continue →';
+
+    // Focus the first interactive element on the new step for keyboard users.
+    if (animate && prev !== current && current !== 1) {
+      var entering = steps.find(function (el) { return el.classList.contains('is-current'); });
+      if (entering) {
+        var t = entering.querySelector('input:not([type=hidden]), select, button:not([hidden]), [tabindex]');
+        if (t) try { t.focus({ preventScroll: true }); } catch (_) {}
+      }
+    }
+    if (animate && prev !== current) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+
+  function validateStep(n) {
+    if (n !== 4) return true;  // Steps 1-3 and 5 have no required fields gating progress.
+    var inputs = form.querySelectorAll(
+      'section[data-step="4"] input[required]:not([hidden])'
+    );
+    var ok = true;
+    inputs.forEach(function (el) {
+      if (!el.value || (el.type === 'url' && !/^https?:\/\//i.test(el.value))) {
+        el.style.borderColor = 'var(--bad)';
+        ok = false;
+      } else {
+        el.style.borderColor = '';
+      }
+    });
+    if (!ok) {
+      var firstBad = form.querySelector('section[data-step="4"] input[style*="bad"]');
+      if (firstBad) firstBad.focus();
+    }
+    return ok;
+  }
+
+  nextBtn.addEventListener('click', function () {
+    if (!validateStep(current)) return;
+    applyStep(nextActive(current, +1));
+  });
+  backBtn.addEventListener('click', function () { applyStep(nextActive(current, -1)); });
+
+  // Allow Enter to advance (except inside textareas / submit step).
+  form.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter') return;
+    if (e.target && (e.target.tagName === 'TEXTAREA')) return;
+    var lastActive = parseInt(activeSteps()[activeSteps().length - 1].getAttribute('data-step'), 10);
+    if (current === lastActive) return;  // last step — let real submit happen
+    e.preventDefault();
+    if (validateStep(current)) applyStep(nextActive(current, +1));
+  });
+
+  // ───────── Theme / Mode preview ─────────
+  var themeInputs = form.querySelectorAll('[data-ob-theme]');
+  var modeInputs = form.querySelectorAll('[data-ob-mode]');
+  var themeHidden = form.querySelector('[data-ob-theme-input]');
+  var modeHidden = form.querySelector('[data-ob-mode-input]');
+  var modeSeg = form.querySelector('[data-ob-mode-seg]');
+  var modeNote = form.querySelector('[data-ob-mode-note]');
+
+  function refreshThemeTiles() {
+    form.querySelectorAll('.ob-theme').forEach(function (label) {
+      var input = label.querySelector('input[data-ob-theme]');
+      label.classList.toggle('is-active', !!input && input.checked);
+    });
+  }
+
+  // Smooth palette swaps: atlas.css ships a `.theme-changing` class on
+  // <html> that puts a 700ms transition on background/color/border-color
+  // /fill/stroke/box-shadow for every element. Toggle it around our
+  // attribute changes so flipping themes morphs rather than snaps.
+  // We keep our own timer (rather than reusing atlas.js's helper) so the
+  // wizard's appearance changes don't try to PATCH /api/settings before
+  // bootstrap is done.
+  var THEME_FADE_MS = 720;
+  var _themeFadeTimer = null;
+  function withThemeFade(fn) {
+    root.classList.add('theme-changing');
+    fn();
+    if (_themeFadeTimer) clearTimeout(_themeFadeTimer);
+    _themeFadeTimer = setTimeout(function () {
+      root.classList.remove('theme-changing');
+      _themeFadeTimer = null;
+    }, THEME_FADE_MS);
+  }
+
+  function applyChosenTheme() {
+    var chosen = form.querySelector('[data-ob-theme]:checked');
+    if (!chosen) return;
+    var theme = chosen.value;
+    withThemeFade(function () { root.setAttribute('data-theme', theme); });
+    if (themeHidden) themeHidden.value = theme;
+    refreshThemeTiles();
+    // Itential is brand-true — its mode is fixed.
+    var isItential = theme === 'itential';
+    if (modeSeg) modeSeg.classList.toggle('is-disabled', isItential);
+    if (modeNote) modeNote.hidden = !isItential;
+  }
+  function applyChosenMode() {
+    var chosen = form.querySelector('[data-ob-mode]:checked');
+    if (!chosen) return;
+    var mode = chosen.value;
+    withThemeFade(function () { root.setAttribute('data-mode', mode); });
+    if (modeHidden) modeHidden.value = mode;
+    moveModeIndicator(true);
+  }
+
+  // ───────── #12 — Sliding mode pill indicator ─────────
+  // The accent pill is a separate absolutely-positioned element behind
+  // the labels. We measure each label's geometry and translate/resize
+  // the indicator. First call uses no transition (avoids slide-in
+  // glitch on first paint); later calls animate.
+  var modeIndicator = form.querySelector('[data-ob-mode-indicator]');
+  var modeFirstMoveDone = false;
+  function moveModeIndicator(animate) {
+    if (!modeSeg || !modeIndicator) return;
+    var checked = form.querySelector('[data-ob-mode]:checked');
+    if (!checked) return;
+    var label = checked.closest('label');
+    if (!label) return;
+    // First call always snaps — labels need a paint cycle to acquire
+    // their final width and the user shouldn't see a "grow from 0" tween.
+    if (!modeFirstMoveDone) animate = false;
+    var labelRect = label.getBoundingClientRect();
+    var segRect = modeSeg.getBoundingClientRect();
+    if (!animate) modeIndicator.style.transition = 'none';
+    // 3px is the .ob-mode-seg padding — the indicator inset.
+    modeIndicator.style.transform = 'translateX(' + (labelRect.left - segRect.left - 3) + 'px)';
+    modeIndicator.style.width = labelRect.width + 'px';
+    if (!animate) {
+      requestAnimationFrame(function () { modeIndicator.style.transition = ''; });
+    }
+    modeFirstMoveDone = true;
+  }
+
+  themeInputs.forEach(function (i) { i.addEventListener('change', applyChosenTheme); });
+  modeInputs.forEach(function (i) { i.addEventListener('change', applyChosenMode); });
+  // Re-position the indicator if the viewport changes width (label widths
+  // are font-dependent and can change with window resize).
+  window.addEventListener('resize', function () { moveModeIndicator(false); });
+
+  // Tier card active-state mirroring (no :has() reliance).
+  // Also: when the tier flips, the Extended-only step + pill appears /
+  // disappears, and pill numbers re-flow to stay 1..N for the visible set.
+  form.querySelectorAll('[data-ob-tier]').forEach(function (input) {
+    input.addEventListener('change', function () {
+      // M5 — persistent morph state: chosen card stays morphed, the other
+      // stays dimmed. Both flip when the user clicks the alternate card.
+      // No setTimeout / snap-back — the user controls the state.
+      form.querySelectorAll('.ob-tier').forEach(function (c) {
+        var i = c.querySelector('input');
+        var checked = !!i && i.checked;
+        c.classList.toggle('is-active',   checked);
+        c.classList.toggle('is-morphing', checked);
+        c.classList.toggle('is-faded',    !checked);
+      });
+      refreshPillVisibilityAndNumbers();
+      // If the user is currently on the Extended step but flipped back to
+      // Standard, gently bounce them forward to the Finish step.
+      var cur = form.querySelector('.ob-step.is-current');
+      if (cur && cur.getAttribute('data-tier-only') === 'extended' && currentTier() !== 'extended') {
+        applyStep(nextActive(parseInt(cur.getAttribute('data-step'), 10), +1));
+      }
+    });
+  });
+
+  // ───────── Vault toggle (under disclosure) ─────────
+  var useVaultCheckbox = form.querySelector('[data-ob-use-vault]');
+  var vaultFields = form.querySelector('[data-ob-vault-fields]');
+  var backendHidden = form.querySelector('[data-ob-backend-input]');
+  var keyringFields = form.querySelectorAll('[data-ob-keyring-field]');
+  var vaultOnlyHints = form.querySelectorAll('[data-ob-vault-field]');
+  var clientSecret = form.querySelector('#platform_client_secret');
+
+  function applyBackendChoice() {
+    var useVault = !!(useVaultCheckbox && useVaultCheckbox.checked);
+    if (vaultFields) vaultFields.hidden = !useVault;
+    if (backendHidden) backendHidden.value = useVault ? 'vault' : 'keyring';
+    keyringFields.forEach(function (el) { el.hidden = useVault; });
+    vaultOnlyHints.forEach(function (el) { el.hidden = !useVault; });
+    if (clientSecret) {
+      clientSecret.required = !useVault;
+      if (useVault) clientSecret.value = '';
+    }
+    applyVaultAuth();
+  }
+
+  var authSelect = form.querySelector('[data-ob-vault-auth]');
+  var authFields = form.querySelectorAll('[data-ob-vault-auth-field]');
+  function applyVaultAuth() {
+    if (!authSelect) return;
+    var method = authSelect.value || 'token';
+    authFields.forEach(function (el) {
+      var allowed = (el.getAttribute('data-ob-vault-auth-field') || '').split(/[,\s]+/).filter(Boolean);
+      el.hidden = allowed.indexOf(method) === -1;
+    });
+  }
+  if (useVaultCheckbox) useVaultCheckbox.addEventListener('change', applyBackendChoice);
+  if (authSelect) authSelect.addEventListener('change', applyVaultAuth);
+
+  // ───────── Vault test (AJAX) ─────────
+  var testBtn = form.querySelector('[data-ob-vault-test]');
+  var resultBox = document.getElementById('ob-vault-result');
+  var TEST_BTN_LABEL = 'Test connection & verify keys';
+
+  function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function badgeFor(item) {
+    if (item.exists)  return '<span class="badge badge--ok">present</span>';
+    if (item.required) return '<span class="badge badge--missing">missing</span>';
+    return '<span class="badge badge--optional">optional</span>';
+  }
+  function buildVaultCmd(result) {
+    if (!result.keys || !result.keys.length) return '';
+    var pairs = result.keys.map(function (k) {
+      var placeholder = k.required ? '<' + k.key + '>' : '<' + k.key + '-optional>';
+      return '  ' + k.key + '=' + placeholder;
+    }).join(' \\\n');
+    return 'vault kv put ' + result.mount + '/' + result.path + ' \\\n' + pairs;
+  }
+  function renderVaultResult(result) {
+    if (!resultBox) return;
+    resultBox.hidden = false;
+    resultBox.classList.remove('is-ok', 'is-fail');
+    var title = resultBox.querySelector('[data-ob-vault-result-title]');
+    var msg = resultBox.querySelector('[data-ob-vault-result-message]');
+    var keys = resultBox.querySelector('[data-ob-vault-result-keys]');
+    var cmd = resultBox.querySelector('[data-ob-vault-cmd]');
+    if (result.ok && (!result.missing_required || !result.missing_required.length)) {
+      resultBox.classList.add('is-ok');
+      title.textContent = 'Vault — connected, all secrets present';
+    } else if (result.ok) {
+      resultBox.classList.add('is-fail');
+      title.textContent = 'Vault — missing required secrets';
+    } else {
+      resultBox.classList.add('is-fail');
+      title.textContent = 'Vault — connection failed';
+    }
+    var line = result.message || '';
+    if (result.ok && result.token_ttl > 0) {
+      var mins = Math.floor(result.token_ttl / 60);
+      var secs = result.token_ttl % 60;
+      line += '\nToken TTL: ' + mins + 'm ' + secs + 's' + (result.token_renewable ? ' · renewable' : ' · not renewable') + '.';
+    }
+    msg.textContent = line;
+    keys.innerHTML = '';
+    (result.keys || []).forEach(function (item) {
+      var li = document.createElement('li');
+      li.innerHTML = '<span>' + escapeHtml(item.key) +
+        ' <span style="color: var(--text-3);">— ' + escapeHtml(item.label) + '</span></span>' + badgeFor(item);
+      keys.appendChild(li);
+    });
+    if (result.ok && result.missing_required && result.missing_required.length) {
+      cmd.hidden = false;
+      cmd.textContent = buildVaultCmd(result);
+    } else {
+      cmd.hidden = true;
+      cmd.textContent = '';
+    }
+  }
+
+  function csrfToken() {
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    return meta ? meta.content : '';
+  }
+
+  if (testBtn) {
+    testBtn.addEventListener('click', function () {
+      var url = (form.querySelector('#vault_url') || {}).value || '';
+      if (!url) {
+        renderVaultResult({ ok: false, message: 'Enter a Vault URL above first.', keys: [], missing_required: [] });
+        return;
+      }
+      testBtn.disabled = true;
+      testBtn.textContent = 'Testing…';
+      var payload = {
+        url: url,
+        auth_method: (authSelect && authSelect.value) || 'token',
+        token: (form.querySelector('#vault_token') || {}).value || '',
+        role_id: (form.querySelector('#vault_role_id') || {}).value || '',
+        secret_id: (form.querySelector('#vault_secret_id') || {}).value || '',
+        wrapping_token: (form.querySelector('#vault_wrapping_token') || {}).value || '',
+        token_file_path: (form.querySelector('#vault_token_file_path') || {}).value || '',
+        mount_point: (form.querySelector('#vault_mount_point') || {}).value || 'secret',
+        secret_path: (form.querySelector('#vault_secret_path') || {}).value || 'platform-atlas',
+        namespace: (form.querySelector('#vault_namespace') || {}).value || '',
+        verify_ssl: (form.querySelector('#vault_verify_ssl') || {}).checked ? '1' : '',
+        tier: (form.querySelector('[data-ob-tier]:checked') || {}).value || 'standard',
+        env_name: (form.querySelector('#env_name') || {}).value || '',
+        gateway4_uri: (form.querySelector('#gateway4_uri') || {}).value || '',
+        iag5_uri: '',
+      };
+      var body = new URLSearchParams();
+      Object.keys(payload).forEach(function (k) { body.append(k, payload[k]); });
+      fetch('/setup/check-vault', {
+        method: 'POST',
+        body: body,
+        headers: { 'X-CSRF-Token': csrfToken() },
+      })
+      .then(function (r) { return r.json(); })
+      .then(renderVaultResult)
+      .catch(function (err) {
+        renderVaultResult({ ok: false, message: String(err), keys: [], missing_required: [] });
+      })
+      .finally(function () {
+        testBtn.textContent = TEST_BTN_LABEL;
+        testBtn.disabled = false;
+      });
+    });
+  }
+
+  // ───────── On-load init ─────────
+  applyChosenTheme();
+  applyChosenMode();
+  applyBackendChoice();
+  refreshPillVisibilityAndNumbers();
+  applyStep(1, /* animate */ false);
+  // The mode-pill indicator is measured the moment step 2 first becomes
+  // visible (handled inside applyStep). Measuring at init would return
+  // zero-rects because step 2 is hidden, leaving the indicator stuck at
+  // width:0 — exactly the bug we're fixing here.
+})();
+</script>
+</body>
+</html>

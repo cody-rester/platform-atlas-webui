@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}Job {{ job.id }} — Platform Atlas{% endblock %}
+{% block crumb %}<a href="/jobs" class="text-inherit hover:text-accent">Jobs</a> <span class="sep">›</span> {{ job.id }}{% endblock %}
+{% block content %}
+
+<header class="flex items-end justify-between gap-6 pb-5 border-b border-line mb-6">
+  <div>
+    <div class="eyebrow"><span class="dot"></span> {{ job.name }}</div>
+    <h1 class="text-[36px] leading-[1.05] font-semibold tracking-[-0.038em] mt-2 mb-1.5">
+      Job <em class="not-italic font-mono text-[18px] text-text-3">{{ job.id }}</em>
+    </h1>
+    <p class="text-[14px] text-text-2 max-w-[64ch]">
+      <span id="job-status" class="job-status job-status--{{ job.status }}">{{ job.status }}</span>
+      <span class="text-text-3 ml-2">started {{ job.started_at or 'pending' }}</span>
+      {% if job.finished_at %}<span class="text-text-3"> · finished {{ job.finished_at }}</span>{% endif %}
+    </p>
+  </div>
+  <div class="flex items-center gap-2">
+    <a class="btn" href="/jobs">Back to jobs</a>
+    {% if job.metadata.get('return_url') %}
+      <a class="btn primary" id="job-return" href="{{ job.metadata.return_url }}">Continue</a>
+    {% endif %}
+  </div>
+</header>
+
+{# Force-stop button — only shown for running jobs, appears after 60s #}
+{% if job.status == 'running' %}
+<div id="kill-bar" hidden class="mb-4 px-4 py-3 rounded-lg flex items-center gap-3"
+     style="background:oklch(72% .16 25/.08); border:1px solid oklch(72% .16 25/.3);">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-warn shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+  <span class="text-[13px] text-text-2 flex-1">This job has been running for over 60 seconds. If it appears stuck, you can force-stop it.</span>
+  <button type="button" class="btn sm danger" id="kill-btn">Force stop</button>
+</div>
+{% endif %}
+
+{% set _is_pipeline  = job.name and job.name.startswith('full pipeline:') %}
+{% set _is_preflight = job.name == 'preflight' %}
+{% set _session_name = job.metadata.get('session_name', '') %}
+
+{% if _is_pipeline %}
+{# Pipeline-only: dedicated card holds progress bar at the top and the
+   post-success mini-report below, with the verbose live output collapsed
+   underneath so the score has room to breathe. JS reveals the mini-report
+   only after every stage actually succeeds. #}
+<section class="card" id="pipeline-shell">
+  <div class="card-head">
+    <h3>Pipeline</h3>
+    <span class="sub">capture → validate → report</span>
+  </div>
+  <div class="card-body" style="padding: 0;">
+    {# Progress bar — JS advances per stage, marks pass/fail per stop. #}
+    <div class="pipeline-progress" id="pipeline-progress" style="--pp-pct: 0%;">
+      <div class="pp-head">
+        <span class="pp-title">Pipeline progress</span>
+        <span class="pp-status" id="pp-status">Waiting to start&hellip;</span>
+      </div>
+      <div class="pp-track">
+        <div class="pp-fill" id="pp-fill"></div>
+        <span class="pp-stop" id="pp-stop-1" style="left: 33.333%">
+          <span class="pp-dot"></span>
+          <span class="pp-label">Capture</span>
+        </span>
+        <span class="pp-stop" id="pp-stop-2" style="left: 66.666%">
+          <span class="pp-dot"></span>
+          <span class="pp-label">Validate</span>
+        </span>
+        <span class="pp-stop" id="pp-stop-3" style="left: 100%">
+          <span class="pp-dot"></span>
+          <span class="pp-label">Report</span>
+        </span>
+      </div>
+    </div>
+
+    {# Mini-report — short teaser. The big score circle, percentage, and
+       findings pills were intentionally removed: this surface is meant
+       to be a brief acknowledgement that the run finished, with the full
+       breakdown one click away via "Open full report".
+
+       Hidden until JS has confirmed all three stages emitted a "complete"
+       event AND the job's terminal status is "succeeded". #}
+    <section class="pipeline-mini-report pipeline-mini-report--compact" id="mini-report" hidden
+             data-session-name="{{ _session_name }}">
+      <div class="pmr-eyebrow" id="mr-eyebrow">PASSED</div>
+      <h2 class="pmr-title" id="mr-title">Compliance audit complete</h2>
+      <div class="pmr-sub" id="mr-sub">—</div>
+      <div class="pmr-counts">
+        <span><b style="color:var(--ok)" id="mr-pass">0</b> compliant</span>
+        <span><b style="color:var(--bad)" id="mr-fail">0</b> non-compliant</span>
+        <span><b id="mr-skip">0</b> skip</span>
+      </div>
+      <div class="pmr-actions">
+        <a class="btn primary" id="mr-continue" href="#">Continue →</a>
+        <a class="btn" id="mr-open-report" href="#" target="_blank" rel="noopener">Open full report ↗</a>
+      </div>
+    </section>
+
+    {# Verbose log section — collapsed by default. The user can expand if
+       they want to see the SSE stream or the raw debug log. #}
+    <button type="button" class="pipeline-logs-toggle" id="logs-toggle"
+            aria-expanded="false" aria-controls="logs-body">
+      <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 12 15 18 9"/>
+      </svg>
+      <span class="label">Show live output &amp; debug log</span>
+      <span class="hint">SSE stream · human or raw view</span>
+    </button>
+    <div class="pipeline-logs-body" id="logs-body" hidden>
+      <div class="stream-mode" id="stream-mode" data-mode="human">
+        <span class="stream-mode-label">Output mode</span>
+        <div class="stream-mode-pills" role="tablist" aria-label="Output verbosity">
+          <button type="button" class="stream-mode-pill is-active"
+                  data-mode="human" role="tab" aria-selected="true">
+            Human-friendly
+          </button>
+          <button type="button" class="stream-mode-pill"
+                  data-mode="raw" role="tab" aria-selected="false">
+            Raw progress logs
+          </button>
+        </div>
+        <span class="stream-mode-hint" id="stream-mode-hint">curated narrative only</span>
+      </div>
+      <div class="job-stream mode-human" id="job-stream"
+           data-job-id="{{ job.id }}"
+           data-job-kind="pipeline"
+           data-session-name="{{ _session_name }}"
+           data-return-url="{{ job.metadata.get('return_url', '') }}"
+           data-started-at="{{ job.started_at_epoch }}"></div>
+    </div>
+  </div>
+</section>
+{% else %}
+<section class="card"{% if _is_preflight %} data-pf-logs="hidden"{% endif %}>
+  <div class="card-head">
+    <h3>{% if _is_preflight %}Preflight{% else %}Live output{% endif %}</h3>
+    <span class="sub">{% if _is_preflight %}connectivity checks{% else %}SSE stream{% endif %}</span>
+  </div>
+  <div class="card-body" style="padding: 0;">
+    {% if _is_preflight %}
+    {# Default-on view for preflight: completed checks accumulate in pf-list,
+       a marching-ants row at the bottom shows what's currently being probed.
+       The verbose event stream below is hidden until the user clicks
+       "Show full output logs". #}
+    <div class="preflight-checks">
+      <h4>Preflight checks</h4>
+      <div id="pf-list"></div>
+      <div class="pf-current" id="pf-current" hidden>
+        <span class="pf-current-label">Checking</span>
+        <span id="pf-current-text">Standing by&hellip;</span>
+      </div>
+      <button type="button" class="pf-toggle-logs" id="pf-toggle-logs"
+              aria-expanded="false">Show full output logs &darr;</button>
+    </div>
+    {% endif %}
+    {# Output mode toggle (preflight + generic jobs). Human (default) shows
+       the curated job narrative; Raw additionally surfaces every
+       platform_atlas log record emitted during the run. State is persisted
+       per-browser in localStorage so reloading mid-stream keeps the choice. #}
+    <div class="stream-mode" id="stream-mode" data-mode="human">
+      <span class="stream-mode-label">Output mode</span>
+      <div class="stream-mode-pills" role="tablist" aria-label="Output verbosity">
+        <button type="button" class="stream-mode-pill is-active"
+                data-mode="human" role="tab" aria-selected="true">
+          Human-friendly
+        </button>
+        <button type="button" class="stream-mode-pill"
+                data-mode="raw" role="tab" aria-selected="false">
+          Raw progress logs
+        </button>
+      </div>
+      <span class="stream-mode-hint" id="stream-mode-hint">curated narrative only</span>
+    </div>
+    <div class="job-stream mode-human" id="job-stream"
+         data-job-id="{{ job.id }}"
+         data-job-kind="generic"
+         data-started-at="{{ job.started_at_epoch }}"></div>
+  </div>
+</section>
+{% endif %}
+
+<script src="{{ url_for('static', path='js/anime.min.js') }}?v={{ asset_version }}" defer></script>
+<script src="{{ url_for('static', path='js/job-stream.js') }}?v={{ asset_version }}" defer></script>
+
+{% endblock %}

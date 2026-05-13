@@ -1,0 +1,27 @@
+{# ── Shared doctor-row partial ────────────────────────────────────
+   Rendered both inline by /config/doctor (for the static rows) and
+   returned by /config/doctor/probe/{kind} (for htmx swap-in).
+   Each completed probe row carries `data-doctor-status` so the page's
+   client-side listener can update the pending counter on swap.
+   ─────────────────────────────────────────────────────────────── #}
+{% set _chip_class = {"ok": "ok", "warn": "warn", "fail": "bad"} %}
+{% set _badge_glyph = {"ok": "✓", "warn": "⚠", "fail": "✘"} %}
+<div class="flex items-start gap-3 px-4 py-3 text-[13px] border-b border-line last:border-b-0
+            {% if row.status == 'fail' %}bg-[oklch(72%_.16_25/.04)]
+            {% elif row.status == 'warn' %}bg-[oklch(82%_.13_75/.04)]
+            {% endif %}"
+     data-doctor-status="{{ row.status }}">
+  <span class="chip {{ _chip_class[row.status] }} shrink-0 mt-[1px]">
+    <span class="dot"></span>
+    {{ _badge_glyph[row.status] }}
+  </span>
+  <div class="min-w-0 flex-1">
+    <div class="font-medium text-text">{{ row.label }}</div>
+    <div class="text-text-3 mt-[2px] break-words font-mono text-[12px]">{{ row.detail }}</div>
+    {% if row.status != 'ok' and row.suggestion %}
+      <div class="text-text-2 mt-1.5 text-[12.5px]">
+        <span class="text-accent">→</span> {{ row.suggestion }}
+      </div>
+    {% endif %}
+  </div>
+</div>

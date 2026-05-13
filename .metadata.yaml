@@ -1,0 +1,13 @@
+name: platform-atlas-webui
+type: platform-app
+active: false
+status: community
+compatibility:
+  - platform
+description: A web UI for managing Itential Platform Atlas
+tags:
+  - app
+maintainer:
+  - Cody Rester < @cody-rester
+repo: https://github.com/itential/platform-atlas-webui
+docs: https://github.com/itential/platform-atlas-webui/blob/main/README.md

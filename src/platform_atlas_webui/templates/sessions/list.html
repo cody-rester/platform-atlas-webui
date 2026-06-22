@@ -165,6 +165,8 @@
             {% if s.is_active %}<span class="chip ok text-[10px] px-1.5 py-px"><span class="dot"></span>Active</span>{% endif %}
             {% if s.tier == 'standard' %}
               <span class="chip text-[10px] px-1.5 py-px" style="color:oklch(60% 0.18 220); border-color:oklch(60% 0.18 220/.3); background:oklch(60% 0.18 220/.07);">Standard</span>
+            {% elif s.tier == 'saas' %}
+              <span class="chip text-[10px] px-1.5 py-px" style="color:oklch(55% 0.2 340); border-color:oklch(55% 0.2 340/.3); background:oklch(55% 0.2 340/.07);">SaaS</span>
             {% else %}
               <span class="chip text-[10px] px-1.5 py-px" style="color:oklch(70% 0.18 30); border-color:oklch(70% 0.18 30/.3); background:oklch(70% 0.18 30/.07);">Extended</span>
             {% endif %}

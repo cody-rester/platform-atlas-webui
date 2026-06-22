@@ -513,8 +513,8 @@
 
   function pp2RenderCapture() {
     if (!pp2ActivityEl) return;
-    var tierLabel = pp2Tier === 'standard' ? 'Standard' : pp2Tier === 'extended' ? 'Extended' : '';
-    var tierCls   = pp2Tier === 'standard' ? 'pp2-tier-std' : 'pp2-tier-ext';
+    var tierLabel = pp2Tier === 'standard' ? 'Standard' : pp2Tier === 'saas' ? 'SaaS' : pp2Tier === 'extended' ? 'Extended' : '';
+    var tierCls   = pp2Tier === 'standard' ? 'pp2-tier-std' : pp2Tier === 'saas' ? 'pp2-tier-std' : 'pp2-tier-ext';
     var tierHtml  = tierLabel
       ? '<span class="pp2-tier-badge ' + tierCls + '">'
         + tierLabel + (pp2TierDetail ? ' · ' + pp2TierDetail : '') + '</span>'
@@ -642,7 +642,7 @@
     if (pp2CurrentStage === 1) {
       // Tier detection — also extract rule count for the badge
       if (!pp2Tier) {
-        var tmM = msg.match(/Tier:\s+(Standard|Extended)/i);
+        var tmM = msg.match(/Tier:\s+(Standard|SaaS|Extended)/i);
         if (tmM) {
           pp2Tier = tmM[1].toLowerCase();
           var rmM = msg.match(/(\d+)\s+rules?/i);

@@ -7,12 +7,19 @@
   <div>
     <div class="eyebrow"><span class="dot"></span> Connectivity check</div>
     <h1 class="text-[36px] leading-[1.05] font-semibold tracking-[-0.038em] mt-2 mb-1.5">
-      Preflight, <em class="not-italic text-text-3">before you capture</em>
+      Preflight, <em class="not-italic text-accent">before you capture</em>
     </h1>
+    {% if is_saas %}
+    <p class="text-[14px] text-text-2 max-w-[64ch]">
+      Verifies SSH and gateway connectivity to the gateway in the active SaaS
+      environment — no Platform, MongoDB, or Redis checks.
+    </p>
+    {% else %}
     <p class="text-[14px] text-text-2 max-w-[64ch]">
       Verifies SSH, MongoDB, Redis, Platform OAuth, and gateway connectivity to every
       target in the active environment. <b>Standard mode</b> skips SSH/Mongo/Redis automatically.
     </p>
+    {% endif %}
   </div>
   <div class="flex items-center gap-2">
     <a class="btn" href="/jobs">Recent jobs</a>

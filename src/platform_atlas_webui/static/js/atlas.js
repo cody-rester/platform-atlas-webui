@@ -121,6 +121,36 @@
     });
   }
 
+  // ── Settings: Display-scale slider (WebUI zoom) ────────────────
+  // Live-preview while dragging (no network); persist once on release.
+  // The value drives --ui-scale on <html>, which body{zoom:var(--ui-scale)}
+  // reads — so the whole UI scales instantly.
+  function bindScaleSlider() {
+    document.querySelectorAll('[data-atlas-scale]').forEach(function (control) {
+      var input = control.querySelector('[data-atlas-scale-input]');
+      if (!input) return;
+      var readout = control.querySelector('[data-atlas-scale-readout]');
+      var reset = control.querySelector('[data-atlas-scale-reset]');
+      function paint(val) {
+        root.style.setProperty('--ui-scale', String(val));
+        if (readout) readout.textContent = Math.round(val * 100) + '%';
+      }
+      input.addEventListener('input', function () { paint(parseFloat(input.value)); });
+      input.addEventListener('change', function () {
+        var val = parseFloat(input.value);
+        paint(val);
+        postForm(APPEARANCE_API, { ui_scale: val });
+      });
+      if (reset) {
+        reset.addEventListener('click', function () {
+          input.value = '1';
+          paint(1);
+          postForm(APPEARANCE_API, { ui_scale: 1 });
+        });
+      }
+    });
+  }
+
   // ── Sidebar Upgrade-to-Extended panel dismiss ──────────────────
   function bindUpgradeDismiss() {
     document.querySelectorAll('[data-atlas-upgrade-dismiss]').forEach(function (btn) {
@@ -285,6 +315,7 @@
     bindModeToggles();
     bindThemeSegment();
     bindModeSegment();
+    bindScaleSlider();
     bindUpgradeDismiss();
     bindRuleToggles();
     bindFormFeedback();

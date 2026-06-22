@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import asyncio
 
-from fastapi import APIRouter, Form, HTTPException, Request
+from fastapi import APIRouter, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from platform_atlas.core._version import __version__ as ATLAS_VERSION
 from platform_atlas.core.context import ctx
+from platform_atlas.core.credentials import CredentialKey, applicable_keys
 from platform_atlas.core.handlers.config import (
     DoctorRow,
     collect_doctor_rows,
@@ -24,7 +25,7 @@ _templates = get_templates()
 
 
 @router.get("", response_class=HTMLResponse)
-async def view_config(request: Request) -> HTMLResponse:
+async def view_config(request: Request, saved: int = Query(0)) -> HTMLResponse:
     cfg = config_svc.read_config()
     return _templates.TemplateResponse(
         request,
@@ -33,6 +34,10 @@ async def view_config(request: Request) -> HTMLResponse:
             request,
             atlas_version=ATLAS_VERSION,
             cfg=cfg,
+            active_env=_active_env_summary(),
+            # Post-save redirect lands on /config?saved=1 — base.html renders
+            # this as a toast so the user gets explicit "it saved" feedback.
+            flash={"kind": "success", "message": "Settings saved."} if saved else None,
         ),
     )
 
@@ -45,6 +50,73 @@ def _row_to_dict(row: "DoctorRow | tuple[str, str, str, str]") -> dict[str, str]
     return {"label": label, "status": status, "detail": detail, "suggestion": suggestion}
 
 
+def _webui_doctor_row(row: "DoctorRow | tuple[str, str, str, str]") -> dict[str, str]:
+    """``_row_to_dict`` plus WebUI-only presentation tweaks (the shared CLI
+    ``collect_doctor_rows`` is left unchanged):
+
+    1. A deliberately-chosen **encrypted local file** backend is a valid choice,
+       not a problem — don't surface the user's own selection as a yellow
+       warning. An *unreadable* file still fails, and a genuinely insecure or
+       broken OS keyring still warns/fails; only the "your selected backend"
+       file row is softened to ``ok``.
+    2. WebUI users shouldn't be told to run a CLI command — when a suggestion
+       points at ``config credentials``, render it as a link to the in-app
+       Credentials page instead (handled in ``_doctor_row.html``).
+    """
+    d = _row_to_dict(row)
+    if (d["label"] == "Credential backend" and d["status"] == "warn"
+            and "Encrypted local file" in d["detail"]):
+        d["status"] = "ok"
+        d["suggestion"] = ""
+    if d.get("suggestion") and "config credentials" in d["suggestion"]:
+        d["suggestion"] = "Set it on the Credentials page."
+        d["cred_link"] = "/config/credentials"
+    return d
+
+
+def _active_env_summary() -> "dict | None":
+    """Resolved tier + credential store for the ACTIVE environment — read-only
+    context for the Settings page's active-environment panel.
+
+    Each environment owns its own tier, credentials, and credential store, so
+    this makes explicit that the values in effect belong to the active
+    environment, not the workspace. Returns ``None`` when no env is active.
+    """
+    import json
+    import os
+    from platform_atlas.core.paths import ATLAS_CONFIG_FILE, ATLAS_ENVIRONMENTS_DIR
+
+    try:
+        raw = json.loads(ATLAS_CONFIG_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    env_name = raw.get("active_environment") or ""
+    if not env_name:
+        return None
+    tier = raw.get("tier") or "standard"
+    backend = raw.get("credential_backend") or "keyring"
+    try:
+        env_file = ATLAS_ENVIRONMENTS_DIR / f"{env_name}.json"
+        if env_file.is_file():
+            env_data = json.loads(env_file.read_text(encoding="utf-8"))
+            if env_data.get("tier"):
+                tier = env_data["tier"]
+            if env_data.get("credential_backend"):
+                backend = env_data["credential_backend"]
+    except Exception:
+        pass
+    env_tier = os.environ.get("ATLAS_TIER")
+    if env_tier and env_tier.strip().lower() in ("standard", "extended", "saas"):
+        tier = env_tier.strip().lower()
+    labels = {"keyring": "OS keyring", "file": "Encrypted local file", "vault": "HashiCorp Vault"}
+    return {
+        "name": env_name,
+        "tier": tier,
+        "backend": backend,
+        "backend_label": labels.get(backend, backend),
+    }
+
+
 @router.get("/doctor", response_class=HTMLResponse)
 async def view_doctor(request: Request) -> HTMLResponse:
     """Render the config-doctor health check page.
@@ -55,21 +127,35 @@ async def view_doctor(request: Request) -> HTMLResponse:
     htmx-streamed in via ``/config/doctor/probe/{kind}`` so the page
     paints in ~10 ms instead of blocking on TCP timeouts.
     """
-    rows, env_name, tier = await asyncio.to_thread(
+    raw_rows, env_name, tier = await asyncio.to_thread(
         collect_doctor_rows, skip_url_probes=True,
     )
 
+    # Apply the WebUI presentation tweaks BEFORE tallying, so the summary tiles
+    # and the overall verdict reflect what's actually shown in the table. A
+    # deliberately-chosen encrypted-file backend is softened warn→ok by
+    # _webui_doctor_row; counting the raw rows would claim a "warning" that no
+    # row in the table actually displays.
+    rows = [_webui_doctor_row(r) for r in raw_rows]
+
     counts = {"ok": 0, "warn": 0, "fail": 0}
     for row in rows:
-        counts[row.status] = counts.get(row.status, 0) + 1
+        counts[row["status"]] = counts.get(row["status"], 0) + 1
 
     # Decide which URL probes are even applicable for the current config.
     # An unset Gateway4 URI is intentional (it's optional), so we don't add
     # a placeholder for it — matches CLI behaviour (no row when unset).
+    #
+    # The Platform URL probe only applies to platform-anchored tiers
+    # (standard/extended). SaaS audits a single gateway with no Platform, so it
+    # is skipped entirely — same tier gating as collect_doctor_rows() and the
+    # CLI doctor, keeping all three surfaces in lockstep.
+    platform_used = CredentialKey.PLATFORM_SECRET in applicable_keys(tier)
     pending_probes: list[dict[str, str]] = []
     try:
         cfg = ctx().config
-        pending_probes.append({"kind": "platform", "label": "Platform URL"})
+        if platform_used:
+            pending_probes.append({"kind": "platform", "label": "Platform URL"})
         if cfg.gateway4_uri:
             pending_probes.append({"kind": "gateway4", "label": "Gateway4 URL"})
     except Exception:
@@ -89,7 +175,7 @@ async def view_doctor(request: Request) -> HTMLResponse:
         template_context(
             request,
             atlas_version=ATLAS_VERSION,
-            rows=[_row_to_dict(r) for r in rows],
+            rows=rows,
             counts=counts,
             overall=overall,
             doctor_env_name=env_name,
@@ -124,8 +210,14 @@ async def view_doctor_probe(request: Request, kind: str) -> HTMLResponse:
         return _templates.TemplateResponse(
             request,
             "config/_doctor_row.html",
-            template_context(request, row=_row_to_dict(row)),
+            template_context(request, row=_webui_doctor_row(row)),
         )
+
+    # Defense-in-depth: the Platform probe placeholder isn't rendered for tiers
+    # that don't use Platform (SaaS), but guard the endpoint too so a direct hit
+    # can't resurrect the false "no platform_uri" row.
+    if kind == "platform" and CredentialKey.PLATFORM_SECRET not in applicable_keys(cfg.tier):
+        raise HTTPException(status_code=404, detail="Platform is not used in this tier")
 
     probe_fn = probe_platform_url if kind == "platform" else probe_gateway4_url
     result = await asyncio.to_thread(probe_fn, cfg)
@@ -137,7 +229,7 @@ async def view_doctor_probe(request: Request, kind: str) -> HTMLResponse:
     return _templates.TemplateResponse(
         request,
         "config/_doctor_row.html",
-        template_context(request, row=_row_to_dict(result), oob_decrement=True),
+        template_context(request, row=_webui_doctor_row(result), oob_decrement=True),
     )
 
 
@@ -159,7 +251,7 @@ async def save_config(
     # are environment-scoped and intentionally not exposed on this page —
     # users edit them on /environments/<name>. Anything received here is
     # ignored to prevent the form from clobbering env-overlay values.
-    config_svc.update_config({
+    updates = {
         "organization_name": organization_name,
         "credential_backend": credential_backend,
         "verify_ssl": verify_ssl,
@@ -167,12 +259,30 @@ async def save_config(
         "theme": theme,
         "extended_validation_checks": extended_validation_checks,
         "debug": debug,
-        "tier": tier,
         "manual_input_mode": manual_input_mode,
         "webui_palette_enabled": webui_palette_enabled,
-    })
+    }
+    # Only a known tier value is written — a missing/garbled field must not
+    # rewrite the global default (the select includes SaaS now, but a stale
+    # or crafted form could still post anything).
+    posted_tier = (tier or "").strip().lower()
+    if posted_tier in ("standard", "extended", "saas"):
+        updates["tier"] = posted_tier
+    config_svc.update_config(updates)
     # Env-overlay tier wins over root in load_config(), so writing tier here
     # without mirroring would let an active overlay silently undo the change.
-    if tier in ("standard", "extended"):
-        config_svc.mirror_tier_to_active_overlay(tier)
-    return RedirectResponse(url="/config", status_code=303)
+    # SaaS is the exception: as a default it applies to FUTURE environments
+    # only — the active env keeps its own tier (and the helper refuses to
+    # rewrite a SaaS env anyway).
+    if posted_tier in ("standard", "extended"):
+        config_svc.mirror_tier_to_active_overlay(posted_tier)
+    # Reload the in-memory context (same as /tier/set) so edited fields —
+    # debug logging in particular — take effect for the next capture or
+    # validation job without a server restart. Best-effort: the disk write
+    # already succeeded.
+    try:
+        from platform_atlas.core.context import init_context
+        init_context()
+    except Exception:
+        pass
+    return RedirectResponse(url="/config?saved=1", status_code=303)

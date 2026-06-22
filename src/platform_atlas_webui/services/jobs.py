@@ -223,6 +223,7 @@ class JobRegistry:
         name: str,
         fn: Callable[..., Any],
         *,
+        timeout: float | None = None,
         metadata: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> JobRecord:
@@ -230,7 +231,9 @@ class JobRegistry:
 
         ``fn`` is invoked as ``fn(job_logger, **kwargs)``. Its return
         value is stored in ``record.result``. Any exception is caught
-        and surfaces as ``status=FAILED``.
+        and surfaces as ``status=FAILED``. When ``timeout`` (seconds) is
+        given, the job is failed if it runs longer — a backstop so a hung
+        network call can't wedge the job (and the worker pool) indefinitely.
         """
         job_id = uuid.uuid4().hex[:12]
         record = JobRecord(id=job_id, name=name, metadata=metadata or {})
@@ -260,10 +263,19 @@ class JobRegistry:
 
             jlogger.info(f"Job '{name}' started", data={"job_id": job_id})
             try:
-                result = await asyncio.to_thread(fn, jlogger, **kwargs)
+                if timeout is not None:
+                    result = await asyncio.wait_for(
+                        asyncio.to_thread(fn, jlogger, **kwargs), timeout
+                    )
+                else:
+                    result = await asyncio.to_thread(fn, jlogger, **kwargs)
                 record.result = result
                 record.status = JobStatus.SUCCEEDED
                 jlogger.success("Job completed successfully")
+            except asyncio.TimeoutError:
+                record.status = JobStatus.FAILED
+                record.error = f"Job timed out after {int(timeout)}s"
+                jlogger.error(record.error)
             except JobCancelled:
                 record.status = JobStatus.FAILED
                 record.error = "Cancelled by user"

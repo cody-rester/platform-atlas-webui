@@ -4,7 +4,7 @@ Alerts routes — drift event timeline + ack actions.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, RedirectResponse
 
@@ -12,9 +12,21 @@ from platform_atlas.core._version import __version__ as ATLAS_VERSION
 from platform_atlas.continuous import alerts as alerts_mod, storage
 from platform_atlas.continuous.models import AlertStatus
 
-from platform_atlas_webui.dependencies import get_atlas_context, get_templates, template_context
+from platform_atlas_webui.dependencies import (
+    forbid_saas_feature,
+    get_atlas_context,
+    get_templates,
+    template_context,
+)
 
-router = APIRouter(prefix="/alerts", tags=["alerts"])
+# Alerts are produced by continuous-audit drift runs — part of a feature that
+# has no role in a single-gateway SaaS audit. Refuse for SaaS; Standard and
+# Extended are unaffected.
+router = APIRouter(
+    prefix="/alerts",
+    tags=["alerts"],
+    dependencies=[Depends(forbid_saas_feature("Alerts"))],
+)
 _templates = get_templates()
 
 

@@ -180,22 +180,79 @@
             </div>
           </div>
           {% endif %}
+          {# Architecture-form nudge — the report's Architecture Overview is only
+             as rich as this environment's architecture answers, so gently
+             surface how much is filled in before capture. Fully optional and
+             non-blocking. Per-environment, so the link is scoped to this
+             session's bound environment. #}
+          {% if arch_summary and not session.capture_completed and not _locked %}
+          {% set _arch_href = ('/architecture?env=' + (session.environment | urlencode)) if session.environment else '/architecture' %}
+          {% set _arch_done = arch_summary.state == 'complete' %}
+          <div class="flex items-start gap-2.5 px-3 py-2.5 mb-3 rounded-md text-[12px] {% if _arch_done %}border{% else %}bg-surface-2 border border-line{% endif %}"
+               {% if _arch_done %}style="background:var(--ok-soft);border-color:var(--ok);"{% endif %}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                 class="shrink-0 mt-0.5 {% if _arch_done %}text-ok{% else %}text-text-3{% endif %}">
+              <rect x="3" y="3" width="7" height="5" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/>
+              <rect x="3" y="13" width="7" height="8" rx="1"/><rect x="14" y="13" width="7" height="8" rx="1"/>
+            </svg>
+            <div class="flex-1 min-w-0">
+              {% if _arch_done %}
+              <div class="font-semibold text-ok mb-0.5">Architecture details complete</div>
+              <div class="text-text-2">
+                Your report will include a full Architecture Overview for this environment.
+                <a href="{{ _arch_href }}" class="text-accent hover:text-accent-hover font-semibold" style="text-decoration:underline;text-underline-offset:2px;">Review →</a>
+              </div>
+              {% elif arch_summary.state == 'skipped' %}
+              <div class="font-semibold text-text mb-0.5">Architecture form skipped</div>
+              <div class="text-text-2">
+                Your report's Architecture Overview will be limited for this environment — adding details is optional but recommended.
+                <a href="{{ _arch_href }}" class="text-accent hover:text-accent-hover font-semibold" style="text-decoration:underline;text-underline-offset:2px;">Fill it out →</a>
+              </div>
+              {% elif arch_summary.state == 'in_progress' %}
+              <div class="font-semibold text-text mb-0.5">Architecture form in progress</div>
+              <div class="text-text-2">
+                The more you add, the richer your report's Architecture Overview.
+                <a href="{{ _arch_href }}" class="text-accent hover:text-accent-hover font-semibold" style="text-decoration:underline;text-underline-offset:2px;">Continue →</a>
+              </div>
+              {% else %}
+              <div class="font-semibold text-text mb-0.5">Architecture details not added yet</div>
+              <div class="text-text-2">
+                Filling out the Architecture form gives your report a fuller Architecture Overview — optional, but it makes the delivered report far more useful.
+                <a href="{{ _arch_href }}" class="text-accent hover:text-accent-hover font-semibold" style="text-decoration:underline;text-underline-offset:2px;">Open the Architecture form →</a>
+              </div>
+              {% endif %}
+              {# Progress bar — mirrors the Architecture form's own "X / Y fields"
+                 indicator. Shown for in-progress and complete; green when
+                 complete, accent while in progress. #}
+              {% if arch_summary.has_total and arch_summary.state in ['in_progress', 'complete'] %}
+              <div class="flex items-center gap-2 mt-2">
+                <div style="flex:1;height:6px;background:var(--surface-3);border-radius:999px;overflow:hidden;">
+                  <div style="height:100%;width:{{ arch_summary.pct }}%;background:{% if _arch_done %}var(--ok){% else %}var(--accent){% endif %};border-radius:999px;"></div>
+                </div>
+                <span class="shrink-0 font-mono text-[11px] {% if _arch_done %}text-ok{% else %}text-text-3{% endif %}">{{ arch_summary.filled }} / {{ arch_summary.total }}</span>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+          {% endif %}
           <form action="/sessions/{{ session.name }}/run/capture" method="post" class="flex flex-col items-start gap-2">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            {% set _agg_ok = session.tier not in ('standard', 'saas') %}
             <label class="inline-flex items-center gap-2 text-[12px] text-text-2
-                          {% if session.tier == 'standard' %}cursor-not-allowed{% else %}cursor-pointer{% endif %}">
+                          {% if not _agg_ok %}cursor-not-allowed{% else %}cursor-pointer{% endif %}">
               <input type="checkbox" name="run_aggregations" value="1" id="agg-capture"
-                     {% if session.tier != 'standard' %}checked{% else %}disabled{% endif %} class="m-0">
+                     {% if _agg_ok %}checked{% else %}disabled{% endif %} class="m-0">
               <span>
                 Run MongoDB aggregation pipelines after capture
-                {% if session.tier == 'standard' %}
+                {% if not _agg_ok %}
                   <span class="text-text-3 italic">— Extended tier only</span>
                 {% else %}
                   <span class="text-text-3">(default on; uncheck to skip)</span>
                 {% endif %}
               </span>
             </label>
-            {% if session.tier != 'standard' %}
+            {% if _agg_ok %}
             <div id="ps-capture" class="hidden w-full px-3 py-2.5 bg-bg border border-line rounded-md">
               <div class="flex items-center justify-between mb-2">
                 <span class="text-[10.5px] font-semibold uppercase tracking-wide text-text-3">Pipelines to run</span>
@@ -408,6 +465,8 @@
           <span>
             {% if session.tier == 'standard' %}
               <span class="font-medium" style="color:oklch(60% 0.18 220);">Standard</span>
+            {% elif session.tier == 'saas' %}
+              <span class="font-medium" style="color:oklch(55% 0.2 340);">SaaS</span>
             {% else %}
               <span class="font-medium" style="color:oklch(70% 0.18 30);">Extended</span>
             {% endif %}

@@ -1,4 +1,4 @@
-/* ── Self-hosted fonts (Inter · JetBrains Mono · Instrument Serif) ── */
+/* ── Self-hosted fonts (Hanken Grotesk · Sora · JetBrains Mono · Inter fallback) ── */
 /* latin-ext */
 @font-face {
   font-family: 'Inter';
@@ -35,22 +35,42 @@
   src: url('/static/fonts/jetbrains-mono-latin.woff2') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
+/* ── Hanken Grotesk — body (variable) ── */
 /* latin-ext */
 @font-face {
-  font-family: 'Instrument Serif';
+  font-family: 'Hanken Grotesk';
   font-style: normal;
-  font-weight: 400;
+  font-weight: 100 900;
   font-display: swap;
-  src: url('/static/fonts/instrument-serif-latin-ext.woff2') format('woff2');
+  src: url('/static/fonts/hanken-grotesk-latin-ext.woff2') format('woff2');
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 /* latin */
 @font-face {
-  font-family: 'Instrument Serif';
+  font-family: 'Hanken Grotesk';
   font-style: normal;
-  font-weight: 400;
+  font-weight: 100 900;
   font-display: swap;
-  src: url('/static/fonts/instrument-serif-latin.woff2') format('woff2');
+  src: url('/static/fonts/hanken-grotesk-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* ── Sora — display / headings (variable) ── */
+/* latin-ext */
+@font-face {
+  font-family: 'Sora';
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url('/static/fonts/sora-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Sora';
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url('/static/fonts/sora-latin.woff2') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
@@ -458,7 +478,8 @@
 :root[data-radius="soft"] { --r-sm: 6px; --r-md: 8px; --r-lg: 12px; --r-xl: 16px; }
 
 :root {
-  --ui: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --ui: 'Hanken Grotesk', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --display: 'Sora', 'Hanken Grotesk', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --mono: 'JetBrains Mono', 'SF Mono', ui-monospace, Consolas, monospace;
   --sidebar-w: 248px;
 
@@ -515,14 +536,16 @@ body {
   letter-spacing: 0;
 }
 
-/* Headline tracking — Inter looks intentional with tighter spacing at size. */
+/* Headlines — Sora (geometric display) with tight tracking at size. Weight and
+   size still come from the per-element utility classes in the templates; this
+   only swaps the family + tracking so every heading reads as the display face. */
+h1, h2, h3, h4, h5 { font-family: var(--display); }
 h1 {
   letter-spacing: -0.038em;
-  font-feature-settings: 'cv11' 1, 'ss01' 1, 'ss03' 1, 'cpsp' 1;
   text-wrap: balance;
 }
-h2 { letter-spacing: -0.020em; }
-h3 { letter-spacing: -0.015em; }
+h2 { letter-spacing: -0.022em; }
+h3 { letter-spacing: -0.016em; }
 button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
 a { color: inherit; text-decoration: none; }
 ::selection { background: var(--accent); color: var(--accent-ink); }
@@ -762,6 +785,10 @@ a { color: inherit; text-decoration: none; }
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   overflow: hidden;
+  /* Subtle resting elevation for a fresher, report-like surface. Tuned with a
+     navy-tinted alpha so it reads as soft depth on light themes and stays
+     invisible (harmless) on the dark ones, which lean on the border instead. */
+  box-shadow: 0 1px 2px rgba(16,22,37,0.04), 0 10px 30px -16px rgba(16,22,37,0.14);
 }
 .card-head {
   display: flex; align-items: center; gap: 10px;
@@ -1042,6 +1069,34 @@ a { color: inherit; text-decoration: none; }
 .field select:focus,
 .field textarea:focus { border-color: var(--accent); }
 .field--row { flex-direction: row; align-items: center; gap: 10px; }
+
+/* ── Per-user display scale (Settings → Appearance) ──────────────────
+   zoom is the one clean global lever for this px-based UI; the value is a
+   CSS var so the server renders the persisted scale (no flash) and the
+   slider live-updates it. 1 = 100%. */
+body { zoom: var(--ui-scale, 1); }
+
+.scale-control input[type="range"] { width: 100%; accent-color: var(--accent); cursor: pointer; }
+.scale-control-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; }
+.scale-readout { font-family: var(--mono); font-size: 12px; color: var(--text-2); min-width: 4ch; }
+.scale-hint { display: block; font-size: 11.5px; color: var(--text-3); margin-top: 8px; }
+
+/* ── SaaS gateway picker — make the selected choice unmistakable in light
+   & dark themes (accent border + tint + inset ring drive the cue, not the
+   easy-to-miss native radio dot). */
+.gw-choice {
+  display: flex; align-items: center; gap: 10px;
+  border: 1.5px solid var(--line-2); border-radius: 10px; padding: 10px 12px;
+  cursor: pointer;
+  transition: border-color .15s ease, background-color .15s ease, box-shadow .15s ease;
+}
+.gw-choice:hover { border-color: var(--accent-muted); }
+.gw-choice.is-selected { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.gw-choice input[type="radio"] { accent-color: var(--accent); }
+/* Edit mode locks the kind (radios disabled) — keep the selected card vivid
+   and fade the other so the active choice still reads at a glance. */
+.gw-choice:has(input:disabled) { cursor: default; }
+.gw-choice:has(input:disabled):not(.is-selected) { opacity: .5; }
 .form-actions {
   display: flex; gap: 10px; align-items: center;
   padding-top: 6px;
@@ -2249,11 +2304,16 @@ code, pre, kbd {
 .kpi-num { font-weight: 580; }
 .live-h { font-weight: 560; }
 
+/* Big stat values render in the display face (Sora) for a designed,
+   report-like dashboard. Tabular figures are preserved by the rule above so
+   columns of digits still don't shift between values. */
+.tile-value .num, .kpi-value, .kpi-num, .ring-num { font-family: var(--display); letter-spacing: -0.03em; }
+
 /* ── Page layout helpers ──────────────────────────────────────── */
 .page-header { margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
 .page-header h1 {
-  font-family: var(--ui);
-  font-size: 28px; font-weight: 600;
+  font-family: var(--display);
+  font-size: 28px; font-weight: 700;
   letter-spacing: -0.038em;
   margin: 8px 0 6px;
   color: var(--text);

@@ -101,10 +101,10 @@
      The actual @font-face declarations live in atlas.css. These are
      just the font-family stacks — Tailwind generates `font-sans`,
      `font-display`, `font-mono`, `font-serif` utilities from them. */
-  --font-sans:    Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-display: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-sans:    "Hanken Grotesk", Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display: Sora, "Hanken Grotesk", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono:    "JetBrains Mono", "SF Mono", ui-monospace, Consolas, monospace;
-  --font-serif:   "Instrument Serif", ui-serif, Georgia, serif;
+  --font-serif:   ui-serif, Georgia, "Times New Roman", serif;
 
   /* ── Custom glow shadows (matches v3 config) ───────────────────── */
   --shadow-glow-blue:   0 0 0 1px rgba(27,147,210,0.35), 0 8px 30px rgba(27,147,210,0.18);

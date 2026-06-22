@@ -11,12 +11,14 @@
    real product need. #}
 
 <style>
-  /* Capture-running pulse — kept for the active-session card. */
+  /* Capture-running pulse — a crisp THEME-ACCENT ring that breathes while a
+     capture is live. Zero blur (flat highlight): the ring opacity pulses at a
+     fixed 1.5px width so it reads clean and modern on every theme. */
   @keyframes sc-capture-pulse {
-    0%, 100% { box-shadow: 0 0 0 1px rgba(197,37,143,0.35), 0 8px 30px rgba(197,37,143,0.18); }
-    50%      { box-shadow: 0 0 0 1px rgba(197,37,143,0.55), 0 12px 40px rgba(197,37,143,0.32); }
+    0%, 100% { box-shadow: 0 0 0 1.5px color-mix(in oklab, var(--accent) 30%, transparent); }
+    50%      { box-shadow: 0 0 0 1.5px color-mix(in oklab, var(--accent) 72%, transparent); }
   }
-  .sc-capture-pulse { animation: sc-capture-pulse 2.4s ease-in-out infinite; }
+  .sc-capture-pulse { animation: sc-capture-pulse 2.6s ease-in-out infinite; }
 
   /* Hover-target glow — applied to the live card while the user
      mouses over its label in the customize panel, so they can visually
@@ -29,33 +31,108 @@
      element is pointless. */
   [data-widget-id] { transition: box-shadow 220ms ease-out; }
   .sc-hover-glow {
-    box-shadow:
-      0 0 0 2px color-mix(in oklab, var(--accent) 55%, transparent),
-      0 8px 30px color-mix(in oklab, var(--accent) 28%, transparent),
-      0 0 60px color-mix(in oklab, var(--accent) 14%, transparent) !important;
+    /* Flat accent ring (zero blur) so the "which card?" highlight reads as a
+       crisp outline rather than a soft halo. */
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 60%, transparent) !important;
+    border-color: color-mix(in oklab, var(--accent) 45%, var(--line)) !important;
     position: relative;
     z-index: 5;
   }
+
+  /* Flatter, friendlier hover on the dashboard's cards — a crisp accent edge
+     instead of a soft blurred drop shadow. Scoped to this page only. */
+  .kpi:hover, .tile:hover {
+    box-shadow: none;
+    transform: none;
+    border-color: color-mix(in oklab, var(--accent) 38%, var(--line));
+  }
+
+  /* ── KPI tile resting depth ────────────────────────────────────────
+     Very gentle lift so the tiles read as interactive cards rather than
+     flat labels. Hover clears this (see above) in favor of a crisp
+     accent border, keeping the interaction story clean. */
+  [data-widget-id^="kpi-"] {
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 2px 5px rgba(0,0,0,0.03);
+  }
+
+  /* ── KPI card footer separator ─────────────────────────────────────
+     A hairline rule above the action row keeps the stat and navigation
+     visually distinct without adding weight. */
+  .kpi-footer {
+    margin-top: auto;
+    padding-top: 11px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11.5px;
+  }
+  .kpi-footer-link { color: var(--accent); font-weight: 500; }
+  .kpi-footer-path { font-family: var(--mono); font-size: 11px; opacity: 0.6; }
+
+  /* ── Report-style cover-band hero ──────────────────────────────────
+     Self-contained to the dashboard: a navy band using the standalone
+     report's exact cover palette, carrying the welcome line. Navy
+     regardless of theme (just like the report), so it never depends on or
+     disturbs any of the seven theme palettes. */
+  .dash-hero {
+    position: relative; overflow: hidden;
+    border-radius: var(--r-lg);
+    background: linear-gradient(135deg, #0c1220 0%, #14223d 46%, #1b4d76 122%);
+    color: #fff;
+    padding: 30px 32px;
+    margin-bottom: 20px;
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 24px;
+  }
+  .dash-hero::before {
+    content: ""; position: absolute; right: -100px; top: -170px;
+    width: 460px; height: 460px; pointer-events: none;
+    background: radial-gradient(circle, rgba(197,37,143,0.38), transparent 62%);
+  }
+  .dash-hero::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: url("data:image/svg+xml,%3Csvg width='64' height='64' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M32 0L64 32L32 64L0 32z' fill='none' stroke='%23ffffff' stroke-width='0.5' opacity='0.045'/%3E%3C/svg%3E") repeat;
+  }
+  .dash-hero-inner { position: relative; z-index: 1; min-width: 0; }
+  .dash-hero-eyebrow { color: #6dc5f0; }
+  .dash-hero-eyebrow .dot { background: #6dc5f0; box-shadow: 0 0 0 3px rgba(109,197,240,0.20); }
+  .dash-hero-title {
+    font-family: var(--display); font-weight: 700;
+    font-size: 34px; line-height: 1.06; letter-spacing: -0.035em;
+    margin: 12px 0 9px; color: #fff;
+  }
+  .dash-hero-title em { color: #6dc5f0; }
+  .dash-hero-sub { color: rgba(255,255,255,0.74); font-size: 14px; line-height: 1.55; max-width: 64ch; }
+  .dash-hero-sub b { color: #fff; font-weight: 600; }
+  .dash-hero-code {
+    font-family: var(--mono); font-size: 12.5px;
+    color: #cfe6f7; background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.16); border-radius: 5px; padding: 1px 6px;
+  }
+  .dash-hero-actions { position: relative; z-index: 1; display: flex; gap: 10px; flex-shrink: 0; }
+  .dash-hero-btn-ghost { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.20); color: #fff; }
+  .dash-hero-btn-ghost:hover { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.32); }
+  @media (max-width: 720px) { .dash-hero { flex-direction: column; } }
 </style>
 
-{# ── Hero ─────────────────────────────────────────────────────────── #}
-<header class="flex items-start justify-between gap-6 mb-5">
-  <div>
-    <div class="eyebrow"><span class="dot"></span> Welcome back</div>
-    <h1 class="text-[36px] leading-[1.05] font-semibold tracking-[-0.038em] mt-2 mb-1.5">
+{# ── Hero — report-style navy cover band ──────────────────────────── #}
+<header class="dash-hero">
+  <div class="dash-hero-inner">
+    <div class="eyebrow dash-hero-eyebrow"><span class="dot"></span> Welcome back</div>
+    <h1 class="dash-hero-title">
       {{ organization_name or 'Workspace' }},
-      <em class="not-italic text-text-3">at a glance</em>
+      <em class="not-italic">at a glance</em>
     </h1>
-    <p class="text-[14px] text-text-2 max-w-[64ch]">
-      Running in <b class="text-text font-semibold">{{ tier|capitalize }} mode</b>{% if tier == 'standard' %}, audit via Platform OAuth{% else %}, full infrastructure audit{% endif %}.
+    <p class="dash-hero-sub">
+      Running in <b>{{ 'SaaS' if tier == 'saas' else tier|capitalize }} mode</b>{% if tier == 'standard' %}, audit via Platform OAuth{% elif tier == 'saas' %}, single-gateway audit{% else %}, full infrastructure audit{% endif %}.
       {% if active_env and active_env.platform_uri %}
-        Targeting <code class="font-mono text-[12.5px] text-text-2 bg-bg-2 border border-line rounded px-1.5 py-0.5">{{ active_env.platform_uri }}</code>.
+        Targeting <code class="dash-hero-code">{{ active_env.platform_uri }}</code>.
       {% endif %}
-      {% if active_session %}<b class="text-text font-semibold">1 session</b> is currently active.{% else %}No live sessions.{% endif %}
+      {% if active_session %}<b>1 session</b> is currently active.{% else %}No live sessions.{% endif %}
     </p>
   </div>
-  <div class="flex items-center gap-2 shrink-0">
-    <a class="btn" href="/reports">Reports</a>
+  <div class="dash-hero-actions">
+    <a class="btn dash-hero-btn-ghost" href="/reports">Reports</a>
     <a class="btn primary" href="/sessions/new">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
       Start session
@@ -171,9 +248,7 @@
               transition-colors hover:border-line-2 hover:bg-surface-2 text-text">
       <div class="flex items-center justify-between text-[10.5px] uppercase tracking-[0.1em] font-medium text-text-3">
         <span>Sessions</span>
-        <span class="inline-flex items-center justify-center w-[22px] h-[22px] rounded-md bg-surface-2 border border-line text-text-2">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="3" width="16" height="18" rx="2"/></svg>
-        </span>
+        <span class="inline-block w-[18px] h-[18px] rounded-[4px] shrink-0" style="background: rgba(27,147,210,0.18);"></span>
       </div>
       <div class="flex items-baseline gap-2 mt-3.5 mb-1.5">
         <span class="text-[34px] leading-none font-medium tracking-[-0.03em] tabular-nums">{{ kpis.session_count }}</span>
@@ -182,9 +257,9 @@
       {% if not kpis.session_count %}
         <span class="text-[11.5px] text-text-3 leading-snug">Each session captures, validates, and reports against one environment.</span>
       {% endif %}
-      <div class="mt-auto flex justify-between text-[11.5px] text-text-3 pt-3">
-        <span class="text-text border-b border-line-2 pb-px">Manage</span>
-        <span class="opacity-70 font-mono">audit/sessions</span>
+      <div class="kpi-footer">
+        <span class="kpi-footer-link">Manage</span>
+        <span class="kpi-footer-path">audit/sessions</span>
       </div>
     </a>
 
@@ -195,9 +270,7 @@
               transition-colors hover:border-line-2 hover:bg-surface-2 text-text">
       <div class="flex items-center justify-between text-[10.5px] uppercase tracking-[0.1em] font-medium text-text-3">
         <span>Environments</span>
-        <span class="inline-flex items-center justify-center w-[22px] h-[22px] rounded-md bg-surface-2 border border-line text-text-2">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7l9-4 9 4-9 4-9-4z"/></svg>
-        </span>
+        <span class="inline-block w-[18px] h-[18px] rounded-[4px] shrink-0" style="background: rgba(255,102,51,0.16);"></span>
       </div>
       <div class="flex items-baseline gap-2 mt-3.5 mb-1.5">
         <span class="text-[34px] leading-none font-medium tracking-[-0.03em] tabular-nums">{{ kpis.env_count }}</span>
@@ -205,9 +278,9 @@
       {% if not kpis.env_count %}
         <span class="text-[11.5px] text-text-3 leading-snug">Environments hold one Platform's connection and credentials.</span>
       {% endif %}
-      <div class="mt-auto flex justify-between text-[11.5px] text-text-3 pt-3">
-        <span class="text-text border-b border-line-2 pb-px">Manage</span>
-        <span class="opacity-70 font-mono">config/environments</span>
+      <div class="kpi-footer">
+        <span class="kpi-footer-link">Manage</span>
+        <span class="kpi-footer-path">config/environments</span>
       </div>
     </a>
 
@@ -218,9 +291,7 @@
               transition-colors hover:border-line-2 hover:bg-surface-2 text-text">
       <div class="flex items-center justify-between text-[10.5px] uppercase tracking-[0.1em] font-medium text-text-3">
         <span>Active rules</span>
-        <span class="inline-flex items-center justify-center w-[22px] h-[22px] rounded-md bg-surface-2 border border-line text-text-2">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m9 11 3 3L22 4"/></svg>
-        </span>
+        <span class="inline-block w-[18px] h-[18px] rounded-[4px] shrink-0" style="background: rgba(153,202,60,0.22);"></span>
       </div>
       <div class="flex items-baseline gap-2 mt-3.5 mb-1.5">
         <span class="text-[34px] leading-none font-medium tracking-[-0.03em] tabular-nums">{{ kpis.rule_count }}</span>
@@ -231,9 +302,9 @@
       {% if not kpis.rule_count %}
         <span class="text-[11.5px] text-text-3 leading-snug">No ruleset loaded — rule profiles enable or disable groups of checks.</span>
       {% endif %}
-      <div class="mt-auto flex justify-between text-[11.5px] text-text-3 pt-3">
-        <span class="text-text border-b border-line-2 pb-px">Inspect</span>
-        <span class="opacity-70 font-mono">config/rulesets</span>
+      <div class="kpi-footer">
+        <span class="kpi-footer-link">Inspect</span>
+        <span class="kpi-footer-path">config/rulesets</span>
       </div>
     </a>
 
@@ -244,9 +315,7 @@
               transition-colors hover:border-line-2 hover:bg-surface-2 text-text">
       <div class="flex items-center justify-between text-[10.5px] uppercase tracking-[0.1em] font-medium text-text-3">
         <span>Running jobs</span>
-        <span class="inline-flex items-center justify-center w-[22px] h-[22px] rounded-md bg-surface-2 border border-line text-text-2">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/></svg>
-        </span>
+        <span class="inline-block w-[18px] h-[18px] rounded-[4px] shrink-0" style="background: rgba(197,37,143,0.16);"></span>
       </div>
       <div class="flex items-baseline gap-2 mt-3.5 mb-1.5">
         <span class="text-[34px] leading-none font-medium tracking-[-0.03em] tabular-nums">{{ kpis.running_jobs }}</span>
@@ -254,9 +323,9 @@
       {% if not kpis.running_jobs %}
         <span class="text-[11.5px] text-text-3 leading-snug">No captures or diffs underway. Long-running tasks show up here.</span>
       {% endif %}
-      <div class="mt-auto flex justify-between text-[11.5px] text-text-3 pt-3">
-        <span class="text-text border-b border-line-2 pb-px">Open queue</span>
-        <span class="opacity-70 font-mono">system/jobs</span>
+      <div class="kpi-footer">
+        <span class="kpi-footer-link">Open queue</span>
+        <span class="kpi-footer-path">system/jobs</span>
       </div>
     </a>
 
@@ -265,11 +334,14 @@
   {# ── Active session card (conditional) ───────────────────────────── #}
   {% if active_session %}
   {% set _capturing = active_session.status == 'running' or (active_session.capture_completed is sameas false) %}
+  {# Flat "active session" emphasis — a subtle accent-tinted border plus an
+     inside accent wash (no blurred glow). Inline so it tracks --accent per
+     theme without a Tailwind recompile. The capture pulse, when live, is a
+     crisp accent ring (see <style> above). #}
   <section data-widget-id="active-session"
            :class="{ 'hidden': hidden.includes('active-session'), 'sc-hover-glow': hoveredId === 'active-session' }"
-           class="grid grid-cols-[auto_1fr_auto] gap-5 items-center bg-surface border border-line rounded-lg px-5 py-4 mb-3
-                  shadow-glow-pink {% if _capturing %}sc-capture-pulse{% endif %}
-                  bg-[radial-gradient(120%_80%_at_0%_0%,var(--accent-soft),transparent_55%)]">
+           class="grid grid-cols-[auto_1fr_auto] gap-5 items-center bg-surface border border-line rounded-lg px-5 py-4 mb-3{% if _capturing %} sc-capture-pulse{% endif %}"
+           style="border-color: color-mix(in oklab, var(--accent) 34%, var(--line)); background-image: radial-gradient(135% 125% at 0% 0%, var(--accent-soft) 0%, transparent 60%);">
     <div class="relative w-[52px] h-[52px] rounded-lg bg-surface-2 border border-line grid place-items-center text-accent">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
       <span class="absolute -inset-1 rounded-[14px] border border-dashed border-line opacity-60"
@@ -460,7 +532,12 @@
   // Stores a single array of hidden widget IDs in localStorage. Same
   // try-now-or-on-init Alpine registration pattern as the rest of the
   // codebase so hx-boost re-entry is safe.
-  const ATLAS_DASH_KEY = 'atlas-dashboard-visibility-v3';
+  //
+  // v4: "Recent jobs" and "Active environment" are hidden by default —
+  //     the power-user bottom pair; users can re-enable them via the
+  //     Customize panel. Reset restores the defaults (not "show all").
+  const ATLAS_DASH_KEY = 'atlas-dashboard-visibility-v4';
+  const ATLAS_DASH_DEFAULT_HIDDEN = ['recent-jobs', 'active-env'];
 
   function _atlasRegisterDashboard() {
     if (!window.Alpine || typeof window.Alpine.data !== 'function') return;
@@ -487,11 +564,15 @@
           const raw = localStorage.getItem(ATLAS_DASH_KEY);
           if (raw) {
             const obj = JSON.parse(raw);
-            if (obj && obj.v === 3 && Array.isArray(obj.hidden)) {
+            if (obj && obj.v === 4 && Array.isArray(obj.hidden)) {
               this.hidden = obj.hidden;
+              return;
             }
           }
         } catch (_) { /* corrupt entry — start fresh */ }
+        // First visit or stale key: apply the default-hidden set rather than
+        // showing everything. The user can always open Customize to re-enable.
+        this.hidden = [...ATLAS_DASH_DEFAULT_HIDDEN];
       },
 
       toggle(id) {
@@ -519,13 +600,15 @@
       },
 
       resetVisibility() {
-        this.hidden = [];
+        // "Reset" restores the default-hidden set rather than unhiding
+        // everything — keeps the intent consistent with a fresh install.
+        this.hidden = [...ATLAS_DASH_DEFAULT_HIDDEN];
         try { localStorage.removeItem(ATLAS_DASH_KEY); } catch (_) {}
       },
 
       _save() {
         try {
-          localStorage.setItem(ATLAS_DASH_KEY, JSON.stringify({ v: 3, hidden: this.hidden }));
+          localStorage.setItem(ATLAS_DASH_KEY, JSON.stringify({ v: 4, hidden: this.hidden }));
         } catch (_) { /* quota etc — ignore */ }
       },
     }));

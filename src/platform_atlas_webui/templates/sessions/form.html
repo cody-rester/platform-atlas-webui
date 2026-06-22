@@ -70,15 +70,23 @@
         </div>
 
         <div class="field">
-          <label for="ruleset_profile">Profile <span class="text-text-4 font-normal">(optional)</span></label>
+          <label for="ruleset_profile">Profile</label>
+          {# No "None" choice on purpose — a session always binds a profile.
+             With no prefill or active profile the first visible one is
+             preselected. #}
+          {% if profiles %}
           <select id="ruleset_profile" name="ruleset_profile">
-            <option value="">— None —</option>
             {% for p in profiles %}
             <option value="{{ p.id }}" {% if prefill and prefill.ruleset_profile == p.id %}selected{% elif not prefill and p.is_active %}selected{% endif %}>
               {{ p.id }}{% if p.description %} — {{ p.description }}{% endif %}
             </option>
             {% endfor %}
           </select>
+          {% else %}
+          <select id="ruleset_profile" disabled>
+            <option value="">— no profiles available —</option>
+          </select>
+          {% endif %}
           <span class="hint">Profiles enable or disable specific rules for targeted environments.</span>
         </div>
 
@@ -104,6 +112,10 @@
               <span class="w-2 h-2 rounded-full shrink-0" style="background:oklch(60% 0.18 220);"></span>
               <span class="text-[13px] font-medium" style="color:oklch(60% 0.18 220);">Standard</span>
               <span class="text-[12px] text-text-3">— application audit (Platform OAuth + IAG4)</span>
+            {% elif active_tier == 'saas' %}
+              <span class="w-2 h-2 rounded-full shrink-0" style="background:oklch(55% 0.2 340);"></span>
+              <span class="text-[13px] font-medium" style="color:oklch(55% 0.2 340);">SaaS</span>
+              <span class="text-[12px] text-text-3">— single Gateway audit (no Platform/MongoDB/Redis)</span>
             {% else %}
               <span class="w-2 h-2 rounded-full shrink-0" style="background:oklch(70% 0.18 30);"></span>
               <span class="text-[13px] font-medium" style="color:oklch(70% 0.18 30);">Extended</span>

@@ -68,6 +68,9 @@
   <script src="{{ url_for('static', path='js/alpine.min.js') }}?v={{ asset_version }}" defer></script>
 
   <script src="{{ url_for('static', path='js/htmx.min.js') }}?v={{ asset_version }}" defer></script>
+  {# Per-user display scale — server-rendered so there's no flash. The Settings
+     slider live-updates --ui-scale via atlas.js and persists it. #}
+  <style nonce="{{ csp_nonce }}">:root{ --ui-scale: {{ '%.3f'|format(prefs.scale | default(1)) }}; }</style>
   <script src="{{ url_for('static', path='js/atlas.js') }}?v={{ asset_version }}" defer></script>
   {# Command palette — vanilla IIFE. Loaded from <head> so it survives the
      body-innerHTML swap that hx-boost performs on every internal nav; the
@@ -93,7 +96,7 @@
        style="grid-area: brand;">
     <a href="/" class="flex items-center gap-2.5 font-semibold tracking-[-0.01em] no-underline text-inherit">
       <div class="brand-mark shrink-0" role="img" aria-label="Itential"></div>
-      <span class="text-[15px]">Platform Atlas</span>
+      <span class="text-[15px] font-display font-bold tracking-[-0.02em]">Platform Atlas</span>
       <span class="font-mono text-[10.5px] text-text-3 ml-0.5">v{{ atlas_version | default('1.7.4') }}</span>
     </a>
   </div>
@@ -189,7 +192,7 @@
       </span>
     {% endif %}
 
-    {% if continuous and continuous.enabled %}
+    {% if continuous and continuous.enabled and not is_saas %}
       {# Always-on reminder that continuous audit is running. State drives a
          CSS class so all the color values live in atlas.css next to the rest
          of the design system, not inline. #}
@@ -302,6 +305,9 @@
       {# Platform API — DISABLED. Re-enable by un-commenting; structure is the
          same as the other nav sections. See routes/platform_api.py. #}
 
+      {# Continuous Audit (+ its Alerts/Notifications) is platform-anchored —
+         hidden under SaaS, where the routes also 403. Standard/Extended keep it. #}
+      {% if not is_saas %}
       <div class="mb-3.5">
         {{ _nav_label('Continuous') }}
         <a href="/continuous" class="{{ _nav_base }} {% if request.url.path.startswith('/continuous') %}{{ _nav_active }}{% else %}{{ _nav_idle }}{% endif %}">
@@ -317,6 +323,7 @@
           <span>Notifications</span>
         </a>
       </div>
+      {% endif %}
 
       <div class="mb-3.5">
         {{ _nav_label('System') }}
@@ -324,10 +331,14 @@
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
           <span>Jobs</span>
         </a>
+        {# Support Bundle is platform-anchored — hidden under SaaS, where the
+           route also 403s. Standard/Extended keep it. #}
+        {% if not is_saas %}
         <a href="/support-bundle" class="{{ _nav_base }} {% if request.url.path.startswith('/support-bundle') %}{{ _nav_active }}{% else %}{{ _nav_idle }}{% endif %}">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l2-1.14"/><path d="M16.5 9.4 7.55 4.24"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" y1="22" x2="12" y2="12"/><circle cx="18.5" cy="15.5" r="2.5"/><path d="M20.27 17.27 22 19"/></svg>
           <span>Support Bundle</span>
         </a>
+        {% endif %}
       </div>
     </nav>
 

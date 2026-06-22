@@ -5,6 +5,7 @@
 
 {# ── Report-specific stylesheet (theme-agnostic — uses atlas.css vars) ── #}
 <link rel="stylesheet" href="{{ url_for('static', path='css/reports/viewmodel.css') }}?v={{ asset_version }}">
+<link rel="stylesheet" href="{{ url_for('static', path='css/reports/export.css') }}?v={{ asset_version }}">
 
 {# Inter + JetBrains Mono render via the self-hosted @font-face rules in
    atlas.css (loaded by base.html) — no external CDN fonts here. #}
@@ -52,6 +53,18 @@
       </svg>
       Session
     </a>
+    {# Report Export — packages this session into a delivery archive (the WebUI
+       twin of the CLI `session export`). Opens the modal below; export.js wires
+       the click (no inline handlers — strict CSP). #}
+    <button type="button" class="btn sm primary" data-rx-open
+            title="Package this session's reports + report.json + metadata into a delivery archive (ZIP)">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      Report Export
+    </button>
   </div>
 
   {# ── Tab strip ─────────────────────────────────────────────────────── #}
@@ -78,6 +91,10 @@
       <span>Compliance</span>
       <span class="vm-tab-count" data-vm-tab-count="compliance">—</span>
     </button>
+    {# Operational data (MongoDB pipelines, log analysis) is Extended-only —
+       a single-gateway SaaS audit has none, so the tab is hidden for SaaS
+       reports. Standard/Extended unchanged. #}
+    {% if session.tier != 'saas' %}
     <button type="button" role="tab" class="vm-tab"
             data-tab-id="operational"
             :class="tab === 'operational' && 'is-active'"
@@ -90,6 +107,7 @@
       <span>Operational</span>
       <span class="vm-tab-count" data-vm-tab-count="operational">—</span>
     </button>
+    {% endif %}
     <button type="button" role="tab" class="vm-tab"
             data-tab-id="architecture"
             :class="tab === 'architecture' && 'is-active'"
@@ -312,10 +330,12 @@
               <span class="k">Host</span>
               <span class="v mono" data-vm-id="hostname">—</span>
             </div>
+            {% if session.tier != 'saas' %}
             <div class="vm-meta-r">
               <span class="k">Platform</span>
               <span class="v mono" data-vm-id="platform_version">—</span>
             </div>
+            {% endif %}
             <div class="vm-meta-r">
               <span class="k">Captured at</span>
               <span class="v mono" data-vm-id="captured_at">—</span>
@@ -326,6 +346,8 @@
     </div>
   </section>
 
+  {# Operational panel hidden for SaaS reports (no Mongo / log infra). #}
+  {% if session.tier != 'saas' %}
   {# ── Panel: Operational ──────────────────────────────────────────── #}
   <section x-show="loaded && tab === 'operational'" x-cloak
            x-transition:enter="vm-panel-enter"
@@ -379,6 +401,7 @@
       </div>
     </div>
   </section>
+  {% endif %}{# /Operational panel #}
 
   {# ── Panel: Architecture ─────────────────────────────────────────── #}
   <section x-show="loaded && tab === 'architecture'" x-cloak
@@ -428,7 +451,7 @@
     <div class="vm-identity-cell"><span class="lbl">Tier</span><span class="val mono" data-vm-id="tier">—</span></div>
     <div class="vm-identity-cell"><span class="lbl">Ruleset</span><span class="val mono" data-vm-id="ruleset">—</span></div>
     <div class="vm-identity-cell"><span class="lbl">Host</span><span class="val mono" data-vm-id="hostname">—</span></div>
-    <div class="vm-identity-cell"><span class="lbl">Platform</span><span class="val mono" data-vm-id="platform_version">—</span></div>
+    {% if session.tier != 'saas' %}<div class="vm-identity-cell"><span class="lbl">Platform</span><span class="val mono" data-vm-id="platform_version">—</span></div>{% endif %}
     <div class="vm-identity-cell"><span class="lbl">Captured</span><span class="val mono" data-vm-id="captured_at">—</span></div>
   </footer>
 
@@ -474,6 +497,18 @@
       </header>
 
       <div class="vm-detail-body">
+        {# Skipped-rule callout — color-coded by reason (unreachable /
+           no_data / conditional). JS sets the vm-skip-{kind} modifier, the
+           title, and the reason text, then unhides it for SKIP rules. Sits
+           first so "why was this skipped" leads the panel. #}
+        <div class="vm-detail-skip" data-vm-detail-skip hidden>
+          <span class="vm-detail-skip-dot" aria-hidden="true"></span>
+          <div>
+            <p class="vm-detail-skip-title" data-vm-detail-skip-title></p>
+            <p class="vm-detail-skip-reason" data-vm-detail-skip-reason></p>
+          </div>
+        </div>
+
         {# Each body section is its own L1 card — subtle background,
            rounded corners, hairline border. The card-based treatment
            replaces the previous flat-section design so the panel reads
@@ -555,6 +590,99 @@
     </div>
   </aside>
 
+{# ── Report Export modal ──────────────────────────────────────────────
+     Packages the session into a delivery archive — the WebUI twin of the
+     CLI `session export`. Lives OUTSIDE #vm-root so its fixed positioning
+     is viewport-relative. All state (form → working → result / error) is
+     toggled by static/js/reports/export.js — no inline scripts (CSP). The
+     data-* attributes hand the script the session, POST target, and CSRF
+     token without hard-coding anything in JS. #}
+<div class="rx-modal" data-rx-modal hidden
+     data-rx-session="{{ session_name }}"
+     data-rx-action="/reports/{{ session_name }}/export"
+     data-rx-csrf="{{ csrf_token }}">
+  <div class="rx-backdrop" data-rx-close></div>
+  <div class="rx-card" role="dialog" aria-modal="true" aria-labelledby="rx-title">
+    <header class="rx-head">
+      <div class="rx-head-text">
+        <h3 class="rx-title" id="rx-title">Export report for delivery</h3>
+        <p class="rx-sub">Package this session's reports, the machine-readable
+          <code>report.json</code>, and metadata into an archive you can attach to
+          an Itential ER ticket.</p>
+      </div>
+      <button type="button" class="rx-x" data-rx-close aria-label="Close">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </header>
+
+    {# ── State: options form ── #}
+    <div class="rx-body" data-rx-state="form">
+      <div class="rx-field">
+        <span class="rx-field-label">Archive format</span>
+        <div class="rx-seg" role="radiogroup" aria-label="Archive format">
+          <label class="rx-seg-opt">
+            <input type="radio" name="rx-format" value="zip" checked>
+            <span>ZIP</span>
+          </label>
+          <label class="rx-seg-opt">
+            <input type="radio" name="rx-format" value="tar.gz">
+            <span>tar.gz</span>
+          </label>
+        </div>
+      </div>
+      <label class="rx-check">
+        <input type="checkbox" data-rx-debug>
+        <span class="rx-check-text">
+          <span class="rx-check-title">Include troubleshooting files</span>
+          <span class="rx-check-note">Adds the session log and raw capture
+            (01_capture.json, debug.log). Off by default so sensitive data stays
+            out of the archive.</span>
+        </span>
+      </label>
+    </div>
+
+    {# ── State: working ── #}
+    <div class="rx-body rx-working" data-rx-state="working" hidden>
+      <span class="rx-spinner" aria-hidden="true"></span>
+      <p class="rx-working-text">Packaging your export…</p>
+    </div>
+
+    {# ── State: result ── #}
+    <div class="rx-body rx-result" data-rx-state="result" hidden>
+      <div class="rx-result-head">
+        <svg class="rx-ok" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        <div class="rx-result-headtext">
+          <div class="rx-result-title">Export ready</div>
+          <div class="rx-result-name" data-rx-archive-name>—</div>
+        </div>
+      </div>
+      <dl class="rx-meta">
+        <div class="rx-meta-row"><dt>Size</dt><dd data-rx-size>—</dd></div>
+        <div class="rx-meta-row"><dt>Contents</dt><dd data-rx-contents>—</dd></div>
+        <div class="rx-meta-row rx-meta-path"><dt>Saved to</dt><dd><code data-rx-path>—</code></dd></div>
+      </dl>
+    </div>
+
+    {# ── State: error ── #}
+    <div class="rx-body rx-errbox" data-rx-state="error" hidden>
+      <svg class="rx-err" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <p class="rx-err-text" data-rx-error>Something went wrong.</p>
+    </div>
+
+    <footer class="rx-foot">
+      <button type="button" class="btn sm" data-rx-cancel>Cancel</button>
+      <button type="button" class="btn sm primary" data-rx-submit>Create export</button>
+      <a class="btn sm primary" data-rx-download download hidden>Download</a>
+      <button type="button" class="btn sm" data-rx-again hidden>Export again</button>
+    </footer>
+  </div>
+</div>
+
 {# anime.js v4 — vendored locally so the report works air-gapped. The
    IIFE bundle exposes the global `window.anime` with `.animate`,
    `.stagger`, etc. Loaded BEFORE viewmodel.js (no `defer` ordering
@@ -563,5 +691,7 @@
 {# Hydration script — runs on every navigation to this view (hx-boost
    re-executes <body> scripts, and viewmodel.js is idempotent). #}
 <script src="{{ url_for('static', path='js/reports/viewmodel.js') }}?v={{ asset_version }}" defer></script>
+{# Report Export modal controller — open/close, submit, render result. #}
+<script src="{{ url_for('static', path='js/reports/export.js') }}?v={{ asset_version }}" defer></script>
 
 {% endblock %}

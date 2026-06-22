@@ -130,8 +130,23 @@ async def submit_setup(
     gateway4_uri: str = Form(""),
     gateway4_username: str = Form(""),
     gateway4_password: str = Form(""),
+    # SaaS — single-gateway audit fields (saas_-prefixed so they never collide
+    # with the optional platform-tier Gateway 4 disclose on the same form)
+    saas_gateway_kind: str = Form(""),
+    saas_gw4_ssh: str = Form(""),
+    saas_gw4_uri: str = Form(""),
+    saas_gw4_username: str = Form(""),
+    saas_gw4_password: str = Form(""),
+    saas_iag_host: str = Form(""),
+    saas_ssh_user: str = Form(""),
+    saas_ssh_port: str = Form(""),
+    saas_ssh_key: str = Form(""),
+    saas_gw5_source: str = Form("ssh"),
+    saas_gw5_source_path: str = Form(""),
+    saas_gw5_conf_path: str = Form(""),
     verify_ssl: str = Form(""),
     credential_backend: str = Form("keyring"),
+    vault_secret_store: str = Form("keyring"),
     # Appearance — applied during the wizard via live preview, persisted on submit
     webui_theme: str = Form(""),
     webui_mode: str = Form(""),
@@ -152,16 +167,33 @@ async def submit_setup(
         return RedirectResponse(url="/", status_code=303)
 
     backend_choice = (credential_backend or "keyring").strip().lower()
+    if (tier or "").strip().lower() == "saas":
+        # The SaaS Connect step posts its own gateway-API fields.
+        gateway4_uri = saas_gw4_uri
+        gateway4_username = saas_gw4_username
+        gateway4_password = saas_gw4_password
     form_payload = {
         "organization_name": organization_name,
         "tier": tier,
         "env_name": env_name,
+        "saas_gateway_kind": saas_gateway_kind,
+        "saas_gw4_ssh": saas_gw4_ssh,
+        "saas_gw4_uri": saas_gw4_uri,
+        "saas_gw4_username": saas_gw4_username,
+        "saas_iag_host": saas_iag_host,
+        "saas_ssh_user": saas_ssh_user,
+        "saas_ssh_port": saas_ssh_port,
+        "saas_ssh_key": saas_ssh_key,
+        "saas_gw5_source": saas_gw5_source,
+        "saas_gw5_source_path": saas_gw5_source_path,
+        "saas_gw5_conf_path": saas_gw5_conf_path,
         "platform_uri": platform_uri,
         "platform_client_id": platform_client_id,
         "gateway4_uri": gateway4_uri,
         "gateway4_username": gateway4_username,
         "verify_ssl": bool(verify_ssl),
         "credential_backend": backend_choice,
+        "vault_secret_store": (vault_secret_store or "keyring").strip().lower(),
         "vault_url": vault_url,
         "vault_auth_method": vault_auth_method,
         "vault_role_id": vault_role_id,
@@ -197,8 +229,18 @@ async def submit_setup(
             gateway4_uri=gateway4_uri,
             gateway4_username=gateway4_username,
             gateway4_password=gateway4_password,
+            saas_gateway_kind=saas_gateway_kind,
+            saas_gw4_ssh=bool(saas_gw4_ssh),
+            saas_iag_host=saas_iag_host,
+            saas_ssh_user=saas_ssh_user,
+            saas_ssh_port=saas_ssh_port,
+            saas_ssh_key=saas_ssh_key,
+            saas_gw5_source=saas_gw5_source,
+            saas_gw5_source_path=saas_gw5_source_path,
+            saas_gw5_conf_path=saas_gw5_conf_path,
             verify_ssl=bool(verify_ssl),
             credential_backend=backend_choice,
+            vault_secret_store=(vault_secret_store or "keyring").strip().lower(),
             vault_payload=vault_payload if backend_choice == "vault" else None,
             webui_theme=webui_theme,
             webui_mode=webui_mode,
@@ -264,6 +306,26 @@ async def submit_setup(
     return response
 
 
+def _done_tier(cfg: dict) -> str:
+    """The tier the finished setup actually created — the active env's
+    overlay tier when set, falling back to the global value. (Bootstrap
+    writes the same tier to both since 2.0.0, but the overlay stays the
+    source of truth in case the config was hand-edited in between.)"""
+    env_name = cfg.get("active_environment") or ""
+    if env_name:
+        try:
+            from platform_atlas.core.paths import ATLAS_ENVIRONMENTS_DIR
+            import json as _json
+            env_file = ATLAS_ENVIRONMENTS_DIR / f"{env_name}.json"
+            if env_file.is_file():
+                env_tier = (_json.loads(env_file.read_text(encoding="utf-8")).get("tier") or "").lower()
+                if env_tier in ("standard", "extended", "saas"):
+                    return env_tier
+        except Exception:
+            pass
+    return cfg.get("tier") or "standard"
+
+
 @router.get("/done", response_class=HTMLResponse)
 async def setup_done(request: Request) -> HTMLResponse:
     """Post-bootstrap success view — the peak/end moment of onboarding.
@@ -286,7 +348,7 @@ async def setup_done(request: Request) -> HTMLResponse:
             "atlas_version": ATLAS_VERSION,
             "organization_name": cfg.get("organization_name") or "",
             "active_environment": cfg.get("active_environment") or "",
-            "tier": cfg.get("tier") or "standard",
+            "tier": _done_tier(cfg),
             "prefs": {"theme": theme, "mode": mode},
             "csrf_token": generate_csrf_token(request.cookies.get(COOKIE_NAME)),
             "csp_nonce": getattr(request.state, "csp_nonce", "") or "",

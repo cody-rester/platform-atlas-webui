@@ -7,7 +7,7 @@
   <div>
     <div class="eyebrow"><span class="dot"></span> Audit</div>
     <h1 class="text-[36px] leading-[1.05] font-semibold tracking-[-0.038em] mt-2 mb-1.5">
-      Compare sessions, <em class="not-italic text-text-3">side-by-side</em>
+      Compare sessions, <em class="not-italic text-accent">side-by-side</em>
     </h1>
     <p class="text-[14px] text-text-2 max-w-[64ch]">
       Pick a baseline and a latest session. Both must have completed validation. The diff
@@ -42,7 +42,7 @@
               <option value="" disabled selected>— Pick a baseline session —</option>
               {% for s in sessions %}
                 {% set ts = s.updated_at[:16].replace('T', ' ') if s.updated_at else '—' %}
-                <option value="{{ s.name }}">{{ s.name }} — {{ s.tier|capitalize }} · {{ s.environment or '—' }} · {{ ts }}</option>
+                <option value="{{ s.name }}">{{ s.name }} — {{ 'SaaS' if s.tier == 'saas' else s.tier|capitalize }} · {{ s.environment or '—' }} · {{ ts }}</option>
               {% endfor %}
             </select>
           </div>
@@ -53,7 +53,7 @@
               <option value="" disabled selected>— Choose a baseline first —</option>
               {% for s in sessions %}
                 {% set ts = s.updated_at[:16].replace('T', ' ') if s.updated_at else '—' %}
-                <option value="{{ s.name }}" data-name="{{ s.name }}">{{ s.name }} — {{ s.tier|capitalize }} · {{ s.environment or '—' }} · {{ ts }}</option>
+                <option value="{{ s.name }}" data-name="{{ s.name }}">{{ s.name }} — {{ 'SaaS' if s.tier == 'saas' else s.tier|capitalize }} · {{ s.environment or '—' }} · {{ ts }}</option>
               {% endfor %}
             </select>
             <span class="hint hidden" id="latest-hint">

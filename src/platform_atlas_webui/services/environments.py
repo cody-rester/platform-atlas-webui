@@ -20,10 +20,12 @@ from platform_atlas.core.paths import ATLAS_ENVIRONMENTS_DIR
 
 _TOPOLOGY_FORM_FIELDS = (
     "deployment_mode", "iap_host", "mongo_host", "redis_host", "iag_host",
+    "saas_gateway_kind", "saas_gw4_ssh",
     "iap_host_ha", "iap_host_2", "iap_host_3",
     "mongo_host_ha", "mongo_host_2", "mongo_host_3",
     "redis_host_ha", "redis_host_2", "redis_host_3",
     "iag_host_ha",
+    "gateway5_source", "gateway5_source_path",
     "ssh_user", "ssh_port",
     "iap_transport", "iap_cm_socket", "iap_cm_target", "iap_cm_port",
 )
@@ -64,6 +66,75 @@ def _preserve_transport_fields(existing_node: dict, host: str, primary: bool) ->
     return preserved
 
 
+def _build_saas_topology(payload: dict[str, Any]) -> dict | None:
+    """Gateway-only topology for a SaaS env, from the form's gateway fields.
+
+    GW4: an SSH node only when the optional SSH block is enabled and a host
+    given — otherwise None (API-only audit; the capture engine synthesizes
+    the single ipsdk target from ``gateway4_uri``). GW5: an SSH node, or a
+    file-backed (``transport=gateway5_file``) node per the source picker.
+    Mirrors the CLI's SaaS wizard.
+    """
+    kind = (payload.get("saas_gateway_kind") or "").strip().lower()
+    ssh_user = (payload.get("ssh_user") or "atlas").strip() or "atlas"
+    try:
+        ssh_port = int((payload.get("ssh_port") or 22))
+    except (TypeError, ValueError):
+        ssh_port = 22
+    ssh_key = (payload.get("ssh_key") or "").strip()
+
+    def _gw_ssh_node(host: str, modules: list[str]) -> dict[str, Any]:
+        return {
+            "role": "iag", "host": host, "label": "iag-01",
+            "transport": "ssh", "ssh_user": ssh_user, "ssh_port": ssh_port,
+            "ssh_key": ssh_key, "modules": modules,
+        }
+
+    nodes: list[dict[str, Any]] = []
+    if kind == "gateway5":
+        source = (payload.get("gateway5_source") or "").strip().lower()
+        path = (payload.get("gateway5_source_path") or "").strip()
+        conf_path = (payload.get("gateway5_conf_path") or "").strip()
+        host = (payload.get("iag_host") or "").strip()
+        if source in ("compose", "helm") and path:
+            nodes.append({
+                "role": "iag", "host": "gateway5-file", "label": "iag5-file",
+                "transport": "gateway5_file", "gateway5_source_path": path,
+                "modules": ["gateway5"],
+            })
+        elif source == "conf" and host:
+            node = _gw_ssh_node(host, ["system", "gateway5", "filesystem"])
+            node["gateway5_conf_path"] = conf_path
+            nodes.append(node)
+        elif host:
+            nodes.append(_gw_ssh_node(host, ["system", "gateway5", "filesystem"]))
+        if not nodes:
+            raise ValueError(
+                "A SaaS Gateway 5 environment needs a source — an SSH host (for "
+                "printenv or the server gateway.conf), or a Compose / Helm file path."
+            )
+    else:  # gateway4
+        host = (payload.get("iag_host") or "").strip()
+        wants_ssh = (payload.get("saas_gw4_ssh") or "").strip().lower() in ("1", "on", "true", "yes")
+        if wants_ssh and not host:
+            raise ValueError(
+                "Gateway SSH collection is enabled but no gateway SSH host was given."
+            )
+        if wants_ssh and host:
+            nodes.append(_gw_ssh_node(host, ["system", "gateway4", "filesystem"]))
+        if not nodes:
+            return None  # API-only GW4 — no topology needed
+
+    deployment: dict[str, Any] = {
+        "mode": "gateway_only",
+        "capture_scope": "primary_only",
+        "nodes": nodes,
+    }
+    if ssh_key and any(n.get("transport") == "ssh" for n in nodes):
+        deployment["ssh_defaults"] = {"key_path": ssh_key, "username": ssh_user, "port": ssh_port}
+    return deployment
+
+
 def build_topology_from_form(payload: dict[str, Any], existing: dict | None = None) -> dict | None:
     """Construct a ``deployment`` dict from the env form's topology fields.
 
@@ -83,6 +154,8 @@ def build_topology_from_form(payload: dict[str, Any], existing: dict | None = No
     tier = (payload.get("tier") or "").strip().lower()
     if tier == "standard":
         return None
+    if tier == "saas":
+        return _build_saas_topology(payload)
 
     mode = (payload.get("deployment_mode") or "standalone").strip().lower()
 
@@ -188,6 +261,40 @@ def build_topology_from_form(payload: dict[str, Any], existing: dict | None = No
             return _preserve_transport_fields(ex, host, primary)
         return _node(role, host, primary=primary)
 
+    def _append_gateway5_node(target_nodes: list[dict[str, Any]]) -> None:
+        """Append the Gateway 5 node per the chosen source (only one is used).
+
+        * compose/helm — an SSH-less, file-backed node (``transport=gateway5_file``)
+          whose env vars are parsed from a local Compose/Helm file at capture time.
+        * ssh          — a normal SSH IAG node (collects Gateway 5 via printenv,
+          plus Gateway 4 over SSH via the IAG role defaults), built from ``iag_host``.
+        * conf         — a normal SSH IAG node that reads the server's gateway.conf
+          over SSH (``gateway5_conf_path``) instead of printenv.
+        * legacy posts without the picker field fall back to ``iag_host`` == SSH,
+          preserving behavior for older forms / direct API submissions.
+        """
+        source = (payload.get("gateway5_source") or "").strip().lower()
+        path = (payload.get("gateway5_source_path") or "").strip()
+        conf_path = (payload.get("gateway5_conf_path") or "").strip()
+        ssh_host = (payload.get("iag_host") or "").strip()
+        if source in ("compose", "helm") and path:
+            target_nodes.append({
+                "role": "iag",
+                "host": "gateway5-file",
+                "label": "iag5-file",
+                "transport": "gateway5_file",
+                "gateway5_source_path": path,
+                "modules": ["gateway5"],
+            })
+        elif source == "conf" and ssh_host:
+            node = _node_preserve("iag", ssh_host, primary=True)
+            node["gateway5_conf_path"] = conf_path
+            target_nodes.append(node)
+        elif source == "ssh" and ssh_host:
+            target_nodes.append(_node_preserve("iag", ssh_host, primary=True))
+        elif "gateway5_source" not in payload and ssh_host:
+            target_nodes.append(_node_preserve("iag", ssh_host, primary=True))
+
     nodes: list[dict[str, Any]] = []
     if mode == "ha2":
         # HA2 reads its own _ha-suffixed primary fields so the standalone and
@@ -201,7 +308,6 @@ def build_topology_from_form(payload: dict[str, Any], existing: dict | None = No
         redis1 = (payload.get("redis_host_ha") or "").strip()
         redis2 = (payload.get("redis_host_2") or "").strip()
         redis3 = (payload.get("redis_host_3") or "").strip()
-        iag = (payload.get("iag_host_ha") or "").strip()
 
         # IAP slots: the form's transport selector applies to the PRIMARY
         # only (Atlas just uses the primary for protocol-level checks).
@@ -220,8 +326,7 @@ def build_topology_from_form(payload: dict[str, Any], existing: dict | None = No
         for i, h in enumerate((redis1, redis2, redis3)):
             if h:
                 nodes.append(_node_preserve("redis", h, primary=(i == 0), slot=i))
-        if iag:
-            nodes.append(_node_preserve("iag", iag, primary=True))
+        _append_gateway5_node(nodes)
 
         deployment: dict[str, Any] = {
             "mode": "ha2",
@@ -232,15 +337,13 @@ def build_topology_from_form(payload: dict[str, Any], existing: dict | None = No
         iap_host = (payload.get("iap_host") or fallback_host).strip()
         mongo_host = (payload.get("mongo_host") or iap_host).strip()
         redis_host = (payload.get("redis_host") or iap_host).strip()
-        iag_host = (payload.get("iag_host") or "").strip()
 
         nodes = [
             _iap_node(iap_host, primary=True),
             _node_preserve("mongo", mongo_host, primary=True),
             _node_preserve("redis", redis_host, primary=True),
         ]
-        if iag_host:
-            nodes.append(_node_preserve("iag", iag_host, primary=True))
+        _append_gateway5_node(nodes)
 
         deployment = {
             "mode": "standalone",
@@ -272,6 +375,26 @@ def topology_summary(env_data: dict | None) -> dict:
             "primary": bool(n.get("primary")),
         })
     return {"configured": True, "mode": mode, "nodes": nodes}
+
+
+def store_ssh_passphrase(env_name: str, backend: str, passphrase: str) -> None:
+    """Write the SSH key passphrase into ``env_name``'s local secret store.
+
+    Direct-substrate write (mirrors ``setup.bootstrap``): the env being
+    edited may not be the active config, so ``active_secret_store()`` could
+    target the wrong backend — write straight to the chosen substrate
+    under the env-scoped service name. Capture reads it back through the
+    same scoped service (``credential_store().get(SSH_PASSPHRASE)``).
+    Vault-backed envs must not arrive here — Vault is read-only from Atlas.
+    """
+    from platform_atlas.core.credentials import (
+        CredentialKey,
+        FileSecretStore,
+        KeyringSecretStore,
+        scoped_service_name,
+    )
+    substrate = FileSecretStore() if (backend or "").strip().lower() == "file" else KeyringSecretStore()
+    substrate.set(scoped_service_name(env_name), CredentialKey.SSH_PASSPHRASE.value, passphrase)
 
 
 def active_env_allows_legacy() -> bool:
@@ -361,9 +484,13 @@ def save_environment(payload: dict[str, Any]) -> Environment:
     # Build a clean dict — start from existing on edit so we don't drop fields
     # the form didn't include.
     base: dict[str, Any] = {}
+    prior_tier = ""
+    prior_kind = ""
     if not creating:
         existing = mgr.load(name)
         base = existing.to_dict()
+        prior_tier = (base.get("tier") or "").strip().lower()
+        prior_kind = (base.get("saas_gateway_kind") or "").strip().lower()
 
     # Whitelist fields we accept from the form. Anything else is ignored.
     # ``organization_name`` is intentionally absent — it lives in the global
@@ -371,7 +498,8 @@ def save_environment(payload: dict[str, Any]) -> Environment:
     # read-only and the WebUI never writes it into an env overlay.
     accepted = {
         "name", "description", "platform_uri",
-        "platform_client_id", "credential_backend", "tier",
+        "platform_client_id", "credential_backend", "vault_secret_store", "tier",
+        "saas_gateway_kind",
         "gateway4_uri", "gateway4_username", "legacy_profile",
         "ssh_key",
         "values_yaml_path", "iag5_values_yaml_path",
@@ -386,6 +514,50 @@ def save_environment(payload: dict[str, Any]) -> Environment:
     if not base.get("tier"):
         base["tier"] = None
 
+    # SaaS environments bind their tier and gateway kind at create time —
+    # converting either direction would leave the env half-invalid.
+    new_tier = (base.get("tier") or "").strip().lower()
+    if not creating and "tier" in payload:
+        if prior_tier == "saas" and new_tier != "saas":
+            raise ValueError(
+                "A SaaS environment's tier is fixed at create time — create a "
+                "new environment for a Standard or Extended audit."
+            )
+        if prior_tier and prior_tier != "saas" and new_tier == "saas":
+            raise ValueError(
+                "An existing Standard/Extended environment can't be converted "
+                "to SaaS — create a new SaaS environment instead."
+            )
+    if (not creating and prior_tier == "saas" and prior_kind
+            and (base.get("saas_gateway_kind") or "").strip().lower() != prior_kind):
+        raise ValueError(
+            "A SaaS environment's gateway kind is fixed at create time — "
+            "create a new environment to audit the other gateway."
+        )
+
+    # Legacy (2023.x) is a Platform concept — a SaaS environment audits a
+    # standalone gateway and never carries the marker. Stripping it here
+    # (not just hiding the form control) also self-heals stale data and
+    # keeps the 2023 rulesets/profiles hidden for gateway-only envs.
+    if (base.get("tier") or "").strip().lower() == "saas":
+        base.pop("legacy_profile", None)
+
+    # saas_gateway_kind only means something for SaaS envs — keep it out of
+    # other tiers' overlays, and insist on it for SaaS (strictly one gateway
+    # per environment, fixed at create time).
+    if (base.get("tier") or "").strip().lower() != "saas":
+        base.pop("saas_gateway_kind", None)
+    elif (base.get("saas_gateway_kind") or "").strip().lower() not in ("gateway4", "gateway5"):
+        raise ValueError(
+            "A SaaS environment needs a gateway kind — Gateway 4 or Gateway 5."
+        )
+    elif (base.get("saas_gateway_kind") or "").strip().lower() == "gateway4" \
+            and not (base.get("gateway4_uri") or "").strip():
+        raise ValueError(
+            "A SaaS Gateway 4 environment needs the Gateway 4 API URL — the "
+            "API is the primary audit source (SSH is the optional supplement)."
+        )
+
     # use_kubectl arrives as a string from the form
     base["use_kubectl"] = bool(base.get("use_kubectl")) and base.get("use_kubectl") not in ("0", "off", "false", "False", "")
 
@@ -399,11 +571,12 @@ def save_environment(payload: dict[str, Any]) -> Environment:
         new_topo = build_topology_from_form(payload, existing=base.get("deployment"))
         if new_topo is not None:
             base["deployment"] = new_topo
-        elif (base.get("tier") or "").strip().lower() == "standard":
-            # Switching to Standard — drop the now-unused topology so it
-            # doesn't drift out of date silently.
+        elif (base.get("tier") or "").strip().lower() in ("standard", "saas"):
+            # Standard never uses a topology; a SaaS build returning None is
+            # an API-only GW4 audit — drop any stale topology either way so
+            # it doesn't drift out of date silently.
             base.pop("deployment", None)
-    elif creating and (base.get("tier") or "extended").strip().lower() != "standard" and not base.get("deployment"):
+    elif creating and (base.get("tier") or "extended").strip().lower() not in ("standard", "saas") and not base.get("deployment"):
         # Brand-new Extended env with no topology fields posted → seed a
         # placeholder deployment so the first capture attempt doesn't error
         # out on missing 'deployment'. The user can refine it on edit.

@@ -1,0 +1,251 @@
+/*
+ * Report Export modal — styles for the delivery-archive dialog on the report
+ * view. Theme-agnostic: every colour comes from the atlas.css design tokens so
+ * the modal tracks the active theme + light/dark mode automatically.
+ *
+ * Motion follows the project rule: transitions are transform / opacity / colour
+ * only — never width/height on text — so nothing reflows mid-animation.
+ */
+
+.rx-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.rx-modal[hidden] { display: none; }
+
+.rx-backdrop {
+  position: absolute;
+  inset: 0;
+  background: oklch(0% 0 0 / 0.55);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  animation: rx-fade 160ms ease-out;
+}
+
+.rx-card {
+  position: relative;
+  width: 100%;
+  max-width: 460px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-lg);
+  box-shadow: 0 24px 60px -12px oklch(0% 0 0 / 0.5);
+  animation: rx-pop 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ── Header ── */
+.rx-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px 18px 12px;
+}
+.rx-head-text { flex: 1; min-width: 0; }
+.rx-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--text);
+}
+.rx-sub {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+.rx-sub code {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 1px 4px;
+  border-radius: var(--r-sm);
+  background: var(--bg-2);
+  color: var(--text);
+}
+.rx-x {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: color 120ms ease, background 120ms ease;
+}
+.rx-x:hover { color: var(--text); background: var(--surface-2); }
+
+/* ── Body ── */
+.rx-body { padding: 8px 18px 4px; }
+
+.rx-field { margin-bottom: 16px; }
+.rx-field-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-3);
+  margin-bottom: 7px;
+}
+
+/* Segmented format control.
+   NOTE: fixed radii (not var(--r-md)) on purpose — under the "pill" radius
+   theme --r-md is 999px, which over-rounds these rectangular boxes and clips
+   their text. A modest fixed radius is correct for small controls. */
+.rx-seg {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.rx-seg-opt { position: relative; cursor: pointer; }
+.rx-seg-opt input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+  cursor: pointer;
+}
+.rx-seg-opt span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+  border-radius: 7px;
+  transition: color 120ms ease, background 120ms ease;
+}
+.rx-seg-opt input:checked + span {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.rx-seg-opt input:focus-visible + span {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Include-debug checkbox */
+.rx-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 11px 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  /* Fixed radius — see note on .rx-seg. A multi-line box must not become a
+     999px pill (pill theme), which clips the wrapped note text. */
+  border-radius: 10px;
+  cursor: pointer;
+}
+.rx-check input {
+  margin: 1px 0 0;
+  flex-shrink: 0;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+.rx-check-text { display: flex; flex-direction: column; gap: 2px; }
+.rx-check-title { font-size: 12.5px; font-weight: 500; color: var(--text); }
+.rx-check-note { font-size: 11px; line-height: 1.45; color: var(--text-3); }
+
+/* ── Working ── */
+.rx-working {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 30px 18px;
+}
+.rx-spinner {
+  width: 30px;
+  height: 30px;
+  border: 3px solid var(--line-2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: rx-spin 750ms linear infinite;
+}
+.rx-working-text { margin: 0; font-size: 13px; color: var(--text-2); }
+
+/* ── Result ── */
+.rx-result-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 14px;
+}
+.rx-ok { flex-shrink: 0; color: var(--ok); }
+.rx-result-title { font-size: 14px; font-weight: 650; color: var(--text); }
+.rx-result-name {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--text-2);
+  word-break: break-all;
+}
+.rx-meta {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.rx-meta-row { display: grid; grid-template-columns: 78px 1fr; gap: 10px; align-items: start; }
+.rx-meta-row dt {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-3);
+  padding-top: 1px;
+}
+.rx-meta-row dd { margin: 0; font-size: 12.5px; color: var(--text); }
+.rx-meta-path dd code {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-2);
+  word-break: break-all;
+  user-select: all;
+}
+
+/* ── Error ── */
+.rx-errbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 16px 18px;
+}
+.rx-err { flex-shrink: 0; color: var(--bad); margin-top: 1px; }
+.rx-err-text { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--text); }
+
+/* ── Footer ── */
+.rx-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 18px 18px;
+}
+
+/* ── Motion ── */
+@keyframes rx-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rx-pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes rx-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .rx-backdrop, .rx-card { animation: none; }
+  .rx-spinner { animation-duration: 1.4s; }
+}

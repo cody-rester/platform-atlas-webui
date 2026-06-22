@@ -8,17 +8,29 @@ Channels persist in the per-environment overlay JSON under
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from platform_atlas.core._version import __version__ as ATLAS_VERSION
 from platform_atlas.continuous import notifications
 
-from platform_atlas_webui.dependencies import get_atlas_context, get_templates, template_context
+from platform_atlas_webui.dependencies import (
+    forbid_saas_feature,
+    get_atlas_context,
+    get_templates,
+    template_context,
+)
 from platform_atlas_webui.services import environments as env_svc
 
-router = APIRouter(prefix="/notifications", tags=["notifications"])
+# Notification channels route continuous-audit drift alerts — part of a feature
+# with no role in a single-gateway SaaS audit. Refuse for SaaS; Standard and
+# Extended are unaffected.
+router = APIRouter(
+    prefix="/notifications",
+    tags=["notifications"],
+    dependencies=[Depends(forbid_saas_feature("Notifications"))],
+)
 _templates = get_templates()
 
 

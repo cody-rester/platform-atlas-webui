@@ -20,6 +20,7 @@ from platform_atlas.core.paths import ATLAS_CONFIG_FILE
 from platform_atlas.core.utils import atomic_write_json
 
 from platform_atlas_webui.dependencies import get_templates, template_context
+from platform_atlas_webui.services import config as config_svc
 
 router = APIRouter(prefix="/tier", tags=["tier"])
 _templates = get_templates()
@@ -32,9 +33,25 @@ async def tier_overview(request: Request) -> HTMLResponse:
     active_tier = "extended"
     org = ""
     try:
+        import os
         data = json.loads(ATLAS_CONFIG_FILE.read_text(encoding="utf-8"))
         active_tier = data.get("tier", "extended")
         org = data.get("organization_name", "")
+        # The active environment's overlay tier wins over the root config tier
+        # (same precedence as load_config), so this page reflects the tier the
+        # active environment actually runs as — not a stale root default. Without
+        # this, a Standard active environment showed "extended" here.
+        env_name = data.get("active_environment") or ""
+        if env_name:
+            from platform_atlas.core.paths import ATLAS_ENVIRONMENTS_DIR
+            env_file = ATLAS_ENVIRONMENTS_DIR / f"{env_name}.json"
+            if env_file.is_file():
+                env_data = json.loads(env_file.read_text(encoding="utf-8"))
+                if env_data.get("tier"):
+                    active_tier = env_data["tier"]
+        env_tier = os.environ.get("ATLAS_TIER")
+        if env_tier and env_tier.strip().lower() in ("standard", "extended", "saas"):
+            active_tier = env_tier.strip().lower()
     except Exception:
         pass
 
@@ -73,18 +90,11 @@ async def tier_set(new_tier: Literal["standard", "extended"] = Form(...)):
 
     # The env overlay's tier wins over root config in load_config(), so a stale
     # ``tier`` field in the active environment file would silently undo the
-    # switch. Mirror the new tier into the overlay when one is active.
-    env_name = data.get("active_environment") or ""
-    if env_name:
-        try:
-            from platform_atlas.core.paths import ATLAS_ENVIRONMENTS_DIR
-            env_file = ATLAS_ENVIRONMENTS_DIR / f"{env_name}.json"
-            if env_file.is_file():
-                env_data = json.loads(env_file.read_text(encoding="utf-8"))
-                env_data["tier"] = new_tier
-                atomic_write_json(env_file, env_data)
-        except Exception:
-            pass  # Best-effort — root config write already succeeded
+    # switch. The service helper mirrors the new tier into the overlay, skips
+    # SaaS environments (tier fixed at create time — the switch then only
+    # changes the global default, exactly what the /tier overview promises),
+    # and invalidates the resolve_active_tier() cache.
+    config_svc.mirror_tier_to_active_overlay(new_tier)
 
     # Reload the in-memory context so subsequent operations (capture, validate)
     # immediately use the new tier without requiring a server restart.
@@ -354,17 +364,8 @@ async def revert_to_standard():
         data = json.loads(ATLAS_CONFIG_FILE.read_text(encoding="utf-8"))
         data["tier"] = "standard"
         atomic_write_json(ATLAS_CONFIG_FILE, data)
-        env_name = data.get("active_environment") or ""
-        if env_name:
-            try:
-                from platform_atlas.core.paths import ATLAS_ENVIRONMENTS_DIR
-                env_file = ATLAS_ENVIRONMENTS_DIR / f"{env_name}.json"
-                if env_file.is_file():
-                    env_data = json.loads(env_file.read_text(encoding="utf-8"))
-                    env_data["tier"] = "standard"
-                    atomic_write_json(env_file, env_data)
-            except Exception:
-                pass
+        # Same SaaS-aware overlay mirror as tier_set above.
+        config_svc.mirror_tier_to_active_overlay("standard")
         from platform_atlas.core.context import init_context
         init_context()
     except Exception:

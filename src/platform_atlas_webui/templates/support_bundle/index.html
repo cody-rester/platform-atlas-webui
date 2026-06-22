@@ -171,6 +171,96 @@
   max-width: 500px;
   margin-top: 12px;
 }
+
+/* ── Platform asset picker (vanilla JS, CSP-safe) ──────────────── */
+.sbap-overlay {
+  display: none;
+  position: fixed; inset: 0; z-index: 200;
+  align-items: center; justify-content: center; padding: 22px;
+  background: rgba(16, 22, 37, 0.42); backdrop-filter: blur(4px);
+}
+.sbap-panel {
+  display: flex; flex-direction: column;
+  width: 800px; max-width: 96vw; height: 78vh; max-height: 720px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-lg); overflow: hidden;
+  box-shadow: 0 24px 70px -16px rgba(16,22,37,0.34), 0 6px 16px rgba(16,22,37,0.08);
+  will-change: transform, opacity;
+}
+.sbap-head { padding: 18px 20px 0; }
+.sbap-head-row { display: flex; align-items: flex-start; gap: 12px; }
+.sbap-title { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
+.sbap-subtitle { margin: 2px 0 0; font-size: 12px; color: var(--text-3); }
+.sbap-x { width: 30px; height: 30px; flex: 0 0 auto; border-radius: var(--r-md);
+  border: 1px solid var(--line); background: var(--surface); color: var(--text-3);
+  display: grid; place-items: center; cursor: pointer; font-size: 13px; }
+.sbap-x:hover { background: var(--surface-2); color: var(--text); }
+.sbap-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.sbap-tab { position: relative; display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px;
+  border-radius: var(--r-md); border: 1px solid transparent; background: transparent;
+  color: var(--text-2); font-family: var(--ui); font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: background .14s, color .14s; }
+.sbap-tab:hover { background: var(--surface-2); }
+.sbap-tab.is-active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.sbap-tic { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 7px;
+  background: var(--accent-soft); color: var(--accent); flex: 0 0 auto; }
+.sbap-tab.is-active .sbap-tic { background: var(--accent); color: #fff; }
+.sbap-tabcount { font-size: 11px; opacity: 0.7; }
+.sbap-tabsel { position: absolute; top: -5px; right: -4px; display: grid; place-items: center;
+  background: var(--accent); color: #fff; border-radius: 999px; padding: 0 5px;
+  font-size: 10px; font-weight: 700; min-width: 16px; height: 16px;
+  box-shadow: 0 0 0 2px var(--surface); }
+.sbap-toolbar { padding: 12px 16px; }
+.sbap-srch { position: relative; }
+.sbap-srch .sbap-mg { position: absolute; left: 13px; top: 9px; color: var(--text-4); pointer-events: none; font-size: 15px; }
+.sbap-srch input { width: 100%; height: 38px; border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--bg-2); color: var(--text); font-family: var(--ui); font-size: 13px;
+  padding: 0 14px 0 36px; outline: none; transition: border-color .15s, box-shadow .15s, background .15s; }
+.sbap-srch input:focus { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px var(--accent-soft); }
+.sbap-list { flex: 1; overflow-y: auto; padding: 2px 8px 8px; min-height: 0; }
+.sbap-row { display: flex; align-items: center; gap: 12px; padding: 9px 14px; border-radius: 10px;
+  cursor: pointer; position: relative; will-change: transform, opacity; }
+.sbap-row:hover { background: var(--surface-2); }
+.sbap-row::before { content: ""; position: absolute; left: 3px; top: 8px; bottom: 8px; width: 3px;
+  border-radius: 3px; background: var(--accent); transform: scaleY(0); transition: transform .18s; }
+.sbap-row.is-sel::before { transform: scaleY(1); }
+.sbap-row.is-sel { background: var(--accent-soft); }
+.sbap-cbx { flex: 0 0 auto; width: 18px; height: 18px; border-radius: 6px; border: 1.5px solid var(--line-2);
+  background: var(--surface); position: relative; transition: background .12s, border-color .12s; }
+.sbap-row.is-sel .sbap-cbx { background: var(--accent); border-color: var(--accent); }
+.sbap-cbx::after { content: ""; position: absolute; left: 5px; top: 1.5px; width: 5px; height: 9px;
+  border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg) scale(0); transition: transform .12s; }
+.sbap-row.is-sel .sbap-cbx::after { transform: rotate(45deg) scale(1); }
+.sbap-rowname { flex: 1; min-width: 0; font-size: 13px; font-weight: 500; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sbap-rowmeta { font-size: 11px; color: var(--text-4); font-family: var(--mono); flex-shrink: 0; }
+.sbap-empty { text-align: center; color: var(--text-4); font-size: 13px; padding: 40px 16px; line-height: 1.5; }
+.sbap-foot { display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+  border-top: 1px solid var(--line); background: var(--bg-2); }
+.sbap-pager { display: flex; align-items: center; gap: 8px; }
+.sbap-pgbtn { height: 30px; padding: 0 12px; border-radius: var(--r-md); border: 1px solid var(--line);
+  background: var(--surface); color: var(--text-2); font-family: var(--ui); font-size: 12px; cursor: pointer; }
+.sbap-pgbtn:hover:not([disabled]) { background: var(--surface-2); }
+.sbap-pgbtn[disabled] { opacity: 0.45; cursor: not-allowed; }
+.sbap-pginfo { font-size: 11.5px; color: var(--text-4); }
+.sbap-foot-r { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.sbap-countpill { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px;
+  border-radius: 999px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; }
+.sbap-sel-lbl { font-size: 12.5px; color: var(--text-3); }
+.sbap-linkbtn { background: none; border: none; cursor: pointer; color: var(--text-3);
+  font-size: 12.5px; font-family: var(--ui); padding: 0 2px; }
+.sbap-linkbtn:hover { color: var(--bad); }
+
+/* ── Collect-bundle form inputs: pin legible text + placeholder ─────
+   The ticket / description / log-window fields are styled with utility
+   classes only and set no explicit `color`, so they fall through to the
+   UA default — which `color-scheme: dark` (the app's default scheme)
+   renders near-white. On a light theme the field surface (bg-surface-2)
+   is light, so typed text became invisible. Pin to the theme text tokens
+   the same way `.field input` and `.sbap-srch input` do, so they read
+   correctly in every theme + mode. */
+#sb-ticket, #sb-desc, #sb-days { color: var(--text); }
+#sb-ticket::placeholder, #sb-desc::placeholder { color: var(--text-4); opacity: 1; }
 </style>
 
 {# ── Page header (always shown) ─────────────────────────────── #}
@@ -194,7 +284,7 @@
 
   {% set _tier   = job.metadata.get('tier', tier) %}
   {% set _ticket = job.metadata.get('ticket', '') %}
-  {% set _is_ext = _tier != 'standard' %}
+  {% set _is_ext = _tier == 'extended' %}
 
   <div class="max-w-[660px] mx-auto">
     <div class="card">
@@ -592,15 +682,37 @@
                    class="w-24 text-[13px] font-mono px-3 py-2 bg-surface-2 border border-line rounded-md focus:border-accent focus:outline-none">
             <span class="text-[13px] text-text-3">days</span>
           </div>
-          {% if tier == 'standard' %}
+          {% if tier != 'extended' %}
           <p class="text-[11px] text-text-4 mt-1 m-0 italic">
-            SSH logs require Extended tier — this setting is unused in Standard mode.
+            SSH logs require Extended tier — this setting is unused in
+            {{ 'a SaaS gateway audit' if tier == 'saas' else 'Standard mode' }}.
           </p>
           {% else %}
           <p class="text-[11px] text-text-4 mt-1 m-0">
             Look back this many days when fetching platform, webserver, and MongoDB logs via SSH.
           </p>
           {% endif %}
+        </div>
+
+        {# ── Platform assets (optional) ─────────────────────────── #}
+        <div class="border-t border-line pt-4">
+          <div class="text-[11px] font-semibold text-text-3 uppercase tracking-[0.07em]">
+            Platform assets
+            <span class="text-text-4 font-normal normal-case tracking-normal">(optional)</span>
+          </div>
+          <p class="text-[11px] text-text-4 mt-1 mb-2 m-0">
+            Export Workflows, JST Transformations, JSON Forms or whole Projects from
+            <span class="font-mono">{{ active_env or 'this environment' }}</span> into the
+            bundle — exported as-is from the Platform.
+          </p>
+          <input type="hidden" name="assets" id="sbap-input">
+          <div class="flex items-center gap-3">
+            <button type="button" class="btn" id="sbap-open">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              <span data-label>Add Platform assets</span>
+            </button>
+            <span class="chip text-[11px]" id="sbap-chip" style="display:none;"><span id="sbap-chip-count">0</span>&nbsp;selected</span>
+          </div>
         </div>
 
         <div class="pt-1">
@@ -630,7 +742,15 @@
         <div class="text-[11.5px] text-text-3">Active config snapshot — credentials replaced with <code class="font-mono">***</code></div>
       </div>
 
-      {% if tier != 'standard' %}
+      <div>
+        <div class="flex items-center gap-1.5 mb-1">
+          <span class="font-semibold text-text text-[12.5px]">Platform assets</span>
+          <span class="chip text-[10px]">optional</span>
+        </div>
+        <div class="text-[11.5px] text-text-3">Workflows, JST, JSON Forms or whole Projects you pick — exported as-is into <code class="font-mono">exports/</code></div>
+      </div>
+
+      {% if tier == 'extended' %}
       <div>
         <div class="flex items-center gap-1.5 mb-1">
           <span class="font-semibold text-text text-[12.5px]">SSH logs</span>
@@ -647,7 +767,11 @@
       </div>
       {% else %}
       <div class="text-[11.5px] text-text-4 italic border-t border-line pt-3">
-        Switch to Extended tier to include SSH logs and system info in the bundle.
+        {% if tier == 'saas' %}
+          A SaaS gateway audit bundles the Atlas config snapshot only — there are no Platform/MongoDB log sources.
+        {% else %}
+          Switch to Extended tier to include SSH logs and system info in the bundle.
+        {% endif %}
       </div>
       {% endif %}
 
@@ -658,7 +782,255 @@
     </div>
   </aside>
 
+</div>{# /grid #}
+
+{# ── Platform asset picker overlay (vanilla JS, CSP-safe) ───────── #}
+<div class="sbap-overlay" id="sbap-overlay" aria-hidden="true">
+  <div class="sbap-panel">
+    <div class="sbap-head">
+      <div class="sbap-head-row">
+        <div style="flex:1">
+          <h3 class="sbap-title">Add Platform assets</h3>
+          <p class="sbap-subtitle">Selected items are exported as-is into <code style="font-family:var(--mono)">exports/</code> in the bundle ZIP.</p>
+        </div>
+        <button type="button" class="sbap-x" id="sbap-close" aria-label="Close">✕</button>
+      </div>
+      <div class="sbap-tabs" id="sbap-tabs"></div>
+    </div>
+    <div class="sbap-toolbar">
+      <div class="sbap-srch">
+        <span class="sbap-mg" aria-hidden="true">⌕</span>
+        <input type="text" id="sbap-search" autocomplete="off" spellcheck="false" placeholder="Search by name…">
+      </div>
+    </div>
+    <div class="sbap-list" id="sbap-list"></div>
+    <div class="sbap-foot">
+      <div class="sbap-pager">
+        <button type="button" class="sbap-pgbtn" id="sbap-prev">‹ Prev</button>
+        <button type="button" class="sbap-pgbtn" id="sbap-next">Next ›</button>
+        <span class="sbap-pginfo" id="sbap-pageinfo"></span>
+      </div>
+      <div class="sbap-foot-r">
+        <span class="sbap-countpill" id="sbap-count">0</span>
+        <span class="sbap-sel-lbl">selected</span>
+        <button type="button" class="sbap-linkbtn" id="sbap-clear">Clear</button>
+        <button type="button" class="btn primary" id="sbap-done">Done</button>
+      </div>
+    </div>
+  </div>
 </div>
+
+<script src="{{ url_for('static', path='js/anime.min.js') }}?v={{ asset_version }}"></script>
+<script type="application/json" id="sbap-types">{{ asset_types | tojson }}</script>
+<script nonce="{{ csp_nonce }}">
+(function () {
+  var openBtn = document.getElementById('sbap-open');
+  var overlay = document.getElementById('sbap-overlay');
+  var input   = document.getElementById('sbap-input');
+  if (!openBtn || !overlay || !input) return;
+
+  var types = [];
+  try { types = JSON.parse(document.getElementById('sbap-types').textContent || '[]'); } catch (e) {}
+
+  // Type icons for the segmented tabs.
+  var ICON = {
+    workflows:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.6-2-3.4-2.3 1a7 7 0 0 0-1.7-1l-.3-2.4H10.4l-.3 2.4a7 7 0 0 0-1.7 1l-2.3-1-2 3.4L6 11a7 7 0 0 0 0 2l-2 1.6 2 3.4 2.3-1a7 7 0 0 0 1.7 1l.3 2.4h3.2l.3-2.4a7 7 0 0 0 1.7-1l2.3 1 2-3.4-2-1.6c.1-.3.1-.7.1-1z"/></svg>',
+    transformations:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M8 4H7a3 3 0 0 0-3 3v3a2 2 0 0 1-2 2 2 2 0 0 1 2 2v3a3 3 0 0 0 3 3h1"/><path d="M16 4h1a3 3 0 0 1 3 3v3a2 2 0 0 0 2 2 2 2 0 0 0-2 2v3a3 3 0 0 1-3 3h-1"/></svg>',
+    forms:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="4" y="3" width="16" height="18" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="13" y2="16"/></svg>',
+    projects:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg>',
+  };
+
+  var LIMIT = 25;
+  var panel    = overlay.querySelector('.sbap-panel');
+  var listEl   = document.getElementById('sbap-list');
+  var tabsEl   = document.getElementById('sbap-tabs');
+  var searchEl = document.getElementById('sbap-search');
+  var tabs = {};
+  types.forEach(function (t) {
+    tabs[t.key] = { search: '', skip: 0, items: [], total: 0, count: undefined, loaded: false, loading: false, error: null };
+  });
+  var active = (types[0] || {}).key || null;
+  var cart = {};            // { type: { id: name } }
+  var inited = false;
+  var debounce = null;
+  var animateNext = false;  // stagger rows on navigation, not on every keystroke
+  function ANI() { return (typeof window.anime === 'function') ? window.anime : null; }  // bundled anime.js
+
+  function esc(s) { var d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; }
+  function cur() { return tabs[active] || { items: [], total: 0, skip: 0, search: '', loading: false }; }
+  function cartCount() { var n = 0; for (var t in cart) n += Object.keys(cart[t]).length; return n; }
+  function cartCountFor(t) { return cart[t] ? Object.keys(cart[t]).length : 0; }
+
+  function syncInput() {
+    var out = {};
+    for (var t in cart) {
+      var ids = Object.keys(cart[t]);
+      if (ids.length) out[t] = ids.map(function (id) { return { id: id, name: cart[t][id] }; });
+    }
+    input.value = JSON.stringify(out);
+    var c = cartCount();
+    var chip = document.getElementById('sbap-chip'); if (chip) chip.style.display = c ? '' : 'none';
+    var cc = document.getElementById('sbap-chip-count'); if (cc) cc.textContent = c;
+    var lbl = openBtn.querySelector('[data-label]'); if (lbl) lbl.textContent = c ? 'Edit selection (' + c + ')' : 'Add Platform assets';
+  }
+
+  function renderTabs() {
+    if (!tabsEl) return;
+    tabsEl.innerHTML = '';
+    types.forEach(function (t) {
+      var st = tabs[t.key];
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'sbap-tab' + (t.key === active ? ' is-active' : '');
+      var sel = cartCountFor(t.key);
+      b.innerHTML = '<span class="sbap-tic">' + (ICON[t.key] || '') + '</span>' +
+        '<span>' + esc(t.label) + '</span>' +
+        '<span class="sbap-tabcount">' + (st.count === undefined ? '…' : st.count) + '</span>' +
+        (sel ? '<span class="sbap-tabsel">' + sel + '</span>' : '');
+      b.addEventListener('click', function () { selectTab(t.key); });
+      tabsEl.appendChild(b);
+    });
+  }
+
+  function renderList() {
+    if (!listEl) return;
+    var st = cur();
+    if (st.loading && !st.items.length) { listEl.innerHTML = '<div class="sbap-empty">Loading…</div>'; return; }
+    if (st.error) { listEl.innerHTML = '<div class="sbap-empty">⚠ Couldn’t reach the Platform.<br><span style="font-size:11px;color:var(--text-4)">' + esc(st.error) + '</span></div>'; return; }
+    if (!st.items.length) { listEl.innerHTML = '<div class="sbap-empty">No matches.</div>'; return; }
+    var m = cart[active] || {};
+    listEl.innerHTML = st.items.map(function (it) {
+      return '<div class="sbap-row' + (m[it.id] ? ' is-sel' : '') + '" data-id="' + esc(it.id) + '">' +
+        '<span class="sbap-cbx"></span>' +
+        '<span class="sbap-rowname">' + esc(it.name) + '</span>' +
+        '<span class="sbap-rowmeta">' + esc(it.updated || '') + '</span></div>';
+    }).join('');
+    if (animateNext) {
+      animateNext = false;
+      var a = ANI();
+      if (a) a({ targets: listEl.querySelectorAll('.sbap-row'), opacity: [0, 1], translateY: [6, 0],
+        delay: a.stagger(13), duration: 280, easing: 'easeOutQuad' });
+    }
+  }
+
+  function renderFoot() {
+    var st = cur();
+    var cnt = document.getElementById('sbap-count'); if (cnt) cnt.textContent = cartCount();
+    var info;
+    if (st.total) { var s = st.skip + 1, e = Math.min(st.skip + LIMIT, st.total); info = s + '–' + e + ' of ' + st.total; }
+    else info = (st.loading ? 'Loading…' : '0 of 0');
+    var pi = document.getElementById('sbap-pageinfo'); if (pi) pi.textContent = info;
+    var pv = document.getElementById('sbap-prev'); if (pv) pv.disabled = st.skip <= 0;
+    var nx = document.getElementById('sbap-next'); if (nx) nx.disabled = st.skip + LIMIT >= st.total;
+  }
+
+  function renderAll() { renderTabs(); renderList(); renderFoot(); }
+
+  function load(type, animate) {
+    var st = tabs[type]; if (!st) return;
+    st.loading = true; st.error = null;
+    if (type === active) { renderList(); renderFoot(); }
+    var url = '/support-bundle/assets/' + encodeURIComponent(type) +
+      '?search=' + encodeURIComponent(st.search) + '&skip=' + st.skip + '&limit=' + LIMIT;
+    fetch(url, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+      .then(function (r) {
+        if (r.ok) return r.json();
+        return r.text().then(function (t) {
+          var msg = 'HTTP ' + r.status;
+          try { var j = JSON.parse(t); if (j && j.detail) msg = j.detail; } catch (e) {}
+          throw new Error(msg);
+        });
+      })
+      .then(function (d) {
+        st.items = d.items || []; st.total = d.total || 0; st.loaded = true; st.loading = false;
+        if (!st.search) st.count = st.total;
+        renderTabs();
+        if (type === active) { if (animate) animateNext = true; renderList(); renderFoot(); }
+      })
+      .catch(function (err) {
+        st.items = []; st.total = 0; st.loading = false;
+        st.error = (err && err.message) ? err.message : String(err);
+        renderTabs();
+        if (type === active) { renderList(); renderFoot(); }
+      });
+  }
+
+  function selectTab(key) {
+    if (key === active) return;
+    active = key;
+    if (searchEl) searchEl.value = tabs[key].search;
+    if (tabs[key].loaded) { animateNext = true; renderAll(); }
+    else { renderAll(); load(key, true); }
+  }
+
+  // Delegated row toggle — rows are re-rendered as innerHTML, so one listener stays valid.
+  if (listEl) listEl.addEventListener('click', function (e) {
+    var row = e.target.closest('.sbap-row'); if (!row) return;
+    var id = row.getAttribute('data-id'); if (id == null) return;
+    var items = cur().items, it = null;
+    for (var i = 0; i < items.length; i++) { if (String(items[i].id) === id) { it = items[i]; break; } }
+    if (!it) return;
+    if (!cart[active]) cart[active] = {};
+    var a = ANI();
+    if (cart[active][id]) { delete cart[active][id]; row.classList.remove('is-sel'); }
+    else {
+      cart[active][id] = it.name; row.classList.add('is-sel');
+      if (a) a({ targets: row.querySelector('.sbap-cbx'), scale: [0.6, 1], duration: 300, easing: 'easeOutBack' });
+    }
+    syncInput(); renderTabs(); renderFoot();
+    var cnt = document.getElementById('sbap-count');
+    if (cnt && a) a({ targets: cnt, scale: [1.3, 1], duration: 320, easing: 'easeOutBack' });
+  });
+
+  function openPicker() {
+    overlay.style.display = 'flex';
+    var a = ANI();
+    if (a && panel) {
+      a.set(overlay, { opacity: 0 });
+      a.set(panel, { opacity: 0, scale: 0.965, translateY: 12 });
+      a({ targets: overlay, opacity: 1, duration: 180, easing: 'easeOutQuad' });
+      a({ targets: panel, opacity: 1, scale: 1, translateY: 0, duration: 420, easing: 'easeOutExpo' });
+    }
+    if (!inited) { inited = true; types.forEach(function (t) { load(t.key, t.key === active); }); }
+    else if (tabs[active] && tabs[active].loaded) { animateNext = true; }
+    renderAll();
+    if (searchEl) setTimeout(function () { searchEl.focus(); }, 140);
+  }
+  function closePicker() {
+    var a = ANI();
+    if (a && panel) {
+      a({ targets: panel, opacity: 0, scale: 0.97, translateY: 8, duration: 160, easing: 'easeInQuad' });
+      a({ targets: overlay, opacity: 0, duration: 180, easing: 'linear',
+        complete: function () { overlay.style.display = 'none'; } });
+    } else { overlay.style.display = 'none'; }
+  }
+
+  openBtn.addEventListener('click', openPicker);
+  var b;
+  b = document.getElementById('sbap-close'); if (b) b.addEventListener('click', closePicker);
+  b = document.getElementById('sbap-done');  if (b) b.addEventListener('click', closePicker);
+  b = document.getElementById('sbap-clear'); if (b) b.addEventListener('click', function () {
+    cart = {};
+    if (listEl) listEl.querySelectorAll('.sbap-row.is-sel').forEach(function (r) { r.classList.remove('is-sel'); });
+    syncInput(); renderTabs(); renderFoot();
+  });
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) closePicker(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && overlay.style.display === 'flex') closePicker(); });
+
+  if (searchEl) {
+    searchEl.addEventListener('input', function (e) {
+      var st = cur(); st.search = e.target.value;
+      clearTimeout(debounce);
+      debounce = setTimeout(function () { st.skip = 0; load(active, false); }, 250);
+    });
+    searchEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') e.preventDefault(); });
+  }
+  var pvBtn = document.getElementById('sbap-prev'); if (pvBtn) pvBtn.addEventListener('click', function () { var st = cur(); if (st.skip > 0) { st.skip = Math.max(0, st.skip - LIMIT); load(active, true); } });
+  var nxBtn = document.getElementById('sbap-next'); if (nxBtn) nxBtn.addEventListener('click', function () { var st = cur(); if (st.skip + LIMIT < st.total) { st.skip += LIMIT; load(active, true); } });
+
+  syncInput();
+}());
+</script>
 
 {% endif %}
 

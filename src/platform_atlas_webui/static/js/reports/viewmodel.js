@@ -44,6 +44,14 @@
     INFO:       'Info',
   };
 
+  // Skip-reason callout titles — keyed by the viewmodel's skip_kind so the
+  // detail panel can headline *why* a rule was skipped, color-coded to match.
+  const SKIP_KIND_TITLES = {
+    unreachable: "Couldn't reach this system",
+    no_data:     'No data collected for this check',
+    conditional: 'Conditional check — not applicable',
+  };
+
   function statusLabel(status) {
     if (!status) return '';
     const key = String(status).toUpperCase();
@@ -399,6 +407,11 @@
 
       const display = statusLabel(statusUp);
       const statusKey = statusClassKey(statusUp);
+      // Skip-reason cue: tint the SKIP pill + a leading dot by reason so the
+      // table is scannable without opening each rule.
+      const skipKind = (statusKey === 'SKIP' && r.skip_kind) ? String(r.skip_kind) : '';
+      const skipCls  = skipKind ? ' vm-skip-' + escapeAttr(skipKind) : '';
+      const skipDot  = skipKind ? '<span class="vm-skip-dot" aria-hidden="true"></span>' : '';
 
       // View button is its own column at the right edge so all View
        // buttons line up vertically — like a normal data table.
@@ -406,8 +419,8 @@
         '<td class="vm-col-rule mono text-text-3">' + escapeHTML(r.rule_number || '') + '</td>' +
         '<td class="vm-col-name">' + escapeHTML(r.name || '') + '</td>' +
         '<td class="vm-col-category text-text-3">' + escapeHTML(r.category || '') + '</td>' +
-        '<td class="vm-col-status"><span class="vm-status vm-status-' + escapeAttr(statusKey) + '">' +
-          escapeHTML(display) + '</span></td>' +
+        '<td class="vm-col-status"><span class="vm-status vm-status-' + escapeAttr(statusKey) + skipCls + '">' +
+          skipDot + escapeHTML(display) + '</span></td>' +
         '<td class="vm-col-view">' +
           '<button type="button" class="vm-view-btn" data-vm-rule-view aria-label="View rule details">' +
             '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
@@ -2025,6 +2038,9 @@
     const elStripe  = panel.querySelector('[data-vm-detail-stripe]');
     const elRecCard = panel.querySelector('[data-vm-detail-rec-card]');
     const elRec     = panel.querySelector('[data-vm-detail-rec]');
+    const elSkip       = panel.querySelector('[data-vm-detail-skip]');
+    const elSkipTitle  = panel.querySelector('[data-vm-detail-skip-title]');
+    const elSkipReason = panel.querySelector('[data-vm-detail-skip-reason]');
     const elCmpCard = panel.querySelector('[data-vm-detail-cmp-card]');
     const elExp     = panel.querySelector('[data-vm-detail-expected]');
     const elAct     = panel.querySelector('[data-vm-detail-actual]');
@@ -2206,9 +2222,24 @@
       // For PASS rules with no recommendation, the empty-state card
       // below takes over the messaging instead.
       const recText = r.recommendations || r.message || '';
+
+      // Skip-reason callout — color-coded by kind (unreachable / no_data /
+      // conditional). When shown it carries the reason text, so the generic
+      // Recommendation card below is hidden to avoid repeating it.
+      const skipKind = (sKey === 'skip' && r.skip_kind) ? String(r.skip_kind) : '';
+      if (elSkip) {
+        if (skipKind) {
+          elSkip.className = 'vm-detail-skip vm-skip-' + escapeAttr(skipKind);
+          if (elSkipTitle)  elSkipTitle.textContent  = SKIP_KIND_TITLES[skipKind] || 'Skipped';
+          if (elSkipReason) elSkipReason.textContent = recText;
+          elSkip.hidden = false;
+        } else {
+          elSkip.hidden = true;
+        }
+      }
       if (elRecCard) {
         elRec.textContent = recText;
-        elRecCard.hidden = !recText;
+        elRecCard.hidden = !recText || !!skipKind;
       }
 
       // Comparison card — Expected → Actual side-by-side with the rule

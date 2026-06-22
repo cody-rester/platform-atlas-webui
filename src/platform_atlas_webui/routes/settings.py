@@ -10,6 +10,8 @@ panel dismiss state.
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Form, HTTPException, Response
 
 from platform_atlas_webui.services import config as config_svc
@@ -21,11 +23,17 @@ _VALID_THEMES = {"aurora", "horizon", "obsidian", "meadow", "carbon", "itential"
 # light/dark at runtime; we only persist the intent.
 _VALID_MODES = {"light", "dark", "auto"}
 
+# Display-scale (WebUI zoom) bounds — mirror services/config.py. The Settings
+# slider snaps within this range; we clamp here as a server-side guard.
+_UI_SCALE_MIN = 0.9
+_UI_SCALE_MAX = 1.3
+
 
 @router.api_route("/appearance", methods=["PATCH", "POST"])
 async def patch_appearance(
     theme: str | None = Form(None),
     mode: str | None = Form(None),
+    ui_scale: str | None = Form(None),
 ) -> Response:
     """Update appearance prefs. Accepts a partial body — either field is optional.
 
@@ -33,7 +41,7 @@ async def patch_appearance(
     to flip ``data-theme`` / ``data-mode`` on ``<html>`` optimistically
     and use this endpoint only for durable storage.
     """
-    updates: dict[str, str] = {}
+    updates: dict[str, Any] = {}
 
     if theme is not None:
         if theme not in _VALID_THEMES:
@@ -51,10 +59,20 @@ async def patch_appearance(
             )
         updates["webui_mode"] = mode
 
+    if ui_scale is not None:
+        try:
+            scale_val = float(ui_scale)
+        except (TypeError, ValueError):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid ui_scale '{ui_scale}' — must be a number.",
+            )
+        updates["webui_ui_scale"] = round(max(_UI_SCALE_MIN, min(_UI_SCALE_MAX, scale_val)), 3)
+
     if not updates:
         raise HTTPException(
             status_code=400,
-            detail="At least one of 'theme' or 'mode' must be provided.",
+            detail="At least one of 'theme', 'mode', or 'ui_scale' must be provided.",
         )
 
     config_svc.update_config(updates)

@@ -75,14 +75,14 @@ def required_keys_for_tier(
     """
     from platform_atlas.core.credentials import CredentialKey
 
-    items: list[dict[str, Any]] = [
-        {
+    items: list[dict[str, Any]] = []
+    if (tier or "").lower() != "saas":
+        items.append({
             "key": CredentialKey.PLATFORM_SECRET.value,
             "label": CredentialKey.PLATFORM_SECRET.display_name,
             "required": True,
             "tier": "both",
-        },
-    ]
+        })
     if has_gateway4:
         items.append({
             "key": CredentialKey.GATEWAY4_PASSWORD.value,
@@ -284,8 +284,18 @@ def bootstrap(
     gateway4_uri: str = "",
     gateway4_username: str = "",
     gateway4_password: str = "",
+    saas_gateway_kind: str = "",
+    saas_gw4_ssh: bool = False,
+    saas_iag_host: str = "",
+    saas_ssh_user: str = "",
+    saas_ssh_port: str = "",
+    saas_ssh_key: str = "",
+    saas_gw5_source: str = "",
+    saas_gw5_source_path: str = "",
+    saas_gw5_conf_path: str = "",
     verify_ssl: bool = False,
     credential_backend: str = "keyring",
+    vault_secret_store: str = "keyring",
     vault_payload: dict[str, Any] | None = None,
     webui_theme: str = "",
     webui_mode: str = "",
@@ -308,13 +318,19 @@ def bootstrap(
     surfaces credential-store errors with their original messages.
     """
     backend_choice = (credential_backend or "keyring").strip().lower()
-    if backend_choice not in ("keyring", "vault"):
+    if backend_choice not in ("keyring", "file", "vault"):
         raise ValueError(
             f"Unsupported credential backend '{credential_backend}'. "
-            "Pick one of: keyring, vault."
+            "Pick one of: keyring, file, vault."
         )
-    if tier not in ("standard", "extended"):
-        raise ValueError(f"Invalid tier '{tier}' (must be 'standard' or 'extended')")
+    # Vault's own connection settings live in a local store (keyring or file).
+    vault_store_choice = (vault_secret_store or "file").strip().lower()
+    if vault_store_choice not in ("keyring", "file"):
+        vault_store_choice = "file"
+    if tier not in ("standard", "extended", "saas"):
+        raise ValueError(f"Invalid tier '{tier}' (must be 'standard', 'extended', or 'saas')")
+    is_saas = tier == "saas"
+    saas_kind = (saas_gateway_kind or "").strip().lower()
     if not organization_name.strip():
         raise ValueError("Organization name is required")
     if not env_name.strip():
@@ -324,14 +340,29 @@ def bootstrap(
             f"Environment name '{env_name}' contains characters that aren't safe "
             "to use as a file name (slashes or null bytes)."
         )
-    if not platform_uri.strip():
-        raise ValueError("Platform URI is required")
-    if not platform_client_id.strip():
-        raise ValueError("Platform OAuth client ID is required")
+    if is_saas:
+        # A SaaS audit has no Platform anchor — it needs a gateway instead.
+        if saas_kind not in ("gateway4", "gateway5"):
+            raise ValueError("A SaaS environment needs a gateway kind — Gateway 4 or Gateway 5.")
+        if saas_kind == "gateway4" and not gateway4_uri.strip():
+            raise ValueError("A SaaS Gateway 4 environment needs the Gateway 4 API URL.")
+        if saas_kind == "gateway5" and (saas_gw5_source or "").strip().lower() in ("", "ssh", "conf") \
+                and not saas_iag_host.strip():
+            raise ValueError(
+                "A SaaS Gateway 5 environment needs a source — an SSH host (for printenv "
+                "or the server gateway.conf), or a Docker Compose / Helm values file path."
+            )
+    else:
+        if not platform_uri.strip():
+            raise ValueError("Platform URI is required")
+        if not platform_client_id.strip():
+            raise ValueError("Platform OAuth client ID is required")
 
-    if backend_choice == "keyring":
-        if not platform_client_secret:
-            raise ValueError("Platform OAuth client secret is required for the keyring backend")
+    if backend_choice in ("keyring", "file"):
+        if not is_saas and not platform_client_secret:
+            raise ValueError(
+                "Platform OAuth client secret is required for the "
+                f"{'encrypted file' if backend_choice == 'file' else 'OS keyring'} backend")
     else:
         if not vault_payload or not (vault_payload.get("url") or "").strip():
             raise ValueError("Vault URL is required when the Vault backend is selected")
@@ -345,7 +376,7 @@ def bootstrap(
             vault_payload=vault_payload or {},
             tier=tier,
             env_name=env_name.strip(),
-            has_gateway4=bool(gateway4_uri.strip()),
+            has_gateway4=bool(gateway4_uri.strip()) or saas_kind == "gateway4",
             has_iag5=False,  # IAG5 URI lives on the env edit page, not the welcome form yet
         )
         if not vault_verify["ok"]:
@@ -370,6 +401,10 @@ def bootstrap(
         "theme": "horizon-dark",
         "extended_validation_checks": True,
         "debug": False,
+        # The chosen tier becomes the GLOBAL default for future environments —
+        # including SaaS: a SaaS install audits gateways ~all the time, so new
+        # envs should default to SaaS too. The env create form still offers
+        # Standard/Extended for the exceptions.
         "tier": tier,
         "active_environment": env_name.strip(),
     }
@@ -392,10 +427,35 @@ def bootstrap(
         "credential_backend": backend_choice,
         "tier": tier,
     }
+    if backend_choice == "vault":
+        env_data["vault_secret_store"] = vault_store_choice
     if gateway4_uri.strip():
         env_data["gateway4_uri"] = gateway4_uri.strip()
     if gateway4_username.strip():
         env_data["gateway4_username"] = gateway4_username.strip()
+    if is_saas:
+        env_data["saas_gateway_kind"] = saas_kind
+        # SaaS envs have no Platform fields at all — keep them out of the overlay.
+        env_data.pop("platform_uri", None)
+        env_data.pop("platform_client_id", None)
+        # gateway_only topology (None for an API-only GW4 audit — its single
+        # ipsdk target is synthesized from gateway4_uri at capture time).
+        from platform_atlas_webui.services.environments import _build_saas_topology
+        saas_topology = _build_saas_topology({
+            "saas_gateway_kind": saas_kind,
+            "saas_gw4_ssh": "1" if saas_gw4_ssh else "",
+            "iag_host": saas_iag_host,
+            "ssh_user": saas_ssh_user,
+            "ssh_port": saas_ssh_port,
+            "ssh_key": saas_ssh_key,
+            "gateway5_source": saas_gw5_source,
+            "gateway5_source_path": saas_gw5_source_path,
+            "gateway5_conf_path": saas_gw5_conf_path,
+        })
+        if saas_topology is not None:
+            env_data["deployment"] = saas_topology
+        if saas_ssh_key.strip():
+            env_data["ssh_key"] = saas_ssh_key.strip()
 
     # Extended-tier topology (deployment / SSH / Mongo / Redis / IAG5)
     # is owned by /environments/{name}/edit. The wizard hands Extended
@@ -411,45 +471,51 @@ def bootstrap(
     # ── 4. Credential storage ────────────────────────────────────────
     cred_summary: dict[str, Any] = {"backend": backend_choice}
 
-    if backend_choice == "keyring":
+    if backend_choice in ("keyring", "file"):
         try:
             from platform_atlas.core.credentials import (
                 CredentialKey,
-                CredentialStore,
-                CredentialBackendType,
+                FileSecretStore,
+                KeyringSecretStore,
+                scoped_service_name,
             )
-            store = CredentialStore(
-                backend_type=CredentialBackendType.KEYRING,
-                env_name=environment.name,
-            )
-            store.set(CredentialKey.PLATFORM_SECRET, platform_client_secret)
-            cred_summary["platform_secret"] = "stored"
+            # The new env isn't the active config yet, so write straight to the
+            # chosen substrate rather than via active_secret_store() (which reads
+            # the current config). No auto-anything.
+            substrate = FileSecretStore() if backend_choice == "file" else KeyringSecretStore()
+            svc = scoped_service_name(environment.name)
+            if not is_saas:
+                substrate.set(svc, CredentialKey.PLATFORM_SECRET.value, platform_client_secret)
+                cred_summary["platform_secret"] = "stored"
             if gateway4_password:
-                store.set(CredentialKey.GATEWAY4_PASSWORD, gateway4_password)
+                substrate.set(svc, CredentialKey.GATEWAY4_PASSWORD.value, gateway4_password)
                 cred_summary["gateway4_password"] = "stored"
             # Extended-tier credentials (Mongo URI, Redis URI, SSH passphrase,
             # IAG5 password) are set via /config/credentials after the user
-            # finishes topology in the env editor — keeps the wizard tight
-            # and uses the same flow Standard-mode admins later use to rotate.
+            # finishes topology in the env editor — keeps the wizard tight.
         except Exception as exc:  # noqa: BLE001 — surface to user
-            logger.exception("Credential store write failed during setup (backend=keyring)")
+            logger.exception("Credential store write failed during setup (backend=%s)", backend_choice)
             cred_summary["error"] = f"{type(exc).__name__}: {exc}"
     else:
-        # Vault: persist the connection settings under the env-scoped
-        # keyring namespace. The actual platform secret must be put
-        # into Vault by the operator (we already verified above).
+        # Vault: persist the connection settings into the chosen local store
+        # (keyring or encrypted file). The platform secret lives in Vault.
         try:
             from platform_atlas.core.credentials import (
                 VaultBackend,
+                FileSecretStore,
+                KeyringSecretStore,
                 scoped_service_name,
             )
             cfg = _build_vault_config(vault_payload or {})
+            boot_store = FileSecretStore() if vault_store_choice == "file" else KeyringSecretStore()
             VaultBackend.save_config_to_keyring(
                 cfg,
                 service=scoped_service_name(environment.name),
+                store=boot_store,
             )
             cred_summary["vault_config"] = "stored"
             cred_summary["vault_url"] = cfg.url
+            cred_summary["vault_secret_store"] = vault_store_choice
             if vault_verify is not None:
                 cred_summary["vault_keys"] = vault_verify.get("keys", [])
                 cred_summary["vault_missing_required"] = vault_verify.get(

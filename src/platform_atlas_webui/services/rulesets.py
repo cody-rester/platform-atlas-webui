@@ -47,7 +47,10 @@ def _get_active_ruleset_meta(rs_id: str) -> dict[str, Any]:
         import json
         mgr = get_ruleset_manager()
         path = None
-        for meta in mgr.discover_rulesets():
+        # include_legacy=True: this resolves the ALREADY-ACTIVE ruleset's
+        # metadata, not a picker — a legacy session's summary must render
+        # even when legacy rulesets are hidden from listings.
+        for meta in mgr.discover_rulesets(include_legacy=True):
             if meta.id == rs_id:
                 path = getattr(meta, "file_path", None)
                 break
@@ -72,10 +75,14 @@ def _is_legacy_profile(profile_id: str) -> bool:
 
 
 def list_rulesets() -> list[dict[str, Any]]:
+    # Legacy (2023.x) rulesets are hidden unless the active environment is
+    # marked legacy. Resolved from disk (not the in-process context) so an
+    # env edit toggling legacy_profile is reflected on the next render.
+    from platform_atlas_webui.services.environments import active_env_allows_legacy
     mgr = get_ruleset_manager()
     active = mgr.get_active_ruleset_id()
     out: list[dict[str, Any]] = []
-    for meta in mgr.discover_rulesets():
+    for meta in mgr.discover_rulesets(include_legacy=active_env_allows_legacy()):
         tp = getattr(meta, "target_product", "")
         out.append({
             "id":             meta.id,
@@ -91,14 +98,21 @@ def list_rulesets() -> list[dict[str, Any]]:
 
 
 def list_profiles() -> list[dict[str, Any]]:
+    # discover_profiles() is tier-scoped (SaaS-marked profiles show ONLY
+    # under the SaaS tier, which in turn sees ONLY those — tier resolved
+    # from the in-process context, re-initialized on tier/env switches)
+    # and legacy-scoped (2023.x profiles only for legacy-marked
+    # environments — resolved from disk like list_rulesets above).
+    from platform_atlas_webui.services.environments import active_env_allows_legacy
     mgr = get_ruleset_manager()
     active_profile = mgr.get_active_profile_id()
     out: list[dict[str, Any]] = []
-    for p in mgr.discover_profiles():
+    for p in mgr.discover_profiles(include_legacy=active_env_allows_legacy()):
         out.append({
             "id":          p.id,
             "name":        getattr(p, "name", p.id),
             "description": getattr(p, "description", ""),
+            "tier":        getattr(p, "tier", None),
             "is_active":   p.id == active_profile,
             "is_legacy":   _is_legacy_profile(p.id),
         })
@@ -195,5 +209,14 @@ def get_active_ruleset_summary() -> dict[str, Any]:
 
 
 def set_active(ruleset_id: str, profile_id: str | None = None) -> None:
+    # The dropdowns only offer visible choices; these guards reject a
+    # crafted POST that bypasses the UI (same stance as the env form's
+    # tier guard). ValueError → the activate route's 400. Legacy is
+    # resolved from disk to match what the page just listed.
+    from platform_atlas_webui.services.environments import active_env_allows_legacy
     mgr = get_ruleset_manager()
+    allow_legacy = active_env_allows_legacy()
+    mgr.ensure_ruleset_allowed(ruleset_id, allow_legacy=allow_legacy)
+    if profile_id:
+        mgr.ensure_profile_allowed(profile_id, allow_legacy=allow_legacy)
     mgr.set_active_ruleset(ruleset_id, profile_id=profile_id)

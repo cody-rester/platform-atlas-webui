@@ -215,7 +215,7 @@
   <div>
     <div class="eyebrow"><span class="dot"></span> Active ruleset</div>
     <h1 class="text-[36px] leading-[1.05] font-semibold tracking-[-0.038em] mt-2 mb-1.5">
-      {{ ruleset.name or ruleset.ruleset_id or 'No ruleset loaded' }}{% if ruleset.profile %}, <em class="not-italic text-text-3">{{ ruleset.profile }}</em>{% endif %}
+      {{ ruleset.name or ruleset.ruleset_id or 'No ruleset loaded' }}{% if ruleset.profile %}, <em class="not-italic text-accent">{{ ruleset.profile }}</em>{% endif %}
     </h1>
     {% if ruleset.description %}
       <p class="text-[14px] text-text-2 max-w-[64ch]">{{ ruleset.description }}</p>
@@ -227,7 +227,7 @@
         {% if ruleset.target_product %}<span class="sep">·</span><span>{{ ruleset.target_product }}</span>{% endif %}
         {% if ruleset.author %}<span class="sep">·</span><span>{{ ruleset.author }}</span>{% endif %}
         {% if ruleset.updated_at %}<span class="sep">·</span><span>updated {{ ruleset.updated_at }}</span>{% endif %}
-        {% if is_standard %}<span class="sep">·</span><span class="text-accent">Standard tier</span>{% endif %}
+        {% if is_standard %}<span class="sep">·</span><span class="text-accent">Standard tier</span>{% elif tier == 'saas' %}<span class="sep">·</span><span class="text-accent">SaaS tier (gateway rules)</span>{% endif %}
       </div>
     {% endif %}
   </div>
@@ -272,15 +272,23 @@
             </select>
           </div>
           <div class="field">
-            <label for="profile_id">Profile <span class="font-normal text-text-3">(optional overlay)</span></label>
+            <label for="profile_id">Profile</label>
+            {# No "None" choice on purpose — an audit always runs with a
+               profile. With nothing active yet the first visible profile
+               is preselected. #}
+            {% if profiles %}
             <select id="profile_id" name="profile_id">
-              <option value="">— None —</option>
               {% for p in profiles %}
                 <option value="{{ p.id }}" {% if p.is_active %}selected{% endif %}>
                   {{ p.id }}{% if p.description %} — {{ p.description }}{% endif %}
                 </option>
               {% endfor %}
             </select>
+            {% else %}
+            <select id="profile_id" disabled>
+              <option value="">— no profiles available —</option>
+            </select>
+            {% endif %}
           </div>
         </fieldset>
         <div class="form-actions">

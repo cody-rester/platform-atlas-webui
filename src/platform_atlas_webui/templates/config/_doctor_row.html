@@ -20,7 +20,8 @@
     <div class="text-text-3 mt-[2px] break-words font-mono text-[12px]">{{ row.detail }}</div>
     {% if row.status != 'ok' and row.suggestion %}
       <div class="text-text-2 mt-1.5 text-[12.5px]">
-        <span class="text-accent">→</span> {{ row.suggestion }}
+        <span class="text-accent">→</span>
+        {% if row.cred_link %}<a href="{{ row.cred_link }}" class="text-accent hover:underline">{{ row.suggestion }}</a>{% else %}{{ row.suggestion }}{% endif %}
       </div>
     {% endif %}
   </div>

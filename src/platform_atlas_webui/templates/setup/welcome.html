@@ -205,18 +205,18 @@
       margin: 0 0 10px;
     }
     .ob-title {
-      font-family: var(--ui);
-      font-size: 28px;
-      line-height: 1.18;
-      font-weight: 600;
-      letter-spacing: -0.025em;
+      font-family: var(--display);
+      font-size: 30px;
+      line-height: 1.14;
+      font-weight: 700;
+      letter-spacing: -0.03em;
       margin: 0 0 10px;
       color: var(--text);
     }
     .ob-title em {
-      font-family: 'Instrument Serif', Georgia, serif;
-      font-style: italic;
-      font-weight: 400;
+      font-family: var(--display);
+      font-style: normal;
+      font-weight: 700;
       color: var(--accent);
     }
     .ob-sub {
@@ -480,96 +480,202 @@
     }
     .ob-mode-note[hidden] { display: none; }
 
-    /* ───────── Step 3 — Audit mode ───────── */
-    .ob-tier-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 14px;
+    /* ───────── Step 3 — Audit mode ─────────
+       #16 — Accordion Triptych. Three equal panels share one fixed-height
+       row; the selected panel breathes wide (flex-grow) while its siblings
+       compress to readable spines. The row always fills 100% of the panel
+       width and is shorter than the old 2-over-1 grid, so the wizard card
+       keeps the same footprint as every other step — no full-width
+       odd-one-out card, no orphan whitespace.
+       Selection model: expanded = checked. The native radio drives
+       everything; JS only mirrors .is-active (same contract as before).
+       Replaces the #14 halo + M5 liquid-morph treatment, which fought the
+       flex tween (and the halo's outset ring would be clipped by the
+       panel's own overflow:hidden anyway). */
+    .ob-tier-acc {
+      display: flex;
+      gap: 10px;
+      height: 330px;
+      /* Container for the cqw calc on .ob-tier-full — lets the expanded
+         sheet be cut to its FINAL width up front, so growing a panel
+         reveals pre-wrapped text instead of re-flowing it every frame. */
+      container-type: inline-size;
     }
-    @media (max-width: 640px) { .ob-tier-grid { grid-template-columns: 1fr; } }
     .ob-tier {
       position: relative;
-      padding: 22px;
+      flex: 1 1 0;
+      min-width: 0;
+      overflow: hidden;
+      display: block;
+      padding: 0;
       border: 1px solid var(--line);
       border-radius: var(--r-lg);
       background: var(--bg-2);
       cursor: pointer;
-      transition: transform .15s var(--ease-standard), border-color .15s var(--ease-standard);
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
+      transition:
+        flex-grow .55s var(--ease-emphasized, var(--ease-standard)),
+        border-color .2s var(--ease-standard),
+        background .3s var(--ease-standard),
+        transform .25s var(--ease-standard),
+        box-shadow .25s var(--ease-standard);
     }
     .ob-tier input { position: absolute; opacity: 0; pointer-events: none; }
-    .ob-tier:hover { transform: translateY(-1px); border-color: var(--line-2); }
+    /* Hover cues are transform/color only. (An earlier flex-grow preview
+       resized every panel and re-wrapped their text mid-tween — too busy.)
+       The spine lifts with a shadow, its icon pops, the Select cue ignites
+       accent, and the crown bar peeks — nothing changes any panel's width. */
+    .ob-tier:not(.is-active):hover {
+      border-color: var(--line-2);
+      transform: translateY(-3px);
+      box-shadow: 0 12px 24px rgba(0, 0, 0, .16);
+    }
+    .ob-tier:not(.is-active):hover::after { transform: scaleX(.3); }
+    .ob-tier:not(.is-active):hover .ob-tier-icon { transform: translateY(-2px) scale(1.08); }
+    .ob-tier:not(.is-active):hover .ob-tier-mini-cue { color: var(--accent); opacity: 1; }
     .ob-tier.is-active {
+      flex-grow: 2.6;
       border-color: var(--accent);
       background: var(--accent-soft);
+      cursor: default;
     }
-    /* #14 — tier card halo: an accent ring expands outward and fades on
-       loop only while the card is selected. Pure decoration; pointer-events
-       off so it doesn't trap clicks. */
-    .ob-tier.is-active::after {
+    /* Keyboard affordance — radios keep native arrow-key group movement;
+       ring paints only for keyboard focus, not clicks. */
+    .ob-tier:has(input:focus-visible) {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    /* Accent bar draws across the chosen panel's crown. */
+    .ob-tier::after {
       content: '';
       position: absolute;
-      inset: -2px;
-      border-radius: inherit;
-      border: 2px solid var(--accent);
+      left: 0; right: 0; top: 0;
+      height: 3px;
+      background: var(--accent);
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform .45s var(--ease-decel);
       pointer-events: none;
-      animation: ob-tier-halo 2.4s ease-out infinite;
     }
-    @keyframes ob-tier-halo {
-      0%   { transform: scale(1);    opacity: .55; }
-      100% { transform: scale(1.04); opacity: 0; }
+    .ob-tier.is-active::after { transform: scaleX(1); }
+
+    /* Collapsed spine — icon, name, badge, one-breath pitch. Absolutely
+       layered so its width never feeds the flex math, and pinned to a
+       FIXED 150px column centered in the panel: the panel can grow or
+       shrink around it without the spine's text ever re-wrapping. */
+    .ob-tier-mini {
+      position: absolute;
+      top: 0; bottom: 0;
+      left: calc(50% - 75px);
+      width: 150px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 16px 8px;
+      text-align: center;
+      transition: opacity .22s var(--ease-standard);
+    }
+    .ob-tier-mini .ob-tier-icon { transition: transform .25s var(--ease-emphasized, var(--ease-standard)); }
+    .ob-tier.is-active .ob-tier-mini { opacity: 0; pointer-events: none; }
+    .ob-tier-mini-name {
+      font-size: 14.5px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--text);
+    }
+    .ob-tier-mini-pitch {
+      font-size: 11px;
+      line-height: 1.5;
+      color: var(--text-3);
+      max-width: 150px;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .ob-tier-mini-cue {
+      margin-top: 6px;
+      font-size: 9.5px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-4);
+      opacity: .8;
+      transition: color .2s var(--ease-standard), opacity .2s var(--ease-standard);
     }
 
-    /* ── M5 — Liquid Morph Selection (T9 tuning, persistent state)
-       When a user clicks a tier card, the chosen card morphs its border-radius
-       into an asymmetric shape with an overshoot spring, plus a single sheen
-       sweep. The OTHER card just dims (opacity only — no blur, no scale)
-       so its text stays fully readable while the user compares modes.
-       The morph state persists until the OTHER card is clicked. */
-    .ob-tier {
-      transition:
-        transform .5s cubic-bezier(.34, 1.56, .64, 1),
-        border-color .15s var(--ease-standard),
-        border-radius .5s cubic-bezier(.34, 1.56, .64, 1),
-        opacity .35s ease,
-        box-shadow .25s ease;
+    /* Expanded sheet — the original card content, cut to its FINAL
+       expanded measure up front: (container − 2 gaps) × 2.6/4.6 grow
+       share, minus the panel's own 2px of borders. The copy wraps once
+       at that width and never again — expanding simply reveals it, and
+       collapsing crops it (overflow:hidden), so no frame of the flex
+       tween re-flows text. min-width keeps the same behavior on any
+       browser without container-query units. Content fades in after the
+       grow has mostly landed. */
+    .ob-tier-full {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      height: 100%;
+      width: calc((100cqw - 20px) * 0.5652 - 2px);
+      min-width: 380px;
+      padding: 20px 22px;
+      visibility: hidden;
+      opacity: 0;
+      transition: opacity .28s var(--ease-standard), visibility 0s .28s;
     }
-    .ob-tier.is-morphing {
-      border-radius: 28px 14px 28px 14px !important;
-      transform: scale(1.04);
-      box-shadow:
-        0 0 0 1px var(--accent),
-        0 16px 50px var(--accent-soft);
-      z-index: 2;
+    .ob-tier.is-active .ob-tier-full {
+      visibility: visible;
+      opacity: 1;
+      transition: opacity .3s var(--ease-standard) .2s, visibility 0s;
     }
-    /* Sheen sweep — uses ::before because ::after is taken by the halo.
-       Plays once when the class is added; sticks at end-state (offscreen). */
-    .ob-tier.is-morphing::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      border-radius: inherit;
-      background: linear-gradient(110deg,
-        transparent 30%,
-        rgba(255,255,255,0.18) 50%,
-        transparent 70%);
-      background-size: 200% 100%;
-      background-position: -100% 0;
-      animation: ob-tier-shimmer .55s ease forwards;
-      pointer-events: none;
-      z-index: 1;
+    .ob-tier-full .ob-tier-needs { margin-top: auto; }
+
+    /* Panels rise in with a small stagger each time the step is entered —
+       same restart mechanics as the #04 word stagger (the hidden toggle
+       on .ob-step restarts the animation). */
+    .ob-step.is-current .ob-tier { animation: ob-tier-in .5s var(--ease-decel) backwards; }
+    .ob-step.is-current .ob-tier:nth-child(2) { animation-delay: .07s; }
+    .ob-step.is-current .ob-tier:nth-child(3) { animation-delay: .14s; }
+    @keyframes ob-tier-in {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
     }
-    @keyframes ob-tier-shimmer { to { background-position: 200% 0; } }
-    /* Faded state — just dim. No blur, no scale change, no saturate —
-       text remains fully readable so users can compare modes mid-selection.
-       pointer-events stays auto so the card is still clickable. */
-    .ob-tier.is-faded { opacity: 0.55; }
+
+    /* Narrow viewports — the spines would compress past legibility, so
+       the row becomes a vertical radio-accordion: every panel shows a
+       compact header row; the chosen one unfolds beneath it. */
+    @media (max-width: 840px) {
+      .ob-tier-acc { flex-direction: column; height: auto; }
+      .ob-tier { flex: none !important; }
+      .ob-tier-mini {
+        position: static;
+        width: auto;
+        left: auto;
+        flex-direction: row;
+        justify-content: flex-start;
+        gap: 12px;
+        padding: 14px 16px;
+        text-align: left;
+      }
+      .ob-tier.is-active .ob-tier-mini { opacity: 1; pointer-events: auto; }
+      .ob-tier-mini-pitch, .ob-tier-mini-cue { display: none; }
+      .ob-tier-full {
+        display: none;
+        width: auto;
+        min-width: 0;
+        height: auto;
+        padding: 0 16px 16px;
+      }
+      .ob-tier.is-active .ob-tier-full { display: flex; visibility: visible; opacity: 1; }
+      /* The mini header already carries icon + name — don't repeat them. */
+      .ob-tier-full .ob-tier-head { display: none; }
+    }
     @media (prefers-reduced-motion: reduce) {
-      .ob-tier.is-morphing,
-      .ob-tier.is-faded { transition: none; }
-      .ob-tier.is-morphing::before { animation: none; }
+      .ob-tier, .ob-tier::after, .ob-tier-mini, .ob-tier-full,
+      .ob-tier-mini .ob-tier-icon, .ob-tier-mini-cue { transition: none; }
+      .ob-step.is-current .ob-tier { animation: none; }
     }
     .ob-tier-head {
       display: flex;
@@ -1002,56 +1108,124 @@
     <section class="ob-step" data-step="3" hidden>
       <p class="ob-eyebrow">Step 3 of 5</p>
       <h2 class="ob-title"><span class="word">What</span> <span class="word">do</span> <span class="word">you</span> <span class="word">want</span> <span class="word">to</span> <span class="word"><em>audit</em>?</span></h2>
-      <p class="ob-sub">Atlas runs in two modes. Most teams start with Standard — you can switch to Extended any time once your SSH and database access is ready.</p>
+      <p class="ob-sub">Atlas runs in three modes. Most teams start with Standard — you can switch to Extended any time once your SSH and database access is ready. Auditing a standalone gateway with no Platform? That's SaaS.</p>
 
-      <div class="ob-tier-grid" role="radiogroup" aria-label="Audit tier">
+      {# #16 — Accordion Triptych: each label carries two layers. The
+         .ob-tier-mini spine is what a collapsed panel shows; .ob-tier-full
+         is the original card content, revealed when the panel expands.
+         The radios are unchanged, so currentTier(), the SaaS connect-step
+         swap, and the POST contract all keep working. Inputs carry an
+         explicit aria-label because the collapsed layers hide their text
+         from the accessibility tree. #}
+      <div class="ob-tier-acc" role="radiogroup" aria-label="Audit tier">
         <label class="ob-tier {% if (form.tier or 'standard') == 'standard' %}is-active{% endif %}">
           <input type="radio" name="tier" value="standard" data-ob-tier
+                 aria-label="Standard — best for first-time audits, customer-facing checks, and CI runners"
                  {% if (form.tier or 'standard') == 'standard' %}checked{% endif %}>
-          <div class="ob-tier-head">
+          <div class="ob-tier-mini" aria-hidden="true">
             <span class="ob-tier-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m9 12 2 2 4-4"/></svg>
             </span>
-            <div>
-              <h3 class="ob-tier-title">Standard <span class="ob-tier-rec">Recommended</span></h3>
-              <p class="ob-tier-best">Best for first-time audits, customer-facing checks, and CI runners.</p>
-            </div>
+            <span class="ob-tier-mini-name">Standard</span>
+            <span class="ob-tier-rec">Recommended</span>
+            <span class="ob-tier-mini-pitch">First-time audits, customer-facing checks, CI runners.</span>
+            <span class="ob-tier-mini-cue">Select</span>
           </div>
-          <ul class="ob-tier-bullets">
-            <li>Runs ~54 rules across Platform &amp; Gateway 4</li>
-            <li>Connects via Platform OAuth — no SSH or database access</li>
-            <li>Finishes in under a minute on most installs</li>
-          </ul>
-          <p class="ob-tier-needs"><strong>Needs:</strong> Platform URL + read-only OAuth client.</p>
+          <div class="ob-tier-full" aria-hidden="true">
+            <div class="ob-tier-head">
+              <span class="ob-tier-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m9 12 2 2 4-4"/></svg>
+              </span>
+              <div>
+                <h3 class="ob-tier-title">Standard <span class="ob-tier-rec">Recommended</span></h3>
+                <p class="ob-tier-best">Best for first-time audits, customer-facing checks, and CI runners.</p>
+              </div>
+            </div>
+            <ul class="ob-tier-bullets">
+              <li>Runs ~54 rules across Platform &amp; Gateway 4</li>
+              <li>Connects via Platform OAuth — no SSH or database access</li>
+              <li>Finishes in under a minute on most installs</li>
+            </ul>
+            <p class="ob-tier-needs"><strong>Needs:</strong> Platform URL + read-only OAuth client.</p>
+          </div>
         </label>
 
         <label class="ob-tier {% if form.tier == 'extended' %}is-active{% endif %}">
           <input type="radio" name="tier" value="extended" data-ob-tier
+                 aria-label="Extended — full infrastructure audit for deep health checks and quarterly reviews"
                  {% if form.tier == 'extended' %}checked{% endif %}>
-          <div class="ob-tier-head">
+          <div class="ob-tier-mini" aria-hidden="true">
             <span class="ob-tier-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h18v4H3zM3 10h18v4H3zM3 16h18v4H3z"/><circle cx="7" cy="6" r=".5" fill="currentColor"/><circle cx="7" cy="12" r=".5" fill="currentColor"/><circle cx="7" cy="18" r=".5" fill="currentColor"/></svg>
             </span>
-            <div>
-              <h3 class="ob-tier-title">Extended</h3>
-              <p class="ob-tier-best">Full infrastructure audit — for deep health checks and quarterly reviews.</p>
-            </div>
+            <span class="ob-tier-mini-name">Extended</span>
+            <span class="ob-tier-mini-pitch">Full infrastructure audit — deep health checks and quarterly reviews.</span>
+            <span class="ob-tier-mini-cue">Select</span>
           </div>
-          <ul class="ob-tier-bullets">
-            <li>Runs ~107 rules across the full stack</li>
-            <li>Adds SSH, MongoDB, Redis, Kubernetes &amp; Gateway 5 collectors</li>
-            <li>Captures replica set state, log scans, and architecture data</li>
-          </ul>
-          <p class="ob-tier-needs"><strong>Needs:</strong> SSH keys + read-only DB users (configurable later).</p>
+          <div class="ob-tier-full" aria-hidden="true">
+            <div class="ob-tier-head">
+              <span class="ob-tier-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h18v4H3zM3 10h18v4H3zM3 16h18v4H3z"/><circle cx="7" cy="6" r=".5" fill="currentColor"/><circle cx="7" cy="12" r=".5" fill="currentColor"/><circle cx="7" cy="18" r=".5" fill="currentColor"/></svg>
+              </span>
+              <div>
+                <h3 class="ob-tier-title">Extended</h3>
+                <p class="ob-tier-best">Full infrastructure audit — for deep health checks and quarterly reviews.</p>
+              </div>
+            </div>
+            <ul class="ob-tier-bullets">
+              <li>Runs ~107 rules across the full stack</li>
+              <li>Adds SSH, MongoDB, Redis, Kubernetes &amp; Gateway 5 collectors</li>
+              <li>Captures replica set state, log scans, and architecture data</li>
+            </ul>
+            <p class="ob-tier-needs"><strong>Needs:</strong> SSH keys + read-only DB users (configurable later).</p>
+          </div>
+        </label>
+
+        <label class="ob-tier {% if form.tier == 'saas' %}is-active{% endif %}">
+          <input type="radio" name="tier" value="saas" data-ob-tier
+                 aria-label="SaaS — single gateway audit for standalone IAG4 or IAG5 with no Platform behind it"
+                 {% if form.tier == 'saas' %}checked{% endif %}>
+          <div class="ob-tier-mini" aria-hidden="true">
+            <span class="ob-tier-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a4.5 4.5 0 1 0-1.04-8.88 6 6 0 1 0-11.2 2.4A3.5 3.5 0 0 0 6.5 19h11z"/></svg>
+            </span>
+            <span class="ob-tier-mini-name">SaaS</span>
+            <span class="ob-tier-mini-pitch">One standalone gateway — no Platform behind it.</span>
+            <span class="ob-tier-mini-cue">Select</span>
+          </div>
+          <div class="ob-tier-full" aria-hidden="true">
+            <div class="ob-tier-head">
+              <span class="ob-tier-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a4.5 4.5 0 1 0-1.04-8.88 6 6 0 1 0-11.2 2.4A3.5 3.5 0 0 0 6.5 19h11z"/></svg>
+              </span>
+              <div>
+                <h3 class="ob-tier-title">SaaS</h3>
+                <p class="ob-tier-best">Single Gateway audit — for standalone IAG4/IAG5 with no Platform behind it.</p>
+              </div>
+            </div>
+            <ul class="ob-tier-bullets">
+              <li>Audits one Gateway 4 <em>or</em> Gateway 5 — strictly one per environment</li>
+              <li>No Platform, MongoDB, or Redis anywhere in the flow</li>
+              <li>One merged report: compliance + Architecture Overview</li>
+            </ul>
+            <p class="ob-tier-needs"><strong>Needs:</strong> GW4 API credentials (SSH optional), or GW5 SSH / a local Compose/Helm file.</p>
+          </div>
         </label>
       </div>
+      <p class="ob-tier-needs" style="margin-top:10px;">Your choice becomes the default for any environments you create later — each new environment can still pick a different mode.</p>
     </section>
 
     <!-- ────────── Step 4 — Connect ────────── -->
     <section class="ob-step" data-step="4" hidden>
       <p class="ob-eyebrow">Step 4 of 5</p>
-      <h2 class="ob-title"><span class="word">Connect</span> <span class="word">to</span> <span class="word">your</span> <span class="word"><em>platform</em>.</span></h2>
-      <p class="ob-sub">Atlas talks to your Itential platform with a read-only OAuth client. Secrets land in your OS keyring — never in a config file.</p>
+      <div data-ob-connect-head="platform">
+        <h2 class="ob-title"><span class="word">Connect</span> <span class="word">to</span> <span class="word">your</span> <span class="word"><em>platform</em>.</span></h2>
+        <p class="ob-sub">Atlas talks to your Itential platform with a read-only OAuth client. Secrets land in your OS keyring — never in a config file.</p>
+      </div>
+      <div data-ob-connect-head="saas" hidden>
+        <h2 class="ob-title"><span class="word">Connect</span> <span class="word">to</span> <span class="word">your</span> <span class="word"><em>gateway</em>.</span></h2>
+        <p class="ob-sub">A SaaS audit talks to one standalone gateway — no Platform, MongoDB, or Redis. Secrets land in your chosen credential store, never a config file.</p>
+      </div>
 
       <div class="ob-form">
         <div class="field-grid-2">
@@ -1071,6 +1245,7 @@
           </div>
         </div>
 
+        <div data-ob-connect-platform style="display:contents">
         <div class="field">
           <label for="platform_uri">Platform URL</label>
           <input id="platform_uri" name="platform_uri" type="url" required
@@ -1093,11 +1268,114 @@
             <span class="hint is-secret">Stored in your OS keyring. Never written to disk.</span>
           </div>
         </div>
+        </div>
+
+        {# ── SaaS variant — one gateway, no Platform (shown when tier=saas) ── #}
+        <div data-ob-connect-saas style="display:none; flex-direction:column; gap:18px;">
+          <div class="field">
+            <label>Which gateway are you auditing?</label>
+            <div style="display:flex; flex-direction:column; gap:8px; margin-top:4px;">
+              <label class="field--row" style="font-weight:400;">
+                <input type="radio" name="saas_gateway_kind" value="gateway4" data-ob-saas-kind
+                       {% if (form.saas_gateway_kind or 'gateway4') == 'gateway4' %}checked{% endif %}>
+                Gateway 4 (IAG4) — audited via its REST API, plus optional SSH
+              </label>
+              <label class="field--row" style="font-weight:400;">
+                <input type="radio" name="saas_gateway_kind" value="gateway5" data-ob-saas-kind
+                       {% if form.saas_gateway_kind == 'gateway5' %}checked{% endif %}>
+                Gateway 5 (IAG5) — env vars via SSH or a local Compose/Helm file
+              </label>
+            </div>
+            <span class="hint">Strictly one gateway per SaaS environment — fixed once created.</span>
+          </div>
+
+          <div data-ob-saas-gw4 style="display:flex; flex-direction:column; gap:18px;">
+            <div class="field">
+              <label for="saas_gw4_uri">Gateway 4 API URL</label>
+              <input id="saas_gw4_uri" name="saas_gw4_uri" type="url"
+                     value="{{ form.saas_gw4_uri or '' }}"
+                     placeholder="https://iag4.acme.cloud">
+            </div>
+            <div class="field-grid-2">
+              <div class="field">
+                <label for="saas_gw4_username">Gateway 4 username</label>
+                <input id="saas_gw4_username" name="saas_gw4_username" type="text"
+                       value="{{ form.saas_gw4_username or 'admin@itential' }}">
+              </div>
+              <div class="field" data-ob-keyring-field>
+                <label for="saas_gw4_password">Gateway 4 password</label>
+                <input id="saas_gw4_password" name="saas_gw4_password" type="password"
+                       autocomplete="new-password" placeholder="••••••••">
+                <span class="hint is-secret">Stored in your chosen credential store. Never written to disk.</span>
+              </div>
+            </div>
+            <div class="field" data-ob-vault-field hidden>
+              <span class="hint">When using Vault, put the password under the <code>gateway4_password</code> key inside your KV path.</span>
+            </div>
+            <div class="field field--row">
+              <input id="saas_gw4_ssh" name="saas_gw4_ssh" type="checkbox" value="1"
+                     {% if form.saas_gw4_ssh %}checked{% endif %}>
+              <label for="saas_gw4_ssh" style="font-weight:400;">Collect deeper config over SSH (properties.yml, venv Python, DB sizes, host facts)</label>
+            </div>
+          </div>
+
+          <div data-ob-saas-gw5 style="display:none; flex-direction:column; gap:18px;">
+            <div class="field">
+              <label for="saas_gw5_source">Gateway 5 configuration source</label>
+              <select id="saas_gw5_source" name="saas_gw5_source">
+                <option value="ssh" {% if (form.saas_gw5_source or 'ssh') == 'ssh' %}selected{% endif %}>SSH (printenv) — read GATEWAY_* env vars from the running server</option>
+                <option value="conf" {% if form.saas_gw5_source == 'conf' %}selected{% endif %}>SSH (server config) — read the server's gateway.conf over SSH</option>
+                <option value="compose" {% if form.saas_gw5_source == 'compose' %}selected{% endif %}>Docker Compose file — parse a local compose file</option>
+                <option value="helm" {% if form.saas_gw5_source == 'helm' %}selected{% endif %}>Helm values file — parse a local IAG5 chart values.yaml</option>
+              </select>
+            </div>
+            <div class="field" data-ob-saas-gw5-path style="display:none;">
+              <label for="saas_gw5_source_path">File path</label>
+              <input id="saas_gw5_source_path" name="saas_gw5_source_path" type="text"
+                     value="{{ form.saas_gw5_source_path or '' }}"
+                     placeholder="/path/to/docker-compose.yml">
+              <span class="hint">A local path on this machine — no SSH or host access needed.</span>
+            </div>
+            <div class="field" data-ob-saas-gw5-conf-path style="display:none;">
+              <label for="saas_gw5_conf_path">Server config path</label>
+              <input id="saas_gw5_conf_path" name="saas_gw5_conf_path" type="text"
+                     value="{{ form.saas_gw5_conf_path or '' }}"
+                     placeholder="/etc/gateway/gateway.conf">
+              <span class="hint">Remote path to the server's gateway.conf, read over SSH (must be a server-mode config).</span>
+            </div>
+          </div>
+
+          <div data-ob-saas-ssh style="display:none; flex-direction:column; gap:18px; padding-left:18px; border-left:2px solid var(--line);">
+            <div class="field">
+              <label for="saas_iag_host">Gateway SSH host</label>
+              <input id="saas_iag_host" name="saas_iag_host" type="text"
+                     value="{{ form.saas_iag_host or '' }}" placeholder="iag.acme.cloud">
+            </div>
+            <div class="field-grid-2">
+              <div class="field">
+                <label for="saas_ssh_user">SSH user</label>
+                <input id="saas_ssh_user" name="saas_ssh_user" type="text"
+                       value="{{ form.saas_ssh_user or 'atlas' }}">
+              </div>
+              <div class="field">
+                <label for="saas_ssh_port">SSH port</label>
+                <input id="saas_ssh_port" name="saas_ssh_port" type="number" min="1" max="65535"
+                       value="{{ form.saas_ssh_port or 22 }}">
+              </div>
+            </div>
+            <div class="field">
+              <label for="saas_ssh_key">SSH private key path</label>
+              <input id="saas_ssh_key" name="saas_ssh_key" type="text"
+                     value="{{ form.saas_ssh_key or '' }}" placeholder="~/.ssh/id_ed25519">
+              <span class="hint">A key passphrase, if any, is added later via Config → Credentials — never stored in a file.</span>
+            </div>
+          </div>
+        </div>
 
         <div class="field field--row">
           <input id="verify_ssl" name="verify_ssl" type="checkbox" value="1"
                  {% if form.verify_ssl %}checked{% endif %}>
-          <label for="verify_ssl" style="font-weight: 400;">Verify SSL certificates against this Platform</label>
+          <label for="verify_ssl" style="font-weight: 400;">Verify SSL certificates on outbound connections (Platform / gateway API)</label>
         </div>
       </div>
     </section>
@@ -1109,7 +1387,7 @@
       <p class="ob-sub">All optional. Skip whatever you're not using and add it later from Settings — Atlas will still work.</p>
 
       <div class="ob-form">
-        <details class="ob-disclose">
+        <details class="ob-disclose" data-ob-gw4-disclose>
           <summary>
             <div class="ob-disclose-head">
               <span class="ob-disclose-title">Gateway 4 <span class="ob-disclose-tag">Optional</span></span>
@@ -1142,6 +1420,15 @@
           </div>
         </details>
 
+        <div class="field" data-ob-localstore-field {% if chosen_backend == 'vault' %}hidden{% endif %}>
+          <label for="ob_local_store">Where to keep this environment's secrets</label>
+          <select id="ob_local_store" data-ob-local-store>
+            <option value="keyring" {% if chosen_backend != 'file' %}selected{% endif %}>OS keyring — encrypted by your operating system (recommended)</option>
+            <option value="file" {% if chosen_backend == 'file' %}selected{% endif %}>Encrypted local file — machine-bound, works anywhere (incl. headless)</option>
+          </select>
+          <span class="hint">An explicit choice — Atlas never auto-switches. Pick the file on a headless host with no usable OS keyring.</span>
+        </div>
+
         <details class="ob-disclose">
           <summary>
             <div class="ob-disclose-head">
@@ -1159,6 +1446,14 @@
             <input type="hidden" name="credential_backend" value="{{ chosen_backend }}" data-ob-backend-input>
 
             <div data-ob-vault-fields {% if chosen_backend != 'vault' %}hidden{% endif %}>
+              <div class="field">
+                <label for="vault_secret_store">Vault connection settings stored in</label>
+                <select id="vault_secret_store" name="vault_secret_store" data-ob-vault-store>
+                  <option value="keyring" {% if (form.vault_secret_store or 'keyring') == 'keyring' %}selected{% endif %}>OS keyring (recommended)</option>
+                  <option value="file" {% if form.vault_secret_store == 'file' %}selected{% endif %}>Encrypted local file</option>
+                </select>
+                <span class="hint">Vault's own URL/token need a local home — Vault can't hold them.</span>
+              </div>
               <div class="field">
                 <label for="vault_url">Vault URL</label>
                 <input id="vault_url" name="vault_url" type="url"
@@ -1399,6 +1694,13 @@
     );
     var ok = true;
     inputs.forEach(function (el) {
+      // Skip fields hidden by the tier variant swap (display:none on an
+      // ancestor wrapper) — a required-but-invisible field would silently
+      // wedge the Continue button with nothing for the user to fix.
+      if (el.offsetParent === null) {
+        el.style.borderColor = '';
+        return;
+      }
       if (!el.value || (el.type === 'url' && !/^https?:\/\//i.test(el.value))) {
         el.style.borderColor = 'var(--bad)';
         ok = false;
@@ -1412,6 +1714,96 @@
     }
     return ok;
   }
+
+  // ───────── SaaS tier — Connect-step variant ─────────
+  // When the user picks SaaS on step 3, step 4 swaps from the Platform
+  // OAuth fields to the gateway fields (kind picker → GW4 API + optional
+  // SSH, or GW5 source). Required flags follow the visible variant so
+  // validateStep(4) checks exactly what the user can see.
+  function obSaasKind() {
+    var k = form.querySelector('[data-ob-saas-kind]:checked');
+    return k ? k.value : 'gateway4';
+  }
+  function obSyncTierFields() {
+    var saas = currentTier() === 'saas';
+    var kind = obSaasKind();
+
+    var headP = form.querySelector('[data-ob-connect-head="platform"]');
+    var headS = form.querySelector('[data-ob-connect-head="saas"]');
+    if (headP) headP.hidden = saas;
+    if (headS) headS.hidden = !saas;
+
+    var platWrap = form.querySelector('[data-ob-connect-platform]');
+    if (platWrap) platWrap.style.display = saas ? 'none' : 'contents';
+    var saasWrap = form.querySelector('[data-ob-connect-saas]');
+    if (saasWrap) saasWrap.style.display = saas ? 'flex' : 'none';
+
+    var platUri = document.getElementById('platform_uri');
+    var platCid = document.getElementById('platform_client_id');
+    if (platUri) platUri.required = !saas;
+    if (platCid) platCid.required = !saas;
+    // The OAuth secret is required only in the platform tiers (and only for
+    // the local backends — applyBackendChoice() owns the Vault side). Without
+    // this, picking SaaS left the hidden secret required and validateStep(4)
+    // failed invisibly, so Continue appeared dead.
+    var useVaultEl = form.querySelector('[data-ob-use-vault]');
+    var platSecret = document.getElementById('platform_client_secret');
+    if (platSecret) platSecret.required = !saas && !(useVaultEl && useVaultEl.checked);
+
+    var gw4Block = form.querySelector('[data-ob-saas-gw4]');
+    var gw5Block = form.querySelector('[data-ob-saas-gw5]');
+    if (gw4Block) gw4Block.style.display = (saas && kind === 'gateway4') ? 'flex' : 'none';
+    if (gw5Block) gw5Block.style.display = (saas && kind === 'gateway5') ? 'flex' : 'none';
+
+    var gw4Uri = document.getElementById('saas_gw4_uri');
+    if (gw4Uri) gw4Uri.required = saas && kind === 'gateway4';
+
+    var gw5Src = document.getElementById('saas_gw5_source');
+    var srcVal = gw5Src ? gw5Src.value : 'ssh';
+    var pathField = form.querySelector('[data-ob-saas-gw5-path]');
+    var fileSrc = srcVal === 'compose' || srcVal === 'helm';
+    if (pathField) pathField.style.display = (saas && kind === 'gateway5' && fileSrc) ? '' : 'none';
+    var pathInput = document.getElementById('saas_gw5_source_path');
+    if (pathInput) pathInput.required = saas && kind === 'gateway5' && fileSrc;
+
+    var confField = form.querySelector('[data-ob-saas-gw5-conf-path]');
+    var confSrc = srcVal === 'conf';
+    if (confField) confField.style.display = (saas && kind === 'gateway5' && confSrc) ? '' : 'none';
+    var confInput = document.getElementById('saas_gw5_conf_path');
+    if (confInput) confInput.required = saas && kind === 'gateway5' && confSrc;
+
+    var gw4SshChk = document.getElementById('saas_gw4_ssh');
+    var needsSsh = saas && ((kind === 'gateway4' && !!(gw4SshChk && gw4SshChk.checked))
+      || (kind === 'gateway5' && (srcVal === 'ssh' || srcVal === 'conf')));
+    var sshBlock = form.querySelector('[data-ob-saas-ssh]');
+    if (sshBlock) sshBlock.style.display = needsSsh ? 'flex' : 'none';
+    var iagHost = document.getElementById('saas_iag_host');
+    if (iagHost) iagHost.required = needsSsh;
+
+    // Step 5's optional platform-tier Gateway 4 disclose duplicates the
+    // SaaS gateway fields — hide it for SaaS runs.
+    var gw4Disclose = form.querySelector('[data-ob-gw4-disclose]');
+    if (gw4Disclose) gw4Disclose.hidden = saas;
+
+    // The accent halo follows the checked tier card (covers all three).
+    form.querySelectorAll('.ob-tier').forEach(function (label) {
+      var input = label.querySelector('input[data-ob-tier]');
+      label.classList.toggle('is-active', !!input && input.checked);
+    });
+  }
+  form.querySelectorAll('[data-ob-tier]').forEach(function (r) {
+    r.addEventListener('change', obSyncTierFields);
+  });
+  form.querySelectorAll('[data-ob-saas-kind]').forEach(function (r) {
+    r.addEventListener('change', obSyncTierFields);
+  });
+  (function () {
+    var sel = document.getElementById('saas_gw5_source');
+    if (sel) sel.addEventListener('change', obSyncTierFields);
+    var chk = document.getElementById('saas_gw4_ssh');
+    if (chk) chk.addEventListener('change', obSyncTierFields);
+  })();
+  obSyncTierFields();
 
   nextBtn.addEventListener('click', function () {
     if (!validateStep(current)) return;
@@ -1519,19 +1911,15 @@
   window.addEventListener('resize', function () { moveModeIndicator(false); });
 
   // Tier card active-state mirroring (no :has() reliance).
+  // #16 accordion: .is-active both selects and expands the panel — the
+  // flex-grow transition in CSS does the rest, so this is a plain mirror.
   // Also: when the tier flips, the Extended-only step + pill appears /
   // disappears, and pill numbers re-flow to stay 1..N for the visible set.
   form.querySelectorAll('[data-ob-tier]').forEach(function (input) {
     input.addEventListener('change', function () {
-      // M5 — persistent morph state: chosen card stays morphed, the other
-      // stays dimmed. Both flip when the user clicks the alternate card.
-      // No setTimeout / snap-back — the user controls the state.
       form.querySelectorAll('.ob-tier').forEach(function (c) {
         var i = c.querySelector('input');
-        var checked = !!i && i.checked;
-        c.classList.toggle('is-active',   checked);
-        c.classList.toggle('is-morphing', checked);
-        c.classList.toggle('is-faded',    !checked);
+        c.classList.toggle('is-active', !!i && i.checked);
       });
       refreshPillVisibilityAndNumbers();
       // If the user is currently on the Extended step but flipped back to
@@ -1550,15 +1938,22 @@
   var keyringFields = form.querySelectorAll('[data-ob-keyring-field]');
   var vaultOnlyHints = form.querySelectorAll('[data-ob-vault-field]');
   var clientSecret = form.querySelector('#platform_client_secret');
+  var localStoreSelect = form.querySelector('[data-ob-local-store]');
+  var localStoreField = form.querySelector('[data-ob-localstore-field]');
 
   function applyBackendChoice() {
     var useVault = !!(useVaultCheckbox && useVaultCheckbox.checked);
+    var localStore = (localStoreSelect && localStoreSelect.value) || 'keyring';
     if (vaultFields) vaultFields.hidden = !useVault;
-    if (backendHidden) backendHidden.value = useVault ? 'vault' : 'keyring';
+    if (localStoreField) localStoreField.hidden = useVault;
+    // keyring | file when local; 'vault' when the Vault disclosure is on.
+    if (backendHidden) backendHidden.value = useVault ? 'vault' : localStore;
     keyringFields.forEach(function (el) { el.hidden = useVault; });
     vaultOnlyHints.forEach(function (el) { el.hidden = !useVault; });
     if (clientSecret) {
-      clientSecret.required = !useVault;
+      // Tier-aware: SaaS has no Platform secret at all (mirrors
+      // obSyncTierFields), Vault reads it from the KV path instead.
+      clientSecret.required = !useVault && currentTier() !== 'saas';
       if (useVault) clientSecret.value = '';
     }
     applyVaultAuth();
@@ -1575,6 +1970,7 @@
     });
   }
   if (useVaultCheckbox) useVaultCheckbox.addEventListener('change', applyBackendChoice);
+  if (localStoreSelect) localStoreSelect.addEventListener('change', applyBackendChoice);
   if (authSelect) authSelect.addEventListener('change', applyVaultAuth);
 
   // ───────── Vault test (AJAX) ─────────
@@ -1669,7 +2065,11 @@
         verify_ssl: (form.querySelector('#vault_verify_ssl') || {}).checked ? '1' : '',
         tier: (form.querySelector('[data-ob-tier]:checked') || {}).value || 'standard',
         env_name: (form.querySelector('#env_name') || {}).value || '',
-        gateway4_uri: (form.querySelector('#gateway4_uri') || {}).value || '',
+        // SaaS posts its own gateway URI field — send that one so the key
+        // check lists gateway4_password for a SaaS GW4 environment.
+        gateway4_uri: (currentTier() === 'saas'
+          ? (obSaasKind() === 'gateway4' ? ((form.querySelector('#saas_gw4_uri') || {}).value || '') : '')
+          : ((form.querySelector('#gateway4_uri') || {}).value || '')),
         iag5_uri: '',
       };
       var body = new URLSearchParams();

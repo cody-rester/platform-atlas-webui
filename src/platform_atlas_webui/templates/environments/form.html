@@ -3,14 +3,19 @@
 {% block crumb %}<a href="/environments" class="text-inherit hover:text-accent">Environments</a> <span class="sep">›</span> {% if mode == 'create' %}New{% else %}{{ env.name }}{% endif %}{% endblock %}
 {% block content %}
 {% set d = env.data if env else {} %}
+{# Tier preselect: the saved env tier on edit; on create, the GLOBAL default
+   tier handed in by the route (a SaaS-default install pre-picks SaaS for new
+   environments). 'extended' remains the last-resort fallback. #}
+{% set _tier_sel = d.get('tier') or (default_tier | default('')) or 'extended' %}
 
-{# Step-number wiring is tier-aware. Standard mode skips the entire
-   Topology step (SSH + Topology + Kubernetes — all Extended-only),
-   so Review moves from step 4 to step 3 and the wizard's total
-   drops from 4 to 3. These vars are referenced by every step's
-   data-wizard-step / x-show / and by the wizard data factory below. #}
-{% set _step_total = 3 if is_standard else 4 %}
-{% set _step_review = _step_total %}
+{# Step-number wiring is tier-aware AND reactive. Standard skips the entire
+   Topology step (SSH + Topology + Kubernetes — all Extended-only), so the
+   wizard has 3 steps (Review = 3) instead of 4. Crucially, `is_standard` is
+   only the SERVER-SIDE snapshot of the ACTIVE tier — the user can switch tier
+   in the Step 1 dropdown, so the step model (labels / total) and the Topology
+   step's visibility are driven reactively by the Alpine `tier` property below,
+   NOT by frozen Jinja constants (which is why Standard envs created under an
+   active Extended tier used to keep showing the SSH/Kubernetes step). #}
 
 {# NOTE: Tailwind migration is partial here — the hero and flash banner are
    converted, but the long form below stays on atlas.css's .form/.field/.hint
@@ -39,7 +44,7 @@
   <div>
     <div class="eyebrow"><span class="dot"></span> {% if mode == 'create' %}Create{% else %}Edit{% endif %}</div>
     <h1 class="text-[36px] leading-[1.05] font-semibold tracking-[-0.038em] mt-2 mb-1.5">
-      {% if mode == 'create' %}New environment{% else %}{{ env.name }}{% endif %}, <em class="not-italic text-text-3">overlay config</em>
+      {% if mode == 'create' %}New environment{% else %}{{ env.name }}{% endif %}, <em class="not-italic text-accent">overlay config</em>
     </h1>
     <p class="text-[14px] text-text-2 max-w-[64ch]">
       {% if is_standard %}
@@ -49,6 +54,7 @@
       {% else %}
         Standard mode only requires a name, Platform URI, and OAuth client ID.
         Extended adds optional topology, gateway, and Kubernetes fields.
+        SaaS audits a single standalone Gateway 4 or 5 — no Platform at all.
       {% endif %}
     </p>
   </div>
@@ -174,11 +180,30 @@
           {% endif %}
           <a href="/tier" style="color:var(--accent);">Switch to Extended</a> to enable Extended environments.
         </span>
-      {% else %}
-        <select id="tier" name="tier">
-          <option value="standard" {% if d.get('tier') == 'standard' %}selected{% endif %}>Standard — Application audit (Platform OAuth + IAG4)</option>
-          <option value="extended" {% if d.get('tier') in (None, '', 'extended') %}selected{% endif %}>Extended — Infrastructure audit (SSH/Mongo/Redis/IAG)</option>
+      {% elif mode == 'edit' and d.get('tier') == 'saas' %}
+        {# A SaaS environment's tier (and gateway kind) is fixed at create
+           time — converting would leave it half-invalid. The server-side
+           guard in save_environment rejects bypasses. #}
+        <select id="tier" disabled aria-describedby="tier-saas-hint"
+                style="opacity:0.65; cursor:not-allowed; background:var(--surface-2);">
+          <option value="saas" selected>SaaS — Single Gateway audit (GW4 or GW5)</option>
         </select>
+        <input type="hidden" name="tier" value="saas">
+        <span id="tier-saas-hint" class="hint">
+          SaaS environments keep their tier for life. Create a new environment
+          for a Standard or Extended audit.
+        </span>
+      {% else %}
+        <select id="tier" name="tier" x-model="tier">
+          <option value="standard" {% if _tier_sel == 'standard' %}selected{% endif %}>Standard — Application audit (Platform OAuth + IAG4)</option>
+          <option value="extended" {% if _tier_sel == 'extended' %}selected{% endif %}>Extended — Infrastructure audit (SSH/Mongo/Redis/IAG)</option>
+          {% if mode == 'create' %}
+          <option value="saas" {% if _tier_sel == 'saas' %}selected{% endif %}>SaaS — Single Gateway audit (GW4 or GW5, no Platform)</option>
+          {% endif %}
+        </select>
+        {% if mode == 'edit' %}
+        <span class="hint">Existing environments can switch between Standard and Extended only — SaaS is chosen at create time.</span>
+        {% endif %}
       {% endif %}
     </div>
   </fieldset>
@@ -187,12 +212,12 @@
   {# ── Step 2 — Connection (Platform + Gateway 4) ───────────────────── #}
   <div data-wizard-step="2" x-show="!wizardOn || step === 2" x-cloak>
   <fieldset>
-    <legend>Platform connection</legend>
-    <div class="field">
+    <legend><span x-show="!saas">Platform connection</span><span x-show="saas" x-cloak>Credentials</span></legend>
+    <div class="field" x-show="!saas">
       <label for="platform_uri">Platform URI</label>
       <input id="platform_uri" name="platform_uri" type="url" placeholder="https://platform.acme.com" value="{{ d.get('platform_uri') or '' }}">
     </div>
-    <div class="field">
+    <div class="field" x-show="!saas">
       <label for="platform_client_id">OAuth client ID</label>
       <input id="platform_client_id" name="platform_client_id" type="text"
              value="{{ d.get('platform_client_id') or '' }}"
@@ -202,15 +227,200 @@
     </div>
     <div class="field">
       <label for="credential_backend">Credential backend</label>
-      <select id="credential_backend" name="credential_backend">
-        <option value="keyring" {% if d.get('credential_backend') in (None, '', 'keyring') %}selected{% endif %}>OS keyring</option>
+      <select id="credential_backend" name="credential_backend" x-model="credBackend">
+        <option value="keyring" {% if d.get('credential_backend') in (None, '', 'keyring') %}selected{% endif %}>OS keyring (recommended)</option>
+        <option value="file" {% if d.get('credential_backend') == 'file' %}selected{% endif %}>Encrypted local file</option>
         <option value="vault" {% if d.get('credential_backend') == 'vault' %}selected{% endif %}>HashiCorp Vault</option>
       </select>
+      <span class="hint">Where Atlas keeps this environment's secrets — an explicit choice; Atlas never auto-switches. The OS keyring is recommended whenever it works on this host.</span>
+    </div>
+    {# Vault sub-choice — revealed inline by Alpine the moment "HashiCorp Vault"
+       is selected (no save-and-reopen round-trip). Always rendered so x-show can
+       toggle it client-side; the route ignores it unless the backend is Vault. #}
+    <div class="field" x-show="credBackend === 'vault'" x-cloak>
+      <label for="vault_secret_store">Vault connection settings stored in</label>
+      <select id="vault_secret_store" name="vault_secret_store">
+        <option value="keyring" {% if (d.get('vault_secret_store') or 'keyring') == 'keyring' %}selected{% endif %}>OS keyring (recommended)</option>
+        <option value="file" {% if d.get('vault_secret_store') == 'file' %}selected{% endif %}>Encrypted local file</option>
+      </select>
+      <span class="hint">Vault's own URL/token need a local home — Vault can't hold them. The OS keyring is recommended; pick the encrypted file if the keyring isn't usable on this host.</span>
     </div>
   </fieldset>
 
-  <fieldset>
-    <legend>Gateway 4 <span style="color:var(--text-3); font-weight:400;">(optional, both tiers)</span></legend>
+  {# ── SaaS — single-gateway audit (reactively shown) ──────────────────
+     Inputs use saas_-prefixed names so they never collide with the
+     Extended topology step's iag_host/ssh_* fields; the route maps them
+     onto the generic payload keys when the posted tier is saas. #}
+  {% set _dep = d.get('deployment') or {} %}
+  {% set _dep_nodes = _dep.get('nodes') or [] %}
+  {% set _saas_file_nodes = _dep_nodes | selectattr('transport', 'equalto', 'gateway5_file') | list %}
+  {% set _saas_ssh_nodes = _dep_nodes | rejectattr('transport', 'equalto', 'gateway5_file') | list %}
+  {% set _saas_file_path = _saas_file_nodes[0].get('gateway5_source_path', '') if _saas_file_nodes else '' %}
+  {% set _saas_ssh_host = _saas_ssh_nodes[0].get('host', '') if _saas_ssh_nodes else '' %}
+  {% set _saas_conf_path = _saas_ssh_nodes[0].get('gateway5_conf_path', '') if _saas_ssh_nodes else '' %}
+  {% set _saas_ssh_defaults = _dep.get('ssh_defaults') or {} %}
+  {% set _is_saas_env = d.get('tier') == 'saas' %}
+  <fieldset x-show="saas" x-cloak>
+    <legend>SaaS gateway</legend>
+    <div class="field">
+      <label>Which gateway are you auditing?</label>
+      <div style="display:flex; flex-direction:column; gap:8px; margin-top:4px;">
+        <label class="field--row gw-choice" :class="{ 'is-selected': saasKind === 'gateway4' }" style="font-weight:400;">
+          <input type="radio" name="saas_gateway_kind" value="gateway4" x-model="saasKind"
+                 {% if mode == 'edit' and _is_saas_env %}disabled{% endif %}>
+          Gateway 4 (IAG4) — audited via its REST API, plus optional SSH
+        </label>
+        <label class="field--row gw-choice" :class="{ 'is-selected': saasKind === 'gateway5' }" style="font-weight:400;">
+          <input type="radio" name="saas_gateway_kind" value="gateway5" x-model="saasKind"
+                 {% if mode == 'edit' and _is_saas_env %}disabled{% endif %}>
+          Gateway 5 (IAG5) — env vars via SSH or a local Compose/Helm file
+        </label>
+      </div>
+      {% if mode == 'edit' and _is_saas_env %}
+        <input type="hidden" name="saas_gateway_kind" value="{{ d.get('saas_gateway_kind') or 'gateway4' }}">
+        <span class="hint">The gateway kind is fixed at create time — strictly one gateway per SaaS environment.</span>
+      {% else %}
+        <span class="hint">Strictly one gateway per SaaS environment — fixed once the environment is created.</span>
+      {% endif %}
+    </div>
+
+    {# GW4: optional deeper-config SSH block #}
+    <div x-show="saasKind === 'gateway4'" x-cloak>
+      <div class="field field--row">
+        <input id="saas_gw4_ssh" name="saas_gw4_ssh" type="checkbox" value="1" x-model="saasGw4Ssh">
+        <label for="saas_gw4_ssh">Collect deeper config over SSH (properties.yml, venv Python, DB sizes, host facts)</label>
+      </div>
+      <span class="hint" x-show="!saasGw4Ssh">API-only audit — SSH-dependent rules will report as SKIP.</span>
+    </div>
+
+    {# GW5: env-var source picker #}
+    <div x-show="saasKind === 'gateway5'" x-cloak>
+      <div class="field">
+        <label for="saas_gw5_source">Gateway 5 configuration source</label>
+        <select id="saas_gw5_source" name="saas_gw5_source" x-model="saasGw5Source">
+          <option value="ssh">SSH (printenv) — read GATEWAY_* env vars from the running server</option>
+          <option value="conf">SSH (server config) — read the server's gateway.conf over SSH</option>
+          <option value="compose">Docker Compose file — parse a local compose file</option>
+          <option value="helm">Helm values file — parse a local IAG5 chart values.yaml</option>
+        </select>
+      </div>
+      <div class="field" x-show="saasGw5Source === 'compose' || saasGw5Source === 'helm'" x-cloak>
+        <label for="saas_gw5_source_path">File path</label>
+        <input id="saas_gw5_source_path" name="saas_gw5_source_path" type="text"
+               placeholder="/path/to/docker-compose.yml" value="{{ _saas_file_path }}"
+               style="font-family:var(--mono); font-size:13px;">
+        <span class="hint">A local path on the Atlas machine — no SSH or host access needed.</span>
+      </div>
+      <div class="field" x-show="saasGw5Source === 'conf'" x-cloak>
+        <label for="saas_gw5_conf_path">Server config path</label>
+        <input id="saas_gw5_conf_path" name="saas_gw5_conf_path" type="text"
+               placeholder="/etc/gateway/gateway.conf" value="{{ _saas_conf_path }}"
+               style="font-family:var(--mono); font-size:13px;">
+        <span class="hint">Remote path to the server's gateway.conf, read over SSH (must be a server-mode config).</span>
+      </div>
+    </div>
+
+    {# Shared gateway SSH details (GW4 with SSH, or GW5 via printenv) #}
+    <div x-show="saasNeedsSsh" x-cloak
+         style="display:flex; flex-direction:column; gap:12px; padding-left:26px; border-left:2px solid var(--line); margin-top:4px;">
+      <div class="field">
+        <label for="saas_iag_host">Gateway SSH host</label>
+        <input id="saas_iag_host" name="saas_iag_host" type="text"
+               placeholder="iag.acme.cloud" value="{{ _saas_ssh_host }}">
+      </div>
+      <div class="field">
+        <label for="saas_ssh_user">SSH user</label>
+        <input id="saas_ssh_user" name="saas_ssh_user" type="text"
+               value="{{ _saas_ssh_defaults.get('username') or 'atlas' }}">
+      </div>
+      <div class="field">
+        <label for="saas_ssh_port">SSH port</label>
+        <input id="saas_ssh_port" name="saas_ssh_port" type="number" min="1" max="65535"
+               value="{{ _saas_ssh_defaults.get('port') or 22 }}">
+      </div>
+      {% set _saas_key = d.get('ssh_key') or _saas_ssh_defaults.get('key_path') or '' %}
+      {% set _saas_key_in_dropdown = _saas_key and (ssh_keys | selectattr('path', 'equalto', _saas_key) | list | length > 0) %}
+      <div class="field">
+        <label for="saas_ssh_key_select">SSH private key</label>
+        <select id="saas_ssh_key_select"
+                style="font-family:var(--mono); font-size:13px;"
+                onchange="(function(s){
+                  var custom = document.getElementById('saas_ssh_key_custom');
+                  var hidden = document.getElementById('saas_ssh_key');
+                  if (s.value === '__custom__') {
+                    custom.style.display = '';
+                    hidden.value = custom.value;
+                  } else {
+                    custom.style.display = 'none';
+                    hidden.value = s.value;
+                  }
+                })(this)">
+          <option value="" {% if not _saas_key %}selected{% endif %}>— None (use SSH agent) —</option>
+          {% for k in ssh_keys %}
+            <option value="{{ k.path }}" {% if _saas_key == k.path %}selected{% endif %}>
+              {{ k.name }} · {{ k.path }}
+            </option>
+          {% endfor %}
+          <option value="__custom__" {% if _saas_key and not _saas_key_in_dropdown %}selected{% endif %}>— Custom path… —</option>
+        </select>
+        {# Hidden field that actually submits — kept in sync by the select's
+           onchange and the custom input's oninput, same as the Extended
+           SSH key picker. #}
+        <input type="hidden" id="saas_ssh_key" name="saas_ssh_key" value="{{ _saas_key }}">
+        <input type="text" id="saas_ssh_key_custom"
+               placeholder="~/.ssh/some_other_key"
+               value="{{ _saas_key if (_saas_key and not _saas_key_in_dropdown) else '' }}"
+               style="font-family:var(--mono); font-size:13px; margin-top:6px;
+                      {% if _saas_key and not _saas_key_in_dropdown %}{% else %}display:none;{% endif %}"
+               oninput="document.getElementById('saas_ssh_key').value = this.value">
+        <span class="hint">
+          {% if ssh_keys %}
+            Atlas found {{ ssh_keys | length }} private key{% if ssh_keys | length != 1 %}s{% endif %}
+            in <code>~/.ssh</code>. Pick one, choose <em>Custom path…</em> for another path,
+            or leave as None to use the SSH agent.
+          {% else %}
+            No private keys detected in <code>~/.ssh</code> — choose <em>Custom path…</em>
+            to enter the full path, or leave as None to use the SSH agent.
+          {% endif %}
+        </span>
+      </div>
+      <div class="field">
+        <label for="saas_ssh_passphrase">SSH key passphrase</label>
+        <input id="saas_ssh_passphrase" name="saas_ssh_passphrase" type="password"
+               autocomplete="new-password" placeholder="••••••••">
+        <span class="hint" x-show="credBackend !== 'vault'">
+          Only needed when the key is encrypted. 🔒 Stored in this environment's
+          credential store on save — never in the env file. Leave blank to keep
+          the currently stored passphrase.
+        </span>
+        <span class="hint" x-show="credBackend === 'vault'" x-cloak>
+          Vault backend: typed here it is used for the connection test only —
+          store it under the <code>ssh_passphrase</code> key inside your KV path.
+        </span>
+      </div>
+      <div class="field">
+        <button type="button" class="btn sm"
+                hx-post="/environments/check-ssh"
+                hx-include="#saas_iag_host, #saas_ssh_user, #saas_ssh_port, #saas_ssh_key, #saas_ssh_passphrase"
+                hx-vals='{"env_name": {{ (env.name if env else "") | tojson }}}'
+                hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'
+                hx-target="#saas-ssh-test-result"
+                hx-swap="innerHTML"
+                hx-disabled-elt="this">
+          Test SSH connection
+        </button>
+        <div id="saas-ssh-test-result" class="mt-1.5 min-h-[18px]"></div>
+        <span class="hint">Tries the host, user, port, key, and passphrase above with the same
+          SSH machinery a capture uses — no more guessing whether it will connect.</span>
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset x-show="!saas || saasKind === 'gateway4'">
+    <legend>Gateway 4
+      <span style="color:var(--text-3); font-weight:400;" x-show="!saas">(optional, both tiers)</span>
+      <span style="color:var(--text-3); font-weight:400;" x-show="saas" x-cloak>(API — required for a SaaS GW4 audit)</span>
+    </legend>
     <div class="field">
       <label for="gateway4_uri">Gateway 4 URI</label>
       <input id="gateway4_uri" name="gateway4_uri" type="url" placeholder="https://iag.acme.com" value="{{ d.get('gateway4_uri') or '' }}">
@@ -228,7 +438,7 @@
      and nothing else. We omit the entire step rather than disabling the
      fields so the wizard reads as three steps end-to-end. #}
   {% if not is_standard %}
-  <div data-wizard-step="3" x-show="!wizardOn || step === 3" x-cloak>
+  <div data-wizard-step="3" x-show="(!wizardOn || step === 3) && extended" x-cloak>
   <fieldset>
     <legend>SSH <span style="color:var(--text-3); font-weight:400;">(Extended only — not used with Kubernetes)</span></legend>
     {% set _current_ssh_key = d.get('ssh_key') or '' %}
@@ -281,6 +491,20 @@
         Saving an empty value removes the key from existing nodes.
       </span>
     </div>
+    <div class="field">
+      <label for="ssh_passphrase">SSH key passphrase</label>
+      <input id="ssh_passphrase" name="ssh_passphrase" type="password"
+             autocomplete="new-password" placeholder="••••••••">
+      <span class="hint" x-show="credBackend !== 'vault'">
+        Only needed when the key is encrypted. 🔒 Stored in this environment's
+        credential store on save — never in the env file. Leave blank to keep
+        the currently stored passphrase.
+      </span>
+      <span class="hint" x-show="credBackend === 'vault'" x-cloak>
+        Vault backend: store the passphrase under the <code>ssh_passphrase</code>
+        key inside your KV path — Atlas reads it from there at capture time.
+      </span>
+    </div>
   </fieldset>
 
   {# Pre-fill topology fields from the existing deployment block, or fall
@@ -302,6 +526,24 @@
   {% set _node_redis_2 = _redis_nodes[1] if _redis_nodes | length > 1 else {} %}
   {% set _node_redis_3 = _redis_nodes[2] if _redis_nodes | length > 2 else {} %}
   {% set _node_iag = (_nodes | selectattr('role', 'equalto', 'iag') | list | first) or {} %}
+  {# Gateway 5 source picker pre-fill. On edit, derive from the saved IAG node
+     (a gateway5_file node → a file source; an SSH iag node → ssh). On an error
+     re-render the flat payload carries the posted gateway5_* fields directly. #}
+  {% set _gw5_source = d.get('gateway5_source') %}
+  {% if _gw5_source is none %}
+    {% if _node_iag.get('transport') == 'gateway5_file' %}
+      {% set _gw5_source = 'compose' %}
+    {% elif _node_iag.get('gateway5_conf_path') %}
+      {% set _gw5_source = 'conf' %}
+    {% elif _node_iag.get('host') %}
+      {% set _gw5_source = 'ssh' %}
+    {% else %}
+      {% set _gw5_source = '' %}
+    {% endif %}
+  {% endif %}
+  {% set _gw5_path = d.get('gateway5_source_path') or _node_iag.get('gateway5_source_path') or '' %}
+  {% set _gw5_conf_path = d.get('gateway5_conf_path') or _node_iag.get('gateway5_conf_path') or '' %}
+  {% set _gw5_ssh_host = d.get('iag_host') or (_node_iag.get('host') if _node_iag.get('transport') != 'gateway5_file' else '') or '' %}
   {% set _ssh_user_default = _ssh_defaults.get('username') or _node_iap.get('ssh_user') or 'atlas' %}
   {% set _ssh_port_default = _ssh_defaults.get('port') or _node_iap.get('ssh_port') or 22 %}
   {% set _iap_transport = _node_iap.get('transport') or 'ssh' %}
@@ -386,14 +628,8 @@
                  style="font-family:var(--mono); font-size:13px;">
           <span class="hint">Defaults to the Platform host when blank.</span>
         </div>
-        <div class="field">
-          <label for="iag_host">IAG SSH host <span style="color:var(--text-3); font-weight:400;">(optional)</span></label>
-          <input id="iag_host" name="iag_host" type="text"
-                 placeholder="Leave blank if no Gateway in this env"
-                 value="{{ _node_iag.get('host') or '' }}"
-                 style="font-family:var(--mono); font-size:13px;">
-          <span class="hint">Add an Automation Gateway node if this deployment includes one.</span>
-        </div>
+        {# Gateway 5 (IAG5) is configured in the shared "Automation Gateway 5"
+           block below — it applies to both standalone and HA2. #}
       </div>
 
       {# ── HA2: multiple hosts per role ───────────────────────────────── #}
@@ -458,13 +694,8 @@
                    style="font-family:var(--mono); font-size:13px;"></div>
         </div>
 
-        <div class="field">
-          <label for="iag_host_ha">IAG SSH host <span style="color:var(--text-3); font-weight:400;">(optional, single node)</span></label>
-          <input id="iag_host_ha" name="iag_host_ha" type="text"
-                 placeholder="Leave blank if no Gateway in this env"
-                 value="{{ _node_iag.get('host') or '' }}"
-                 style="font-family:var(--mono); font-size:13px;">
-        </div>
+        {# Gateway 5 (IAG5) is configured in the shared "Automation Gateway 5"
+           block below — it applies to both standalone and HA2. #}
       </div>
 
       {# ── Kubernetes: hint pointing to dedicated section ──────────────── #}
@@ -615,6 +846,47 @@
                  style="font-family:var(--mono); font-size:13px;">
         </div>
       </div>
+
+      {# ── Automation Gateway 5 (IAG5) — shared by standalone + HA2 ──────── #}
+      <div id="topo-gateway5" class="topo-mode-pane"
+           style="display:none; flex-direction:column; gap:12px; margin-top:14px;
+                  padding-top:12px; border-top:1px dashed var(--line);">
+        <div class="field">
+          <label for="gateway5_source">Automation Gateway 5 <span style="color:var(--text-3); font-weight:400;">(optional)</span></label>
+          <select id="gateway5_source" name="gateway5_source" onchange="atlasGw5SourceToggle()">
+            <option value=""        {% if not _gw5_source %}selected{% endif %}>None — no Gateway 5 in this environment</option>
+            <option value="ssh"     {% if _gw5_source == 'ssh' %}selected{% endif %}>SSH — read env vars (printenv) from the gateway host</option>
+            <option value="conf"    {% if _gw5_source == 'conf' %}selected{% endif %}>SSH — read the server's gateway.conf file</option>
+            <option value="compose" {% if _gw5_source == 'compose' %}selected{% endif %}>Docker Compose file — parse the environment block</option>
+            <option value="helm"    {% if _gw5_source == 'helm' %}selected{% endif %}>Helm values file — parse an IAG5 values.yaml</option>
+          </select>
+          <span class="hint">How Atlas reads this deployment's Gateway 5 configuration. Only one source is used.</span>
+        </div>
+        <div class="field" id="gw5-ssh-field" style="display:none;">
+          <label for="iag_host">Gateway 5 SSH host</label>
+          <input id="iag_host" name="iag_host" type="text"
+                 placeholder="iag-prod-1.acme.internal"
+                 value="{{ _gw5_ssh_host }}"
+                 style="font-family:var(--mono); font-size:13px;">
+          <span class="hint">Hostname or IP of the gateway server (uses the shared SSH credentials above). Also collects Gateway 4 over SSH when present.</span>
+        </div>
+        <div class="field" id="gw5-file-field" style="display:none;">
+          <label for="gateway5_source_path">Gateway 5 file path</label>
+          <input id="gateway5_source_path" name="gateway5_source_path" type="text"
+                 placeholder="~/iag5-compose.yml  or  ./values.yaml"
+                 value="{{ _gw5_path }}"
+                 style="font-family:var(--mono); font-size:13px;">
+          <span class="hint">Local path (on the Atlas host) to the Docker Compose or Helm values file. Parsed directly — no SSH needed for the gateway.</span>
+        </div>
+        <div class="field" id="gw5-conf-field" style="display:none;">
+          <label for="gateway5_conf_path">Gateway 5 server config path</label>
+          <input id="gateway5_conf_path" name="gateway5_conf_path" type="text"
+                 placeholder="/etc/gateway/gateway.conf"
+                 value="{{ _gw5_conf_path }}"
+                 style="font-family:var(--mono); font-size:13px;">
+          <span class="hint">Remote path to the server's <code>gateway.conf</code>, read over SSH using the host + shared credentials above. Must be a server-mode config (<code>application_mode = server</code>).</span>
+        </div>
+      </div>
     </div>
   </fieldset>
 
@@ -762,12 +1034,16 @@
   {# ── Review (Legacy + summary) ────────────────────────────────────────
      Step number is dynamic — step 4 in Extended mode (after Topology),
      step 3 in Standard mode (Topology is skipped entirely). #}
-  <div data-wizard-step="{{ _step_review }}" x-show="!wizardOn || step === {{ _step_review }}" x-cloak>
-  <fieldset>
+  <div :data-wizard-step="total" x-show="!wizardOn || step === total" x-cloak>
+  {# Legacy (2023.x) is a Platform concept — a SaaS environment audits a
+     standalone gateway, so the whole fieldset disappears for SaaS (and the
+     select is disabled so it never submits; the server strips the field
+     from SaaS saves regardless). #}
+  <fieldset x-show="!saas">
     <legend>Legacy</legend>
     <div class="field">
       <label for="legacy_profile">Legacy profile</label>
-      <select id="legacy_profile" name="legacy_profile">
+      <select id="legacy_profile" name="legacy_profile" :disabled="saas">
         <option value="" {% if not d.get('legacy_profile') %}selected{% endif %}>None (Platform 6+)</option>
         <option value="2023" {% if d.get('legacy_profile') == '2023' %}selected{% endif %}>Platform 2023.x</option>
       </select>
@@ -792,16 +1068,21 @@
     <div class="grid grid-cols-2 gap-x-6 gap-y-2 text-[13px]">
       <div><span class="text-text-3">Name</span><div class="font-mono" x-text="v('name')"></div></div>
       <div><span class="text-text-3">Tier</span><div class="font-mono" x-text="v('tier')"></div></div>
-      <div><span class="text-text-3">Platform URI</span><div class="font-mono truncate" x-text="v('platform_uri')"></div></div>
-      <div><span class="text-text-3">OAuth client ID</span><div class="font-mono truncate" x-text="v('platform_client_id')"></div></div>
+      <div x-show="!saas"><span class="text-text-3">Platform URI</span><div class="font-mono truncate" x-text="v('platform_uri')"></div></div>
+      <div x-show="!saas"><span class="text-text-3">OAuth client ID</span><div class="font-mono truncate" x-text="v('platform_client_id')"></div></div>
       <div><span class="text-text-3">Credential backend</span><div class="font-mono" x-text="v('credential_backend')"></div></div>
-      <div><span class="text-text-3">Gateway 4 URI</span><div class="font-mono truncate" x-text="v('gateway4_uri')"></div></div>
-      {# Deployment mode + SSH key live in the Topology step, which Standard
-         doesn't render — skip the Review rows so they don't show as
-         meaningless dashes. #}
+      <div x-show="!saas || saasKind === 'gateway4'"><span class="text-text-3">Gateway 4 URI</span><div class="font-mono truncate" x-text="v('gateway4_uri')"></div></div>
+      <div x-show="saas" x-cloak><span class="text-text-3">Gateway kind</span><div class="font-mono" x-text="saasKind"></div></div>
+      <div x-show="saas && saasKind === 'gateway5'" x-cloak><span class="text-text-3">GW5 source</span><div class="font-mono" x-text="saasGw5Source"></div></div>
+      <div x-show="saasNeedsSsh" x-cloak><span class="text-text-3">Gateway SSH host</span><div class="font-mono truncate" x-text="v('saas_iag_host')"></div></div>
+      {# Deployment mode + SSH key live in the Topology step (Extended only).
+         Rendered when the ACTIVE tier is Extended, but reactively hidden via
+         x-show when the user switches THIS env to Standard so they don't show
+         as meaningless dashes. Not rendered at all when the active tier is
+         Standard (the Topology step is absent entirely). #}
       {% if not is_standard %}
-      <div><span class="text-text-3">Deployment mode</span><div class="font-mono" x-text="v('deployment_mode')"></div></div>
-      <div><span class="text-text-3">SSH key</span><div class="font-mono truncate" x-text="v('ssh_key')"></div></div>
+      <div x-show="extended"><span class="text-text-3">Deployment mode</span><div class="font-mono" x-text="v('deployment_mode')"></div></div>
+      <div x-show="extended"><span class="text-text-3">SSH key</span><div class="font-mono truncate" x-text="v('ssh_key')"></div></div>
       {% endif %}
     </div>
   </fieldset>
@@ -891,8 +1172,10 @@
     const topo = document.getElementById('topology-fieldset');
     if (!tierSel || !topo) return;
     const sync = () => {
-      const isStandard = (tierSel.value || '').toLowerCase() === 'standard';
-      topo.style.display = isStandard ? 'none' : '';
+      const v = (tierSel.value || '').toLowerCase();
+      // Topology applies only to Extended — Standard synthesizes targets
+      // from platform_uri, SaaS builds its gateway node from its own step.
+      topo.style.display = (v === 'standard' || v === 'saas') ? 'none' : '';
     };
     tierSel.addEventListener('change', sync);
     sync();
@@ -934,6 +1217,12 @@
       });
       if (sshShared) sshShared.style.display = sshModes.has(mode) ? 'grid' : 'none';
       if (transportShared) transportShared.style.display = sshModes.has(mode) ? 'flex' : 'none';
+      // Gateway 5 picker shares the SSH-based modes (standalone, ha2).
+      const gw5 = document.getElementById('topo-gateway5');
+      if (gw5) {
+        gw5.style.display = sshModes.has(mode) ? 'flex' : 'none';
+        atlasGw5SourceToggle();
+      }
       // The "primary only" hint after the transport selector is HA2-specific.
       if (ha2Note) ha2Note.style.display = (mode === 'ha2') ? 'inline' : 'none';
     };
@@ -959,6 +1248,26 @@
     });
     syncPanes();
   })();
+
+  // Gateway 5 source picker — show the SSH host field for an SSH source, the
+  // file-path field for a Compose/Helm source, and neither for "None". Declared
+  // at top level (like atlasK8sToggle) so the inline onchange + syncPanes reach it.
+  function atlasGw5SourceToggle() {
+    var sel = document.getElementById('gateway5_source');
+    var val = sel ? (sel.value || '') : '';
+    var sshField = document.getElementById('gw5-ssh-field');
+    var fileField = document.getElementById('gw5-file-field');
+    var confField = document.getElementById('gw5-conf-field');
+    // The SSH host is needed for both the printenv and server-config sources.
+    if (sshField) sshField.style.display = (val === 'ssh' || val === 'conf') ? 'flex' : 'none';
+    if (fileField) fileField.style.display = (val === 'compose' || val === 'helm') ? 'flex' : 'none';
+    if (confField) confField.style.display = (val === 'conf') ? 'flex' : 'none';
+    var pathInput = document.getElementById('gateway5_source_path');
+    if (pathInput) pathInput.required = (val === 'compose' || val === 'helm');
+    var confInput = document.getElementById('gateway5_conf_path');
+    if (confInput) confInput.required = (val === 'conf');
+  }
+  atlasGw5SourceToggle();
 
   // Live ControlMaster command builder. Reads the three CM input fields
   // (socket path, SSH destination, port) and rebuilds the ssh -M command
@@ -1084,18 +1393,57 @@
       wizardOn: false,
       step: 1,
       maxStep: 1,
-      // Tier-driven step model: Standard skips Topology (SSH + Topology +
-      // Kubernetes are all Extended-only) so the wizard becomes 3 steps.
-      // Values rendered at template time from Jinja so they're locked in
-      // for the lifetime of this page render.
-      total: {{ _step_total }},
-      labels: {{ (['Identity', 'Connection', 'Review'] if is_standard else ['Identity', 'Connection', 'Topology', 'Review']) | tojson }},
+      // Reactive mirror of the credential-backend <select> so the Vault
+      // connection-settings sub-field can reveal/hide inline (x-show) the
+      // moment the user picks "HashiCorp Vault" — no save-and-reopen. Seeded
+      // from the server-rendered value (create → keyring; edit → saved backend).
+      credBackend: {{ (d.get('credential_backend') or 'keyring') | tojson }},
+      // Reactive mirror of the tier <select>. `is_standard` is only the
+      // SERVER-SIDE snapshot of the ACTIVE tier; the user can pick a different
+      // tier for THIS env in Step 1, so the Extended-only Topology step and the
+      // step model must react to this value, not the frozen Jinja flag. Seeded
+      // from the locked value (Standard active) or the dropdown's selection.
+      tier: {{ ('standard' if is_standard else _tier_sel) | tojson }},
+      // SaaS gateway state — seeded from the saved env on edit.
+      saasKind: {{ (d.get('saas_gateway_kind') or 'gateway4') | tojson }},
+      saasGw4Ssh: {{ 'true' if (d.get('saas_gateway_kind') == 'gateway4' and _saas_ssh_host) else 'false' }},
+      saasGw5Source: {{ ('compose' if _saas_file_path else ('conf' if _saas_conf_path else 'ssh')) | tojson }},
+      get saas() { return this.tier === 'saas'; },
+      get saasNeedsSsh() {
+        return this.saas && ((this.saasKind === 'gateway4' && this.saasGw4Ssh)
+          || (this.saasKind === 'gateway5'
+              && (this.saasGw5Source === 'ssh' || this.saasGw5Source === 'conf')));
+      },
+      get extended() { return this.tier !== 'standard' && this.tier !== 'saas'; },
+      // Tier-driven step model: Standard/SaaS skip Topology → 3 steps; Extended → 4.
+      get labels() {
+        if (this.saas) return ['Identity', 'Gateway', 'Review'];
+        return this.extended
+          ? ['Identity', 'Connection', 'Topology', 'Review']
+          : ['Identity', 'Connection', 'Review'];
+      },
+      get total() { return this.labels.length; },
+      init() {
+        // Switching Extended → Standard mid-wizard shrinks the step count; clamp
+        // so step/maxStep never exceed it (else the renumbered Review hides).
+        this.$watch('tier', () => {
+          if (this.step > this.total) this.step = this.total;
+          if (this.maxStep > this.total) this.maxStep = this.total;
+        });
+      },
 
       // Run native HTML validation on every input/select inside the current
       // step. Returning false here keeps the user on the page so the browser
       // can render its own error bubble next to the offending field.
       _validateCurrentStep() {
-        const root = this.$root.querySelector('[data-wizard-step="' + this.step + '"]');
+        // Validate the step the user is actually looking at. Stepping no longer
+        // maps 1:1 to data-wizard-step numbers (Standard hides Topology and
+        // renumbers Review), so pick the visible step container rather than
+        // matching on the step index — otherwise we could validate a hidden step.
+        let root = null;
+        for (const s of this.$root.querySelectorAll('[data-wizard-step]')) {
+          if (window.getComputedStyle(s).display !== 'none') { root = s; break; }
+        }
         if (!root) return true;
         const els = root.querySelectorAll('input, select, textarea');
         for (const el of els) {

@@ -51,6 +51,24 @@ def _resolve_target_env(requested: str | None) -> str:
     return architecture_store.DEFAULT_ENV_KEY
 
 
+def _resolve_arch_tier(target_env: str) -> tuple[bool, str]:
+    """Resolve ``(is_saas, saas_gateway_kind)`` for the env the form is editing.
+
+    Keyed off the *target* env (not the active tier) so the env switcher renders
+    the correct layout for whichever env is selected. Fails open to
+    ``(False, "")`` — the full form — on any error, which is harmless for
+    Standard/Extended and the only safe default when the env can't be read.
+    """
+    try:
+        env_rec = env_svc.get_environment(target_env)
+    except Exception:
+        return (False, "")
+    if not env_rec or env_rec.get("tier") != "saas":
+        return (False, "")
+    kind = str((env_rec.get("data") or {}).get("saas_gateway_kind") or "").strip().lower()
+    return (True, kind)
+
+
 @router.get("", response_class=HTMLResponse)
 async def architecture_form(request: Request, env: str | None = None) -> HTMLResponse:
     """Render the architecture overview form for ``env`` (active env if blank)."""
@@ -84,6 +102,8 @@ async def architecture_form(request: Request, env: str | None = None) -> HTMLRes
                     "and underscores). Rename or delete this environment to use the "
                     "Architecture Overview here."
                 ),
+                arch_is_saas=False,
+                saas_gateway_kind="",
             ),
         )
 
@@ -123,6 +143,12 @@ async def architecture_form(request: Request, env: str | None = None) -> HTMLRes
     copied_count = (request.query_params.get("copied_count") or "").strip()
     copy_error = (request.query_params.get("copy_error") or "").strip()
 
+    # Resolve the *target* env's tier + gateway kind so the form can render a
+    # gateway-scoped (SaaS) layout for the env being edited. This is keyed off
+    # target_env (the env switcher can point at a non-active env), NOT the
+    # active tier the nav's ``is_saas`` uses. Fails open to the full form.
+    arch_is_saas, saas_gateway_kind = _resolve_arch_tier(target_env)
+
     return _templates.TemplateResponse(
         request,
         "architecture/index.html",
@@ -138,6 +164,8 @@ async def architecture_form(request: Request, env: str | None = None) -> HTMLRes
             copied_count=copied_count,
             copy_error=copy_error,
             arch_warnings=arch_warnings,
+            arch_is_saas=arch_is_saas,
+            saas_gateway_kind=saas_gateway_kind,
         ),
     )
 
@@ -178,7 +206,21 @@ def _sanitize_arch_payload(payload: object) -> dict:
             raise HTTPException(status_code=400, detail="Invalid skipped entry")
         safe_skipped.append(entry)
 
-    return {"completed": safe_completed, "skipped": safe_skipped, "status": status}
+    result = {"completed": safe_completed, "skipped": safe_skipped, "status": status}
+
+    # Optional persisted progress counts (filled / total fields), used to render
+    # the "X / Y" bar on other surfaces. Coerced to sane non-negative ints; a
+    # malformed value is simply dropped rather than rejected.
+    progress = payload.get("progress")
+    if isinstance(progress, dict):
+        try:
+            filled = max(0, min(int(progress.get("filled", 0)), 100000))
+            total = max(0, min(int(progress.get("total", 0)), 100000))
+            result["progress"] = {"filled": filled, "total": total}
+        except (TypeError, ValueError):
+            pass
+
+    return result
 
 
 @router.get("/warnings")

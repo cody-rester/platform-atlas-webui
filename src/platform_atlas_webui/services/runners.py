@@ -63,7 +63,9 @@ def run_preflight_job(jlogger, *, scope_summary: str = "") -> dict[str, Any]:
         return {"all_passed": False, "target_count": 0}
 
     is_standard = ctx().is_standard
-    jlogger.phase(f"Preflight · {len(targets)} target(s) · {'Standard' if is_standard else 'Extended'} tier")
+    is_saas = ctx().is_saas
+    _tier_name = {"standard": "Standard", "saas": "SaaS"}.get(ctx().tier, "Extended")
+    jlogger.phase(f"Preflight · {len(targets)} target(s) · {_tier_name} tier")
     if scope_summary:
         jlogger.info(scope_summary)
 
@@ -164,8 +166,8 @@ def run_preflight_job(jlogger, *, scope_summary: str = "") -> dict[str, Any]:
                 report.results.append(r)
                 jlogger.check(r.name, r.status.value, r.message, r.details)
 
-    # ── Phase 2b: Kubernetes ──────────────────────────────────────
-    if targets and not is_standard:
+    # ── Phase 2b: Kubernetes (Extended only — never SaaS) ─────────
+    if targets and not is_standard and not is_saas:
         k8s_targets = [t for t in targets if t.get("transport") == "kubernetes"]
         if k8s_targets:
             jlogger.phase("Phase 2b — Kubernetes configuration")
@@ -282,7 +284,10 @@ def run_capture_job(
         from platform_atlas.core.context import ctx
         config = ctx().config
         tier = config.tier
-        tier_label = "Standard (Platform OAuth + Gateway API only)" if tier == "standard" else "Extended (SSH · MongoDB · Redis · Gateways · System)"
+        tier_label = {
+            "standard": "Standard (Platform OAuth + Gateway API only)",
+            "saas": "SaaS (single Gateway audit — no Platform/MongoDB/Redis)",
+        }.get(tier, "Extended (SSH · MongoDB · Redis · Gateways · System)")
         jlogger.info(f"Tier: {tier_label}")
         targets = list(config.targets)
         jlogger.info(f"Targets: {len(targets)} configured")
@@ -378,10 +383,12 @@ def run_capture_job(
         _tier = (_ctx().config.tier or "extended").strip().lower()
     except Exception:
         _tier = "extended"
-    if run_aggregations and _tier != "standard":
+    if run_aggregations and _tier == "extended":
         _run_mongo_aggregations(jlogger, session, pipeline_names=pipeline_names)
     elif _tier == "standard":
         jlogger.info("MongoDB aggregations skipped — Standard tier doesn't reach MongoDB.")
+    elif _tier == "saas":
+        jlogger.info("MongoDB aggregations skipped — a SaaS gateway audit has no MongoDB.")
     else:
         jlogger.info("MongoDB aggregations skipped — opted out for this run.")
 
@@ -603,6 +610,22 @@ def run_report_job(jlogger, *, session_name: str) -> dict[str, Any]:
 
     session_tier = getattr(session.metadata, "tier", None) or df.attrs.get("tier") or "extended"
 
+    # Architecture data loads up front — the SaaS merged report embeds it
+    # directly into 03_report.html (Standard/Extended render it into 05 below).
+    try:
+        from platform_atlas.core import architecture_store
+        arch_env = session.metadata.environment or ""
+        arch_record = architecture_store.load(arch_env)
+        architecture_data = arch_record.get("completed") or {}
+    except Exception:
+        architecture_data = {}
+    if not architecture_data and session.capture_file.exists():
+        try:
+            cap_raw = json.loads(session.capture_file.read_text(encoding="utf-8"))
+            architecture_data = cap_raw.get("checks", {}).get("architecture_validation") or {}
+        except Exception:
+            pass
+
     p_count = int((df["status"].str.upper() == "PASS").sum()) if "status" in df else 0
     f_count = int((df["status"].str.upper() == "FAIL").sum()) if "status" in df else 0
     jlogger.info(f"Rendering compliance report — {p_count} pass · {f_count} fail · org: {organization_name}")
@@ -611,12 +634,13 @@ def run_report_job(jlogger, *, session_name: str) -> dict[str, Any]:
         df,
         REPORT_TEMPLATE,
         output_path=session.report_file,
-        title="Platform Health Report",
+        title="Gateway Health Report" if session_tier == "saas" else "Platform Health Report",
         subtitle=session.name,
         organization_name=organization_name,
         ruleset_version=f"{ruleset_ver} ({ruleset_profile})" if ruleset_profile else ruleset_ver,
         target_system=ruleset_id,
         modules_ran=session.metadata.modules_ran,
+        architecture_data=architecture_data,
         tier=session_tier,
     )
 
@@ -632,6 +656,8 @@ def run_report_job(jlogger, *, session_name: str) -> dict[str, Any]:
 
     if session_tier == "standard":
         jlogger.info("Operational report skipped — log analysis and MongoDB pipeline data require Extended tier.")
+    elif session_tier == "saas":
+        jlogger.info("Operational report skipped — a SaaS gateway audit has no Platform/MongoDB data.")
     else:
         jlogger.info("Rendering operational report — includes log sections and MongoDB pipeline metrics…")
         has_mongo = session.operational_data_file.exists()
@@ -651,30 +677,14 @@ def run_report_job(jlogger, *, session_name: str) -> dict[str, Any]:
             tier=session_tier,
         )
 
-    if session_tier != "standard":
+    if session_tier not in ("standard", "saas"):
         try:
             op_kb = session.operational_file.stat().st_size // 1024
             jlogger.success(f"Operational report (04_operational.html) ready — {op_kb} KB")
         except OSError:
             jlogger.success("Operational report (04_operational.html) ready")
 
-    # Load architecture data from the per-environment store (primary) or the
-    # capture file (fallback for envs that haven't had the form filled in yet).
-    try:
-        from platform_atlas.core import architecture_store
-        arch_env = session.metadata.environment or ""
-        arch_record = architecture_store.load(arch_env)
-        architecture_data = arch_record.get("completed") or {}
-    except Exception:
-        architecture_data = {}
-
-    if not architecture_data and session.capture_file.exists():
-        try:
-            cap_raw = json.loads(session.capture_file.read_text(encoding="utf-8"))
-            architecture_data = cap_raw.get("checks", {}).get("architecture_validation") or {}
-        except Exception:
-            pass
-
+    # Architecture data was loaded before the 03 render (see above).
     if architecture_data:
         sections_found = [k for k in architecture_data if architecture_data[k]]
         jlogger.info(f"Architecture data found — {len(sections_found)} section(s): {', '.join(sections_found)}")
@@ -682,24 +692,28 @@ def run_report_job(jlogger, *, session_name: str) -> dict[str, Any]:
         jlogger.info("No architecture data found for this environment — architecture report will show placeholder content")
         jlogger.info("Fill in the Architecture form under the Audit menu to add this data.")
 
-    jlogger.info("Rendering architecture report (05_arch.html)…")
-    render_arch_report(
-        extended_results,
-        architecture_data,
-        template_path=ARCH_TEMPLATE,
-        output_path=session.arch_file,
-        title="Architecture & Maintenance",
-        subtitle=session.name,
-        organization_name=organization_name,
-        tier=session_tier,
-    )
+    if session_tier == "saas":
+        jlogger.info("Architecture Overview merged into 03_report.html — no separate 05_arch.html in a SaaS audit.")
+        session.mark_stage_complete(SessionStage.REPORT)
+    else:
+        jlogger.info("Rendering architecture report (05_arch.html)…")
+        render_arch_report(
+            extended_results,
+            architecture_data,
+            template_path=ARCH_TEMPLATE,
+            output_path=session.arch_file,
+            title="Architecture & Maintenance",
+            subtitle=session.name,
+            organization_name=organization_name,
+            tier=session_tier,
+        )
 
-    session.mark_stage_complete(SessionStage.REPORT)
-    try:
-        arch_kb = session.arch_file.stat().st_size // 1024
-        jlogger.success(f"Architecture report (05_arch.html) ready — {arch_kb} KB")
-    except OSError:
-        jlogger.success("Architecture report (05_arch.html) ready")
+        session.mark_stage_complete(SessionStage.REPORT)
+        try:
+            arch_kb = session.arch_file.stat().st_size // 1024
+            jlogger.success(f"Architecture report (05_arch.html) ready — {arch_kb} KB")
+        except OSError:
+            jlogger.success("Architecture report (05_arch.html) ready")
     jlogger.success(f"All reports generated — session: {session.name}")
     jlogger.info(f"View reports from the Reports page or open {session.directory}")
     return {"ok": True, "report_file": str(session.report_file)}
@@ -804,6 +818,7 @@ def run_support_bundle_job(
     ticket: str = "",
     description: str = "",
     log_days: int = 7,
+    selection: dict | None = None,
 ) -> dict[str, Any]:
     """Collect Platform health + logs and pack into a support bundle ZIP.
 
@@ -900,6 +915,35 @@ def run_support_bundle_job(
         errors.append(f"Config redaction failed: {exc}")
         jlogger.warning(f"Config redaction failed — {exc}")
 
+    # ── Platform artifacts (optional; WebUI-only) ─────────────────
+    # When the picker supplied a selection, export each artifact via Platform
+    # OAuth (raw JSON, no redaction) into exports/ inside the bundle.
+    exports: dict[str, bytes] = {}
+    artifact_summary: dict | None = None
+    if selection:
+        n_sel = sum(len(v) for v in selection.values())
+        jlogger.info(f"Exporting {n_sel} Platform artifact(s) over Platform OAuth…")
+        try:
+            from platform_atlas.artifacts import export_selection
+
+            def _artifact_progress(label: str, name: str, done: int, total: int) -> None:
+                jlogger.info(f"  [{done}/{total}] {label} · {name}")
+
+            export_result = export_selection(selection, on_progress=_artifact_progress)
+            exports = {f.path: f.data for f in export_result.files}
+            label = f"Platform artifacts ({export_result.ok_count} exported"
+            if export_result.error_count:
+                label += f", {export_result.error_count} failed"
+            collected.append(label + ")")
+            for item in export_result.manifest["items"]:
+                if not item["ok"]:
+                    errors.append(f"Artifact {item['type']}/{item['name']}: {item['error']}")
+            artifact_summary = {"ok": export_result.ok_count, "failed": export_result.error_count}
+            jlogger.success(f"{export_result.ok_count} artifact(s) exported to exports/")
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"Artifact export failed: {exc}")
+            jlogger.warning(f"Artifact export failed — {exc}")
+
     # ── Assemble ZIP ──────────────────────────────────────────────
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     ticket_slug = ticket.replace("/", "-").replace(" ", "-") if ticket else ""
@@ -926,7 +970,7 @@ def run_support_bundle_job(
 
     jlogger.info("Assembling ZIP…")
     try:
-        bundle_bytes = _build_zip(platform_health, logs, system, raw_logs, config_redacted, manifest, folder=bundle_name.removesuffix(".zip"))
+        bundle_bytes = _build_zip(platform_health, logs, system, raw_logs, config_redacted, manifest, folder=bundle_name.removesuffix(".zip"), exports=exports)
     except Exception as exc:  # noqa: BLE001
         jlogger.error(f"Failed to build ZIP: {exc}")
         return {"ok": False, "error": str(exc)}
@@ -954,4 +998,5 @@ def run_support_bundle_job(
         "size_kb": size_kb,
         "collected": collected,
         "errors": errors,
+        "artifacts": artifact_summary,
     }

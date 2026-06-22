@@ -68,8 +68,27 @@ def get_atlas_context() -> Any:
 
 
 def get_active_tier() -> str:
-    """Return the active tier ('standard' or 'extended')."""
+    """Return the active tier ('standard', 'extended', or 'saas')."""
     return get_atlas_context().tier
+
+
+def forbid_saas_feature(feature: str = "This feature"):
+    """Build a FastAPI dependency that 403s when the active tier is SaaS.
+
+    Used to gate platform-anchored features (Support Bundle, Continuous Audit)
+    that have no role in a single-gateway SaaS audit. Standard and Extended
+    pass through untouched. Tier is resolved disk-fresh — the same way
+    ``template_context`` computes ``is_saas`` — so a hidden nav link and a
+    blocked route can never disagree.
+    """
+    def _dep() -> None:
+        from platform_atlas_webui.services.config import resolve_active_tier
+        if resolve_active_tier() == "saas":
+            raise HTTPException(
+                status_code=403,
+                detail=f"{feature} is not available in SaaS mode.",
+            )
+    return _dep
 
 
 def get_session_mgr():
@@ -109,6 +128,7 @@ def template_context(request: Request, **extra) -> dict[str, Any]:
     # Prefs come from disk so PATCH /api/settings/appearance is reflected
     # on the very next render without a context refresh.
     theme, mode = "itential", "dark"
+    scale = 1.0
     upgrade_panel_dismissed = False
     # Cmd+K palette defaults ON — fresh installs and any config that
     # hasn't toggled it yet get the feature. Only an explicit False in
@@ -118,6 +138,7 @@ def template_context(request: Request, **extra) -> dict[str, Any]:
         from platform_atlas_webui.services import config as _cfg_svc
         cfg = _cfg_svc.read_config()
         theme, mode = _cfg_svc.resolve_appearance(cfg)
+        scale = _cfg_svc.resolve_scale(cfg)
         upgrade_panel_dismissed = bool(cfg.get("webui_upgrade_panel_dismissed"))
         palette_enabled = bool(cfg.get("webui_palette_enabled", True))
         if not organization_name and cfg.get("organization_name"):
@@ -146,9 +167,9 @@ def template_context(request: Request, **extra) -> dict[str, Any]:
             except Exception:
                 pass
         env_var_tier = os.environ.get("ATLAS_TIER")
-        if env_var_tier and env_var_tier.strip().lower() in ("standard", "extended"):
+        if env_var_tier and env_var_tier.strip().lower() in ("standard", "extended", "saas"):
             disk_tier = env_var_tier.strip().lower()
-        if disk_tier in ("standard", "extended"):
+        if disk_tier in ("standard", "extended", "saas"):
             tier = disk_tier
             is_standard = (tier == "standard")
     except Exception:
@@ -184,11 +205,12 @@ def template_context(request: Request, **extra) -> dict[str, Any]:
         "request": request,
         "tier": tier,
         "is_standard": is_standard,
+        "is_saas": tier == "saas",
         "active_environment": active_env,
         "organization_name": organization_name,
         # ``mode`` is the new light/dark axis; ``theme`` is the palette identity
         # (aurora|horizon). Templates read both via ``prefs``.
-        "prefs": {"theme": theme, "mode": mode, "palette_enabled": palette_enabled},
+        "prefs": {"theme": theme, "mode": mode, "palette_enabled": palette_enabled, "scale": scale},
         "upgrade_panel_dismissed": upgrade_panel_dismissed,
         "atlas_version": _ATLAS_VERSION,
         "webui_version": _WEBUI_VERSION,

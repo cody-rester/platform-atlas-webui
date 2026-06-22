@@ -43,6 +43,10 @@ def _missing_credentials(env: dict) -> list[dict]:
     backend = data.get("credential_backend") or "keyring"
 
     # The same required-set the credentials page uses; keep them in sync.
+    # SaaS has no statically required credentials — the GW4 API password is
+    # contextual (preflight checks it when a GW4 API target is configured).
+    if tier == "saas":
+        return []
     required_keys = [CredentialKey.PLATFORM_SECRET]
     if tier != "standard":
         required_keys += [CredentialKey.MONGO_URI, CredentialKey.REDIS_URI]
@@ -86,6 +90,17 @@ async def list_environments(request: Request, from_tier: str = Query("")) -> HTM
 async def new_environment_form(request: Request) -> HTMLResponse:
     # ``organization_name`` is no longer a per-env field — it lives in the
     # global Configuration and is supplied to the template by ``template_context``.
+    #
+    # The tier dropdown defaults to the GLOBAL default tier (config.json root
+    # ``tier``, NOT the active env's overlay) — a SaaS-default install pre-picks
+    # SaaS for every new environment, while Standard/Extended behave as before.
+    default_tier = "extended"
+    try:
+        root_tier = (_cfg_svc.read_config().get("tier") or "").strip().lower()
+        if root_tier in ("standard", "extended", "saas"):
+            default_tier = root_tier
+    except Exception:  # noqa: BLE001 — no config yet → keep the historical default
+        pass
     return _templates.TemplateResponse(
         request,
         "environments/form.html",
@@ -94,6 +109,7 @@ async def new_environment_form(request: Request) -> HTMLResponse:
             atlas_version=ATLAS_VERSION,
             mode="create",
             env=None,
+            default_tier=default_tier,
             ssh_keys=ssh_keys_svc.list_private_keys(),
         ),
     )
@@ -156,6 +172,43 @@ async def check_kubectl_binary(path: str = "") -> HTMLResponse:
     )
 
 
+@router.post("/check-ssh", response_class=HTMLResponse)
+async def check_ssh_connection(
+    saas_iag_host: str = Form(""),
+    saas_ssh_user: str = Form(""),
+    saas_ssh_port: str = Form(""),
+    saas_ssh_key: str = Form(""),
+    saas_ssh_passphrase: str = Form(""),
+    env_name: str = Form(""),
+) -> HTMLResponse:
+    """HTMX endpoint: attempt an SSH connection with the form's current values.
+
+    Runs the CLI's own SSHTransport in a worker thread and renders a small
+    inline status fragment (same visual language as the kubectl check). A
+    blank passphrase falls back to the environment's stored one, so the
+    edit form can test without retyping the secret.
+    """
+    from platform_atlas_webui.services import ssh_check
+
+    result = await run_in_threadpool(
+        ssh_check.test_ssh_connection,
+        host=saas_iag_host,
+        port=saas_ssh_port,
+        username=saas_ssh_user,
+        key_path=saas_ssh_key,
+        passphrase=saas_ssh_passphrase,
+        env_name=env_name,
+    )
+    ok_style = "color:var(--green,#4ade80); font-size:12px; font-weight:500;"
+    err_style = "color:var(--red,#f87171); font-size:12px; font-weight:500;"
+    note = ""
+    if result.get("used_stored_passphrase"):
+        note = ' <span style="color:var(--text-3); font-weight:400;">(used this environment’s stored passphrase)</span>'
+    if result.get("ok"):
+        return HTMLResponse(f'<span style="{ok_style}">✓ {escape(result.get("message", ""))}</span>{note}')
+    return HTMLResponse(f'<span style="{err_style}">✗ {escape(result.get("message", ""))}</span>{note}')
+
+
 @router.get("/validate-name", response_class=HTMLResponse)
 async def validate_environment_name(value: str = "") -> HTMLResponse:
     value = value.strip()
@@ -177,12 +230,22 @@ async def view_environment(
     request: Request,
     name: str,
     just_created: int = Query(0),
+    passphrase_error: int = Query(0),
 ) -> HTMLResponse:
     env = env_svc.get_environment(name)
     if env is None:
         raise HTTPException(status_code=404, detail=f"Environment '{name}' not found")
     missing_creds = _missing_credentials(env)
     topology = env_svc.topology_summary(env.get("data"))
+    flash = None
+    if passphrase_error:
+        flash = {
+            "kind": "warning",
+            "message": (
+                "Environment saved, but the SSH key passphrase could not be "
+                "stored — set it on the Credentials page."
+            ),
+        }
     return _templates.TemplateResponse(
         request,
         "environments/detail.html",
@@ -193,6 +256,7 @@ async def view_environment(
             just_created=bool(just_created),
             missing_creds=missing_creds,
             topology=topology,
+            flash=flash,
         ),
     )
 
@@ -224,7 +288,19 @@ async def save_environment(
     platform_uri: str = Form(""),
     platform_client_id: str = Form(""),
     tier: str = Form("extended"),
+    saas_gateway_kind: str = Form(""),
+    saas_gw4_ssh: str = Form(""),
+    saas_gw5_source: str = Form(""),
+    saas_gw5_source_path: str = Form(""),
+    saas_gw5_conf_path: str = Form(""),
+    saas_iag_host: str = Form(""),
+    saas_ssh_user: str = Form(""),
+    saas_ssh_port: str = Form(""),
+    saas_ssh_key: str = Form(""),
+    saas_ssh_passphrase: str = Form(""),
+    ssh_passphrase: str = Form(""),
     credential_backend: str = Form("keyring"),
+    vault_secret_store: str = Form("keyring"),
     gateway4_uri: str = Form(""),
     gateway4_username: str = Form(""),
     legacy_profile: str = Form(""),
@@ -255,6 +331,12 @@ async def save_environment(
     redis_host_2: str = Form(""),
     redis_host_3: str = Form(""),
     iag_host_ha: str = Form(""),
+    # Gateway 5 (IAG5) source — shared across standalone/HA2. "ssh" uses iag_host
+    # above; "conf" also uses iag_host but reads gateway5_conf_path over SSH;
+    # "compose"/"helm" build a file-backed (no-SSH) gateway5 node.
+    gateway5_source: str = Form(""),
+    gateway5_source_path: str = Form(""),
+    gateway5_conf_path: str = Form(""),
     ssh_user: str = Form(""),
     ssh_port: str = Form(""),
     # IAP transport — applies to the primary IAP node in standalone and HA2;
@@ -285,7 +367,14 @@ async def save_environment(
         "platform_uri": platform_uri,
         "platform_client_id": platform_client_id,
         "tier": tier or None,
+        "saas_gateway_kind": saas_gateway_kind,
+        "saas_gw4_ssh": saas_gw4_ssh,
         "credential_backend": credential_backend,
+        # Only meaningful for Vault; None for the local backends so it stays out
+        # of the env overlay.
+        "vault_secret_store": (vault_secret_store
+                               if (credential_backend or "").strip().lower() == "vault"
+                               else None),
         "gateway4_uri": gateway4_uri,
         "gateway4_username": gateway4_username,
         "legacy_profile": legacy_profile or None,
@@ -311,6 +400,9 @@ async def save_environment(
         "redis_host_2": redis_host_2,
         "redis_host_3": redis_host_3,
         "iag_host_ha": iag_host_ha,
+        "gateway5_source": gateway5_source,
+        "gateway5_source_path": gateway5_source_path,
+        "gateway5_conf_path": gateway5_conf_path,
         "ssh_user": ssh_user,
         "ssh_port": ssh_port,
         "iap_transport": iap_transport,
@@ -318,6 +410,18 @@ async def save_environment(
         "iap_cm_target": iap_cm_target,
         "iap_cm_port": iap_cm_port,
     }
+    # SaaS posts its gateway/SSH details under saas_-prefixed names so they
+    # can't collide with the Extended topology step's inputs (hidden fields
+    # still submit). Map them onto the generic keys the topology builder reads.
+    if posted_tier == "saas":
+        payload["iag_host"] = saas_iag_host
+        payload["ssh_user"] = saas_ssh_user
+        payload["ssh_port"] = saas_ssh_port
+        payload["ssh_key"] = (saas_ssh_key or ssh_key).strip()
+        payload["gateway5_source"] = saas_gw5_source
+        payload["gateway5_source_path"] = saas_gw5_source_path
+        payload["gateway5_conf_path"] = saas_gw5_conf_path
+
     # Detect create vs edit so we can lead first-time users into setting up
     # credentials right after the env is saved. We don't trust a hidden form
     # field for this — just check whether the env existed before save.
@@ -347,9 +451,30 @@ async def save_environment(
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"{type(exc).__name__}: {exc}") from exc
 
+    # An SSH key passphrase typed inline goes into the same env-scoped store
+    # as the rest of this environment's credentials (keyring or encrypted
+    # file — Vault is read-only from Atlas, its hint tells the user where to
+    # put it). Blank means "keep whatever is already stored" — the form
+    # never echoes the secret back.
+    typed_passphrase = saas_ssh_passphrase if posted_tier == "saas" else ssh_passphrase
+    backend_choice = (credential_backend or "keyring").strip().lower()
+    passphrase_failed = False
+    if typed_passphrase and backend_choice in ("keyring", "file"):
+        try:
+            env_svc.store_ssh_passphrase(env.name, backend_choice, typed_passphrase)
+        except Exception:  # noqa: BLE001 — env is saved; don't fail the request
+            logger.exception("SSH passphrase store failed for env '%s' (backend=%s)",
+                             env.name, backend_choice)
+            passphrase_failed = True
+
     target = f"/environments/{env.name}"
+    params = []
     if is_create:
-        target += "?just_created=1"
+        params.append("just_created=1")
+    if passphrase_failed:
+        params.append("passphrase_error=1")
+    if params:
+        target += "?" + "&".join(params)
     return RedirectResponse(url=target, status_code=303)
 
 

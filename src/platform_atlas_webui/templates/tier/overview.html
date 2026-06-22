@@ -10,7 +10,7 @@
     <h1 class="text-[36px] leading-[1.05] font-semibold tracking-[-0.038em] mt-2 mb-1.5">Audit tier</h1>
     <p class="text-[14px] text-text-2 max-w-[64ch]">
       The tier controls how deeply Atlas audits your deployment.
-      Currently running in <strong>{% if is_std %}Standard{% else %}Extended{% endif %} mode</strong>.
+      Currently running in <strong>{% if is_std %}Standard{% elif active_tier == 'saas' %}SaaS{% else %}Extended{% endif %} mode</strong>.
     </p>
   </div>
 </header>
@@ -20,12 +20,45 @@
   {% if is_std %}
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
     <span>You are in <strong>Standard mode</strong> — Platform OAuth and optional IAG4 API only. No SSH, MongoDB, or Redis access.</span>
+  {% elif active_tier == 'saas' %}
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+    <span>The active environment is a <strong>SaaS (single-gateway) audit</strong> — its tier is locked at create time and cannot be changed. To audit at a different tier, create a new environment.</span>
   {% else %}
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
     <span>You are in <strong>Extended mode</strong> — full infrastructure access including SSH, MongoDB, Redis, gateways, and system collectors.</span>
   {% endif %}
 </div>
 
+{% if active_tier == 'saas' %}
+{# ── SaaS-locked card (no tier switching available) ── #}
+<section style="margin-bottom:24px;">
+  <div class="card tier-card is-active" style="max-width:560px;">
+    <div class="card-head">
+      <h3>SaaS</h3>
+      <span class="sub">single-gateway audit</span>
+      <div class="right">
+        <span class="tier-card-status"><span class="dot"></span>Active</span>
+      </div>
+    </div>
+    <div class="card-body" style="display:flex; flex-direction:column; gap:10px;">
+      <p style="font-size:13px; color:var(--text-2); margin:0;">
+        This environment audits a single Itential-managed SaaS gateway. Its tier is fixed
+        when the environment is created and cannot be switched to Standard or Extended.
+      </p>
+      <ul style="font-size:12px; color:var(--text-2); margin:0; padding-left:18px; line-height:1.7;">
+        <li>Scoped to the gateway exposed by your Itential SaaS deployment</li>
+        <li>No SSH, MongoDB, or Redis — infrastructure is managed by Itential</li>
+        <li>Tier is locked for the lifetime of this environment</li>
+      </ul>
+      <div style="margin-top:4px;">
+        <span style="font-size:12px; color:var(--text-3);">
+          Need Standard or Extended? Create a new environment with that tier.
+        </span>
+      </div>
+    </div>
+  </div>
+</section>
+{% else %}
 {# ── Tier comparison cards ── #}
 <section class="grid-2" style="grid-template-columns:1fr 1fr; margin-bottom:24px;">
 
@@ -101,8 +134,10 @@
   </div>
 
 </section>
+{% endif %}
 
 {# ── CLI tip ── #}
+{% if active_tier != 'saas' %}
 <div class="card" style="max-width:460px;">
   <div class="card-head">
     <h3>Terminal</h3>
@@ -117,7 +152,9 @@
     </p>
   </div>
 </div>
+{% endif %}
 
+{% if active_tier != 'saas' %}
 {# ── Hidden form (submitted by modal OK button) ── #}
 <form id="tier-form" action="/tier/set" method="post" style="display:none;">
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -240,5 +277,6 @@
     if (e.target === this) this.close();
   });
 </script>
+{% endif %}
 
 {% endblock %}

@@ -2,25 +2,35 @@
 
 from __future__ import annotations
 
+import json as _json
+import logging as _logging
 import os as _os
 import tempfile as _tempfile
 from pathlib import Path as _Path
 
-from fastapi import APIRouter, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from starlette.background import BackgroundTask as _BackgroundTask
 
 from platform_atlas.core._version import __version__ as ATLAS_VERSION
 
-from platform_atlas_webui.dependencies import get_templates, template_context
+from platform_atlas_webui.dependencies import forbid_saas_feature, get_templates, template_context
 from platform_atlas_webui.security.paths import safe_under
 from platform_atlas_webui.services.jobs import get_registry
 from platform_atlas_webui.services import runners
 
-router = APIRouter(prefix="/support-bundle", tags=["support-bundle"])
+# SaaS audits are single-gateway — the diagnostic support bundle is a
+# platform-anchored feature with no role there. Refuse every route under this
+# router for SaaS; Standard/Extended are unaffected.
+router = APIRouter(
+    prefix="/support-bundle",
+    tags=["support-bundle"],
+    dependencies=[Depends(forbid_saas_feature("Support Bundle"))],
+)
 _templates = get_templates()
 _TMPDIR = _Path(_tempfile.gettempdir())
+_log = _logging.getLogger(__name__)
 
 
 def _safe_unlink(p: _Path) -> None:
@@ -57,6 +67,13 @@ async def support_bundle_form(request: Request, job: str = "") -> HTMLResponse:
     except Exception:  # noqa: BLE001
         pass
 
+    asset_types: list[dict] = []
+    try:
+        from platform_atlas.artifacts import ASSET_TYPES
+        asset_types = [{"key": k, "label": a.label} for k, a in ASSET_TYPES.items()]
+    except Exception:  # noqa: BLE001
+        pass
+
     return _templates.TemplateResponse(
         request,
         "support_bundle/index.html",
@@ -66,8 +83,29 @@ async def support_bundle_form(request: Request, job: str = "") -> HTMLResponse:
             job=job_record,
             active_env=active_env,
             tier=tier,
+            asset_types=asset_types,
         ),
     )
+
+
+@router.get("/assets/{asset_type}")
+async def list_platform_assets(
+    asset_type: str, search: str = "", skip: int = 0, limit: int = 25
+) -> JSONResponse:
+    """JSON: one page of selectable Platform artifacts for the asset picker."""
+    from platform_atlas.artifacts import ASSET_TYPES, list_assets, page_to_dict
+    if asset_type not in ASSET_TYPES:
+        raise HTTPException(status_code=404, detail="Unknown asset type")
+    limit = max(1, min(limit, 200))
+    skip = max(0, skip)
+    try:
+        page = await run_in_threadpool(
+            list_assets, asset_type, search=search, skip=skip, limit=limit
+        )
+    except Exception as exc:  # noqa: BLE001
+        _log.exception("artifact list failed for %s", asset_type)
+        raise HTTPException(status_code=502, detail=f"Could not list {asset_type}: {type(exc).__name__}: {exc}")
+    return JSONResponse(page_to_dict(page))
 
 
 @router.post("/run")
@@ -76,6 +114,7 @@ async def run_support_bundle(
     ticket: str = Form("", max_length=9),
     description: str = Form("", max_length=512),
     log_days: int = Form(7),
+    assets: str = Form(""),
 ):
     """Validate form input, kick off a support bundle job, redirect to progress page."""
     import re
@@ -85,6 +124,27 @@ async def run_support_bundle(
         from fastapi import HTTPException
         raise HTTPException(status_code=422, detail="Ticket number must be ISD- followed by 4 or 5 digits.")
     log_days = max(1, min(log_days, 30))
+
+    # Parse the optional Platform-artifact selection (JSON emitted by the picker).
+    selection: dict = {}
+    if assets:
+        try:
+            from platform_atlas.artifacts import ASSET_TYPES
+            parsed = _json.loads(assets)
+            if isinstance(parsed, dict):
+                for key, entries in parsed.items():
+                    if key not in ASSET_TYPES or not isinstance(entries, list):
+                        continue
+                    clean = [
+                        {"id": str(e["id"]), "name": str(e.get("name") or e["id"])}
+                        for e in entries
+                        if isinstance(e, dict) and e.get("id")
+                    ]
+                    if clean:
+                        selection[key] = clean
+        except Exception:  # noqa: BLE001
+            selection = {}
+    asset_count = sum(len(v) for v in selection.values())
 
     # Capture tier before submission so the progress view can display it
     # even while the job is still queued/running.
@@ -96,12 +156,17 @@ async def run_support_bundle(
         pass
 
     reg = get_registry()
+    # Backstop so a hung Platform/SSH call can't wedge the job (and the worker
+    # pool) forever; generous enough not to interrupt a legitimate large bundle.
+    bundle_timeout_s = 1800
     record = await reg.submit(
         "support bundle",
         runners.run_support_bundle_job,
+        timeout=bundle_timeout_s,
         ticket=ticket,
         description=description,
         log_days=log_days,
+        selection=selection,
         metadata={},
     )
     # Set return_url and display metadata after submit — record.id is stable.
@@ -110,6 +175,7 @@ async def run_support_bundle(
     record.metadata["description"] = description
     record.metadata["log_days"] = log_days
     record.metadata["tier"] = active_tier
+    record.metadata["asset_count"] = asset_count
 
     # Redirect to the dedicated support bundle progress/result page, not the
     # generic job stream — the support bundle page has purpose-built UX.

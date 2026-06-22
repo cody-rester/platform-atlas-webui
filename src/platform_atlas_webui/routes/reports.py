@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 
@@ -160,6 +160,76 @@ async def view_session_report(name: str, request: Request) -> HTMLResponse:
             session_name=name,
         ),
     )
+
+
+@router.post("/{name}/export")
+async def create_session_export(
+    name: str,
+    archive_format: str = Form("zip"),
+    include_debug: bool = Form(False),
+) -> JSONResponse:
+    """Package a finished session into ~/.atlas/exports/ and return its info.
+
+    The WebUI twin of ``platform-atlas session export``. Runs synchronously in a
+    threadpool — file copy + zip + one report.json render is fast and bounded
+    (unlike the support bundle's minutes-long SSH/Platform collection), so the
+    modal gets the archive path and a download link back in a single response.
+    CSRF is enforced by middleware; the modal sends the ``X-CSRF-Token`` header.
+    """
+    from urllib.parse import quote
+    from platform_atlas_webui.services import session_export
+
+    if archive_format not in session_export.VALID_FORMATS:
+        raise HTTPException(status_code=422, detail="Format must be 'zip' or 'tar.gz'.")
+
+    session = await run_in_threadpool(session_svc.get_session, name)
+    if session is None:
+        raise HTTPException(status_code=404, detail=f"Session '{name}' not found")
+    if not session.get("report_completed"):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Session '{name}' has no generated report yet — run validate + report first.",
+        )
+
+    try:
+        result = await run_in_threadpool(
+            session_export.build_session_export,
+            name,
+            archive_format=archive_format,
+            include_debug=include_debug,
+        )
+    except Exception as exc:  # noqa: BLE001 — surface any packaging failure as a 500 the modal can show
+        raise HTTPException(status_code=500, detail=f"Export failed: {exc}") from exc
+
+    result["download_url"] = (
+        f"/reports/{quote(name)}/export/download/{quote(result['archive_name'])}"
+    )
+    return JSONResponse(result)
+
+
+@router.get("/{name}/export/download/{filename}")
+async def download_session_export(name: str, filename: str):  # pylint: disable=unused-argument
+    """Serve a previously generated export archive from ~/.atlas/exports/.
+
+    ``name`` stays in the path for REST symmetry and audit-log clarity; the file
+    is identified by ``filename`` (already org+session+date-stamped) within the
+    single-user exports dir.
+
+    Unlike the support bundle (single-use temp file), exports persist — they're
+    deliverables the user attaches to a ticket — so this is a plain, repeatable
+    download with no cleanup. ``safe_under`` clamps the path to the exports dir,
+    so a crafted filename can't escape it.
+    """
+    from platform_atlas_webui.services import session_export
+
+    target = safe_under(session_export.EXPORTS_DIR / filename, session_export.EXPORTS_DIR)
+    if not target.exists() or not target.is_file():
+        raise HTTPException(
+            status_code=404,
+            detail="Export file not found — re-create it from the report page.",
+        )
+    media = "application/gzip" if filename.endswith(".gz") else "application/zip"
+    return FileResponse(str(target), media_type=media, filename=filename)
 
 
 @router.get("/{name}/operational")

@@ -19,7 +19,7 @@ Customers who only need CLI auditing install the core wheel only; the WebUI is o
 - **Command:** `platform-atlas-webui`
 - **Python:** `>=3.11,<4.0`
 - **Dependency management:** Poetry
-- **Core dependency:** `platform-atlas >=1.7,<2.0`
+- **Core dependency:** `platform-atlas >=2.0.0,<3.0`
 - **Distribution:** `.whl` via GitHub Releases on `itential/platform-atlas-webui`
 
 ### Branding & Identity
@@ -90,7 +90,7 @@ Long-running operations (capture, validate, report, preflight) run in a thread p
 
 1. Parse CLI args → build `WebUISettings`
 2. Print version banner (WebUI + platform-atlas versions)
-3. Verify `platform-atlas >=1.7,<2.0` is installed
+3. Verify `platform-atlas >=2.0.0,<3.0` is installed
 4. Generate / rotate self-signed TLS cert (`~/.atlas/webui-cert.pem`, 365-day validity)
 5. Set up logging (file at `~/.atlas/webui.log` + optional console)
 6. Generate / load OS-user binding token (`~/.atlas/.webui-token`, mode 0600)

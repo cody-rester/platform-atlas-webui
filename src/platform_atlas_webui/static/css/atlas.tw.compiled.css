@@ -11,6 +11,7 @@
     --font-weight-normal: 400;
     --font-weight-medium: 500;
     --font-weight-semibold: 600;
+    --font-weight-bold: 700;
     --tracking-normal: 0em;
     --tracking-wide: 0.025em;
     --tracking-wider: 0.05em;
@@ -28,7 +29,7 @@
     --blur-xs: 4px;
     --default-transition-duration: 150ms;
     --default-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-    --font-display: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-display: Sora, "Hanken Grotesk", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   }
 }
 @layer utilities {
@@ -187,6 +188,9 @@
   .mr-1\.5 {
     margin-right: calc(var(--spacing) * 1.5);
   }
+  .mb-0 {
+    margin-bottom: calc(var(--spacing) * 0);
+  }
   .mb-0\.5 {
     margin-bottom: calc(var(--spacing) * 0.5);
   }
@@ -310,8 +314,8 @@
   .h-\[11px\] {
     height: 11px;
   }
-  .h-\[22px\] {
-    height: 22px;
+  .h-\[18px\] {
+    height: 18px;
   }
   .h-\[26px\] {
     height: 26px;
@@ -370,8 +374,8 @@
   .w-\[11px\] {
     width: 11px;
   }
-  .w-\[22px\] {
-    width: 22px;
+  .w-\[18px\] {
+    width: 18px;
   }
   .w-\[52px\] {
     width: 52px;
@@ -440,6 +444,9 @@
     flex: 1 1 0;
   }
   .flex-shrink {
+    flex-shrink: 1;
+  }
+  .shrink {
     flex-shrink: 1;
   }
   .shrink-0 {
@@ -602,6 +609,9 @@
   .gap-x-6 {
     column-gap: calc(var(--spacing) * 6);
   }
+  .gap-x-8 {
+    column-gap: calc(var(--spacing) * 8);
+  }
   .gap-x-\[18px\] {
     column-gap: 18px;
   }
@@ -611,8 +621,8 @@
   .gap-y-2 {
     row-gap: calc(var(--spacing) * 2);
   }
-  .self-center {
-    align-self: center;
+  .gap-y-4 {
+    row-gap: calc(var(--spacing) * 4);
   }
   .truncate {
     overflow: hidden;
@@ -630,6 +640,9 @@
   }
   .rounded {
     border-radius: 0.25rem;
+  }
+  .rounded-\[4px\] {
+    border-radius: 4px;
   }
   .rounded-\[14px\] {
     border-radius: 14px;
@@ -783,9 +796,6 @@
   .bg-warn-soft {
     background-color: var(--warn-soft);
   }
-  .bg-\[radial-gradient\(120\%_80\%_at_0\%_0\%\,var\(--accent-soft\)\,transparent_55\%\)\] {
-    background-image: radial-gradient(120% 80% at 0% 0%,var(--accent-soft),transparent 55%);
-  }
   .p-0 {
     padding: calc(var(--spacing) * 0);
   }
@@ -897,6 +907,9 @@
   .pt-3 {
     padding-top: calc(var(--spacing) * 3);
   }
+  .pt-4 {
+    padding-top: calc(var(--spacing) * 4);
+  }
   .pt-6 {
     padding-top: calc(var(--spacing) * 6);
   }
@@ -921,9 +934,6 @@
   .pb-14 {
     padding-bottom: calc(var(--spacing) * 14);
   }
-  .pb-px {
-    padding-bottom: 1px;
-  }
   .pl-1 {
     padding-left: calc(var(--spacing) * 1);
   }
@@ -944,6 +954,9 @@
   }
   .align-middle {
     vertical-align: middle;
+  }
+  .font-display {
+    font-family: Sora, "Hanken Grotesk", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   }
   .font-mono {
     font-family: "JetBrains Mono", "SF Mono", ui-monospace, Consolas, monospace;
@@ -1030,6 +1043,10 @@
   .leading-tight {
     --tw-leading: var(--leading-tight);
     line-height: var(--leading-tight);
+  }
+  .font-bold {
+    --tw-font-weight: var(--font-weight-bold);
+    font-weight: var(--font-weight-bold);
   }
   .font-medium {
     --tw-font-weight: var(--font-weight-medium);
@@ -1205,10 +1222,6 @@
   }
   .shadow-2xl {
     --tw-shadow: 0 25px 50px -12px var(--tw-shadow-color, rgb(0 0 0 / 0.25));
-    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
-  }
-  .shadow-glow-pink {
-    --tw-shadow: 0 0 0 1px var(--tw-shadow-color, rgba(197,37,143,0.35)), 0 8px 30px var(--tw-shadow-color, rgba(197,37,143,0.20));
     box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
   }
   .shadow-xs {

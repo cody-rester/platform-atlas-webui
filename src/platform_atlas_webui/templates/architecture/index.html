@@ -311,7 +311,7 @@
 <header class="flex items-end justify-between gap-6 pb-5 border-b border-line mb-6">
   <div>
     <div class="eyebrow">
-      <span class="dot"></span> Extended Mode
+      <span class="dot"></span> {{ 'SaaS Gateway' if arch_is_saas else 'Extended Mode' }}
       <span class="arch-env-pill" title="Editing answers for this environment">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
         {{ target_env }}
@@ -470,6 +470,10 @@
     </div>
   </div>
 
+  {# Platform / MongoDB / Redis architecture — not part of a single-gateway
+     SaaS audit, so all three are dropped when editing a SaaS environment.
+     Standard/Extended render them exactly as before. #}
+  {% if not arch_is_saas %}
   {# 2. Platform Architecture #}
   <div class="arch-section" data-section="platform">
     <div class="arch-section-head" onclick="archToggle(this)">
@@ -741,7 +745,11 @@
       </div>
     </div>
   </div>
+  {% endif %}{# /Platform · MongoDB · Redis #}
 
+  {# Gateway 4 — kept for Standard/Extended; under SaaS shown only when the
+     environment's gateway kind is gateway4. #}
+  {% if not arch_is_saas or saas_gateway_kind == 'gateway4' %}
   {# 5. Gateway 4 Architecture #}
   <div class="arch-section" data-section="gateway4">
     <div class="arch-section-head" onclick="archToggle(this)">
@@ -859,7 +867,11 @@
       </div>
     </div>
   </div>
+  {% endif %}{# /Gateway 4 #}
 
+  {# Gateway 5 — kept for Standard/Extended; under SaaS shown only when the
+     environment's gateway kind is gateway5. #}
+  {% if not arch_is_saas or saas_gateway_kind == 'gateway5' %}
   {# 6. Gateway 5 Architecture #}
   <div class="arch-section" data-section="gateway5">
     <div class="arch-section-head" onclick="archToggle(this)">
@@ -977,6 +989,7 @@
       </div>
     </div>
   </div>
+  {% endif %}{# /Gateway 5 #}
 
   {# 7. Load Balancer #}
   <div class="arch-section" data-section="load_balancer">
@@ -1431,10 +1444,15 @@
   // ── Saved data from server ───────────────────────────────────────────
   const SAVED = {{ arch_data_json | safe }};
 
+  // SaaS scoping — mirrors the Jinja-rendered sections so progress math only
+  // counts what's actually on the page. false/'' for Standard/Extended.
+  const IS_SAAS = {{ arch_is_saas | tojson }};
+  const SAAS_GW_KIND = {{ (saas_gateway_kind or '') | tojson }};
+
   // ── Section registry ─────────────────────────────────────────────────
   // Maps section id → { fields[], skippable }
   // field: { key, inputId, type, parent?, cond? }
-  const SECTIONS = [
+  const _SECTIONS_ALL = [
     { id: 'environment', skippable: false, fields: [
       { key: 'environment_type',       inputId: 'f-environment-type',          type: 'select' },
       { key: 'datacenter_location',    inputId: 'f-datacenter-location',       type: 'text' },
@@ -1558,6 +1576,19 @@
       { key: 'frequency',                     inputId: 'f-va-frequency',                  type: 'select', cond: true },
     ]},
   ];
+
+  // Under SaaS, drop Platform/MongoDB/Redis and the unused gateway so the
+  // section set matches the rendered DOM exactly — progress, the completion
+  // banner, and the saved payload all key off SECTIONS. The conditions mirror
+  // the Jinja wraps above. Standard/Extended use the full set unchanged.
+  const SECTIONS = IS_SAAS
+    ? _SECTIONS_ALL.filter(function (s) {
+        if (s.id === 'platform' || s.id === 'mongodb' || s.id === 'redis') return false;
+        if (s.id === 'gateway4') return SAAS_GW_KIND === 'gateway4';
+        if (s.id === 'gateway5') return SAAS_GW_KIND === 'gateway5';
+        return true;
+      })
+    : _SECTIONS_ALL;
 
   // Active environment — used as the ?env= param for save calls.
   const TARGET_ENV = {{ target_env | tojson }};
@@ -1780,7 +1811,21 @@
       return p.total === 0 || p.filled >= p.total;
     });
 
-    return { completed, skipped, status: allDone ? 'complete' : 'in_progress' };
+    // Persist the live progress counts (same numbers the progress bar shows)
+    // so other surfaces — e.g. the capture page's Architecture nudge — can
+    // render an identical "X / Y fields" bar without re-deriving the schema.
+    let _pFilled = 0, _pTotal = 0;
+    SECTIONS.forEach(sec => {
+      const p = sectionProgress(sec);
+      _pFilled += p.filled;
+      _pTotal += p.total;
+    });
+
+    return {
+      completed, skipped,
+      status: allDone ? 'complete' : 'in_progress',
+      progress: { filled: _pFilled, total: _pTotal },
+    };
   }
 
   // ── Progress counting ─────────────────────────────────────────────────

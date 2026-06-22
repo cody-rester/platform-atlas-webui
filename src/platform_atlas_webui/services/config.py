@@ -45,6 +45,7 @@ EDITABLE_FIELDS: tuple[str, ...] = (
     "webui_accent",  # legacy — accepted on write so existing forms don't 4xx
     "webui_upgrade_panel_dismissed",
     "webui_palette_enabled",
+    "webui_ui_scale",
     "tier",
     "active_environment",
     "active_ruleset",
@@ -106,6 +107,27 @@ def resolve_appearance(cfg: dict[str, Any]) -> tuple[str, str]:
     return theme, mode
 
 
+# Display scale (WebUI zoom). The Settings slider snaps within this range; we
+# clamp any stored value into it so a hand-edited config can't make the UI
+# unreadable. 1.0 = 100% is the shared default.
+_UI_SCALE_MIN = 0.9
+_UI_SCALE_MAX = 1.3
+_UI_SCALE_DEFAULT = 1.0
+
+
+def resolve_scale(cfg: dict[str, Any]) -> float:
+    """Return the persisted WebUI display scale (e.g. 1.0), clamped to range.
+
+    Falls back to 1.0 (100%) when unset or unparseable.
+    """
+    raw = cfg.get("webui_ui_scale")
+    try:
+        val = float(raw)
+    except (TypeError, ValueError):
+        return _UI_SCALE_DEFAULT
+    return round(max(_UI_SCALE_MIN, min(_UI_SCALE_MAX, val)), 3)
+
+
 def read_config() -> dict[str, Any]:
     if not ATLAS_CONFIG_FILE.is_file():
         return {}
@@ -133,7 +155,7 @@ def resolve_active_tier(default: str = "extended") -> str:
 
     import os as _os
     env_tier = _os.environ.get("ATLAS_TIER", "").strip().lower()
-    if env_tier in ("standard", "extended"):
+    if env_tier in ("standard", "extended", "saas"):
         _tier_cache_value = env_tier
         _tier_cache_ts = now
         return env_tier
@@ -173,6 +195,10 @@ def mirror_tier_to_active_overlay(new_tier: str) -> None:
         if not env_file.is_file():
             return
         env_data = json.loads(env_file.read_text(encoding="utf-8"))
+        # SaaS environments bind their tier at create time — never converted.
+        # The global default still changes; this overlay just keeps its own.
+        if (env_data.get("tier") or "").lower() == "saas":
+            return
         env_data["tier"] = new_tier
         atomic_write_json(env_file, env_data)
         _invalidate_tier_cache()

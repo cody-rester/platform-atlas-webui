@@ -9,7 +9,7 @@ import asyncio
 import json
 import re
 
-from fastapi import APIRouter, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
@@ -31,13 +31,25 @@ from platform_atlas.continuous.models import (
 from platform_atlas.continuous.policy import describe_policy
 from platform_atlas.continuous.runtime import can_enable, read_settings, write_settings
 
-from platform_atlas_webui.dependencies import get_atlas_context, get_templates, template_context
+from platform_atlas_webui.dependencies import (
+    forbid_saas_feature,
+    get_atlas_context,
+    get_templates,
+    template_context,
+)
 from platform_atlas_webui.services import continuous as cont_svc
 from platform_atlas_webui.services import continuous as _cont_svc  # alias for topbar_summary
 from platform_atlas_webui.services import environments as env_svc
 from platform_atlas_webui.services import rulesets as ruleset_svc
 
-router = APIRouter(prefix="/continuous", tags=["continuous"])
+# SaaS audits are single-gateway — continuous drift monitoring is a
+# platform-anchored feature with no role there. Refuse every route under this
+# router for SaaS; Standard/Extended are unaffected.
+router = APIRouter(
+    prefix="/continuous",
+    tags=["continuous"],
+    dependencies=[Depends(forbid_saas_feature("Continuous Audit"))],
+)
 _templates = get_templates()
 
 # TODO: Log file watching — deferred to a later version of Atlas.

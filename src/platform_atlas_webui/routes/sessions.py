@@ -278,6 +278,12 @@ async def view_session(
                         )
                     break
 
+    # Architecture-form completeness for the gentle pre-capture nudge. Scoped to
+    # the session's bound environment, since architecture answers are per-env.
+    arch_summary = await run_in_threadpool(
+        session_svc.architecture_completion_summary, env_name or None,
+    )
+
     return _templates.TemplateResponse(
         request,
         "sessions/detail.html",
@@ -289,6 +295,7 @@ async def view_session(
             run_lock_flash=bool(lock_run),
             cm_reminder_cmd=cm_reminder_cmd,
             missing_creds=missing_creds,
+            arch_summary=arch_summary,
         ),
     )
 

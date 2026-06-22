@@ -32,7 +32,15 @@ logger = logging.getLogger(__name__)
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def _read_runtime_config() -> tuple[str, str, str]:
-    """Return (tier, backend_type, env_name) from disk, merging env overlay."""
+    """Return (tier, backend_type, env_name) from disk, merging env overlay.
+
+    Both tier and backend follow the precedence the rest of Atlas uses — the
+    active environment's overlay wins over root config, and ``ATLAS_TIER``
+    overrides tier. Resolving the overlay tier matters: without it the page
+    showed the root config's tier (e.g. "extended") even when a Standard
+    environment was active.
+    """
+    import os
     tier = "standard"
     backend_type = "keyring"
     env_name = ""
@@ -48,9 +56,38 @@ def _read_runtime_config() -> tuple[str, str, str]:
                 env_data = json.loads(env_file.read_text(encoding="utf-8"))
                 if env_data.get("credential_backend"):
                     backend_type = env_data["credential_backend"]
+                if env_data.get("tier"):
+                    tier = env_data["tier"]
+        env_tier = os.environ.get("ATLAS_TIER")
+        if env_tier and env_tier.strip().lower() in ("standard", "extended", "saas"):
+            tier = env_tier.strip().lower()
     except Exception:
         pass
     return tier, backend_type, env_name
+
+
+def _secret_store_info() -> dict:
+    """Honest view of the chosen local secret-store substrate.
+
+    Reflects the store the environment explicitly selected — the OS keyring, or
+    the encrypted local file (``~/.atlas/credentials.enc``). The page mirrors how
+    the CLI reports the file store: honestly, never dressed up as an "OS keyring."
+
+    Returns ``{"is_file": bool, "label": str, "health": str | None}`` where
+    ``health`` is ``"ok" | "empty" | "unreadable"`` for the file store, else
+    ``None``.
+    """
+    info: dict = {"is_file": False, "label": "OS Keyring", "health": None}
+    try:
+        from platform_atlas.core.credentials import active_secret_store, FileSecretStore
+        store = active_secret_store()
+        info["label"] = store.display_name
+        info["is_file"] = bool(getattr(store, "is_file", False))
+        if isinstance(store, FileSecretStore):
+            info["health"] = store.health().value
+    except Exception:  # noqa: BLE001 — a display helper must never break the page
+        pass
+    return info
 
 
 def _load_credential_status() -> dict:
@@ -59,13 +96,15 @@ def _load_credential_status() -> dict:
 
     Returns a dict with:
       backend, env_name, tier, vault_url, vault_path, vault_config,
-      connected, error, credentials (list of per-key dicts)
+      connected, error, credentials (list of per-key dicts),
+      store_is_file, store_label, store_health (the resolved substrate)
     """
     from platform_atlas.core.credentials import (
         CredentialKey,
         CredentialStore,
         CredentialBackendType,
-        EXTENDED_ONLY_KEYS,
+        applicable_keys,
+        required_keys,
         scoped_service_name,
     )
 
@@ -85,19 +124,28 @@ def _load_credential_status() -> dict:
         "credentials": [],
     }
 
+    # Reflect the ACTUAL secret-store substrate (OS keyring vs. the encrypted
+    # local-file fallback) so the page never claims "OS Keyring" when the
+    # headless file-store fallback is what's really in use.
+    _ss = _secret_store_info()
+    result["store_is_file"] = _ss["is_file"]
+    result["store_label"] = _ss["label"]
+    result["store_health"] = _ss["health"]
+
     # Ordered list of all credentials with their metadata
+    _required_now = required_keys(tier)
     key_meta = [
         {
             "key": CredentialKey.PLATFORM_SECRET,
-            "required": True,
-            "tier_note": "both tiers",
+            "required": CredentialKey.PLATFORM_SECRET in _required_now,
+            "tier_note": "Standard & Extended — never used in SaaS",
             "extended_only": False,
             "description": "OAuth client secret for authenticating with IAP.",
         },
         {
             "key": CredentialKey.GATEWAY4_PASSWORD,
             "required": False,
-            "tier_note": "both tiers — optional",
+            "tier_note": "all tiers — optional",
             "extended_only": False,
             "description": "API password for Gateway 4 (ipsdk authentication).",
         },
@@ -118,9 +166,9 @@ def _load_credential_status() -> dict:
         {
             "key": CredentialKey.SSH_PASSPHRASE,
             "required": False,
-            "tier_note": "Extended only — optional if key has no passphrase",
+            "tier_note": "Extended & SaaS — optional if key has no passphrase",
             "extended_only": True,
-            "description": "Passphrase for the SSH private key used in Extended captures.",
+            "description": "Passphrase for the SSH private key used in SSH captures.",
         },
     ]
 
@@ -151,8 +199,9 @@ def _load_credential_status() -> dict:
             except Exception:
                 present = False
 
-            # In Standard mode, Extended-only credentials are inaccessible
-            unavailable = (m["extended_only"] and tier == "standard")
+            # Keys outside the active tier's applicable set are inaccessible
+            # (Mongo/Redis/SSH in Standard; Platform/Mongo/Redis in SaaS).
+            unavailable = m["key"] not in applicable_keys(tier)
 
             result["credentials"].append({
                 "key": ck.value,
@@ -169,7 +218,7 @@ def _load_credential_status() -> dict:
         result["error"] = str(exc)
         for m in key_meta:
             ck: CredentialKey = m["key"]
-            unavailable = (m["extended_only"] and tier == "standard")
+            unavailable = m["key"] not in applicable_keys(tier)
             result["credentials"].append({
                 "key": ck.value,
                 "display": ck.display_name,

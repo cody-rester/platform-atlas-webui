@@ -51,12 +51,13 @@ The CLI is unchanged — the WebUI is purely additive. Sessions, environments, a
 - **Live job streaming** — Long-running operations (preflight, capture, validate, report, full pipeline) run in a background thread and stream events to the browser via Server-Sent Events. Per-job toggle between a human-friendly summary and raw progress logs.
 - **Pipeline progress bar** — "Run full pipeline" jobs show a clean three-stop bar (Capture → Validate → Report) that advances as each stage completes.
 - **Preflight checks panel** — Shows phase headers and pass/fail rows as they arrive, with an animated indicator for the check currently in flight.
-- **Environment management** — Create, edit, activate, and delete environments. Credential storage (OS keyring or HashiCorp Vault) is handled inline.
-- **Tier toggle** — Switch between Standard (Platform OAuth + IAG4 API) and Extended (full SSH / Mongo / Redis / Gateway audit) tiers. Rule counts and target requirements update automatically.
+- **Environment management** — Create, edit, activate, and delete environments. Credential storage — OS keyring, encrypted local file, or HashiCorp Vault — is chosen and managed inline. The form also covers the Gateway 5 config source (SSH / Docker Compose / Helm / server `gateway.conf`), an SSH-key dropdown, passphrase storage, and an inline **Test SSH connection** button.
+- **Three tiers** — Standard (Platform OAuth + IAG4 API), Extended (full SSH / Mongo / Redis / Gateway audit), and SaaS (a single standalone GW4 *or* GW5 with no Platform/Mongo/Redis). Standard ⇄ Extended toggles live; SaaS is fixed per environment at create time. Rule counts and target requirements update automatically.
 - **Ruleset picker** — Choose the active ruleset and profile per session. Changes take effect on the next validation run.
 - **Architecture form** — Multi-section form for capturing infrastructure-as-deployed metadata that feeds the Architecture & Maintenance report.
 - **Diff view** — Compare any two sessions and surface what changed between them.
-- **Reports** — Browse and open generated compliance, operational, and architecture reports directly in the browser.
+- **Reports** — Browse and open generated compliance, operational, and architecture reports directly in the browser. A skipped rule's detail explains *why* it was skipped (couldn't reach the system / no data / conditional), color-coded.
+- **Support bundle & Platform asset export** — Collect a diagnostic ZIP (health endpoints, redacted config, Extended logs), and optionally export Workflows, JSON Transformations, JSON Forms, or whole Projects from the active environment into the bundle over Platform OAuth.
 - **Fleet view** — Aggregate health across all environments — per-environment pass rate, continuous-audit state, and unacknowledged drift counters in one place.
 - **Continuous audit** — Schedule recurring audits and inspect the full run history.
 - **Notifications & alerts** — Route alerts to Slack or any JSON webhook when failures cross a threshold.
@@ -81,6 +82,7 @@ The CLI is unchanged — the WebUI is purely additive. Sessions, environments, a
 | Preflight | `/preflight` | Connectivity checks with live output |
 | Jobs | `/jobs` | Job list, detail, live SSE stream |
 | Reports | `/reports` | Browse generated HTML reports |
+| Support Bundle | `/support-bundle` | Diagnostic ZIP + optional Platform asset export |
 | Architecture | `/architecture` | Multi-section infrastructure form |
 | Diff | `/diff` | Compare two sessions |
 | Fleet | `/fleet` | Multi-environment health summary |
@@ -98,7 +100,7 @@ The CLI is unchanged — the WebUI is purely additive. Sessions, environments, a
 - **Python** `>=3.11,<4.0`
 - **OS** — Linux (RHEL/Rocky 8+9, Ubuntu) or macOS. Daemon mode is POSIX-only; on Windows, run the WebUI under your service supervisor of choice.
 - **Browser** — Any modern Chromium, Firefox, or Safari. The UI uses `EventSource`, `@property`, and View Transitions — release-channel browsers from 2024 onward work without polyfills.
-- **`platform-atlas` core** — installed alongside (Poetry pulls it automatically; pip install both wheels for production).
+- **`platform-atlas` core** `>=2.0.0,<3.0` — installed alongside (Poetry pulls it automatically; pip install both wheels for production). The WebUI enforces this at startup.
 - **Optional** — `keyring` (included with `platform-atlas`) for OS-keyring credential storage, or `hvac` for HashiCorp Vault.
 
 ---

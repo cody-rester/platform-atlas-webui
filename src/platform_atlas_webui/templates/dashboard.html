@@ -65,10 +65,10 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 11.5px;
+    font-size: 13px;
   }
   .kpi-footer-link { color: var(--accent); font-weight: 500; }
-  .kpi-footer-path { font-family: var(--mono); font-size: 11px; opacity: 0.6; }
+  .kpi-footer-path { font-family: var(--mono); font-size: 13px; opacity: 0.6; }
 
   /* ── Report-style cover-band hero ──────────────────────────────────
      Self-contained to the dashboard: a navy band using the standalone
@@ -102,10 +102,10 @@
     margin: 12px 0 9px; color: #fff;
   }
   .dash-hero-title em { color: #6dc5f0; }
-  .dash-hero-sub { color: rgba(255,255,255,0.74); font-size: 14px; line-height: 1.55; max-width: 64ch; }
+  .dash-hero-sub { color: rgba(255,255,255,0.74); font-size: 16px; line-height: 1.55; max-width: 64ch; }
   .dash-hero-sub b { color: #fff; font-weight: 600; }
   .dash-hero-code {
-    font-family: var(--mono); font-size: 12.5px;
+    font-family: var(--mono); font-size: 14px;
     color: #cfe6f7; background: rgba(255,255,255,0.08);
     border: 1px solid rgba(255,255,255,0.16); border-radius: 5px; padding: 1px 6px;
   }
@@ -142,7 +142,7 @@
 
 {# ── Ruleset update notice ────────────────────────────────────────── #}
 {% if ruleset_updates %}
-<div class="flex items-center gap-3 rounded-md border border-line bg-surface px-3.5 py-2 mb-4 text-[12.5px]"
+<div class="flex items-center gap-3 rounded-md border border-line bg-surface px-3.5 py-2 mb-4 text-[14px]"
      style="border-left: 3px solid var(--accent);">
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
        stroke-linecap="round" stroke-linejoin="round" class="shrink-0 text-accent">
@@ -156,7 +156,7 @@
     {% endfor %}
   </span>
   <span class="ml-auto text-text-3 shrink-0">
-    Run <code class="font-mono bg-bg-2 border border-line rounded px-1.5 py-0.5 text-[11.5px] text-text-2">platform-atlas ruleset update</code>
+    Run <code class="font-mono bg-bg-2 border border-line rounded px-1.5 py-0.5 text-[13px] text-text-2">platform-atlas ruleset update</code>
   </span>
 </div>
 {% endif %}
@@ -174,8 +174,8 @@
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5v14"/></svg>
   </div>
   <div class="flex-1 min-w-0">
-    <h3 class="text-[15px] m-0 mb-1">Welcome to Platform Atlas</h3>
-    <p class="text-[13px] text-text-2 m-0 mb-3 leading-relaxed">
+    <h3 class="text-[17px] m-0 mb-1">Welcome to Platform Atlas</h3>
+    <p class="text-[15px] text-text-2 m-0 mb-3 leading-relaxed">
       Create an environment to point Atlas at your platform, then start your first audit session.
     </p>
     <div class="flex items-center gap-2 flex-wrap">
@@ -211,9 +211,9 @@
     <div x-show="customizing" x-cloak
          @mouseleave="hoveredId = null"
          class="flex items-center gap-2 flex-wrap">
-      <span class="text-[11.5px] text-text-3 ml-1 mr-1">Show:</span>
+      <span class="text-[13px] text-text-3 ml-1 mr-1">Show:</span>
       <template x-for="w in widgets" :key="w.id">
-        <label class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-surface-2 border border-line cursor-pointer hover:bg-bg-2 text-[12px] transition-colors"
+        <label class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-surface-2 border border-line cursor-pointer hover:bg-bg-2 text-[14px] transition-colors"
                x-show="!w.conditional || w.present"
                @mouseenter="hoverEnter(w.id)">
           <input type="checkbox"
@@ -231,7 +231,7 @@
     </div>
 
     <span x-show="!customizing && hidden.length > 0" x-cloak
-          class="ml-auto text-[11.5px] text-text-3 italic"
+          class="ml-auto text-[13px] text-text-3 italic"
           x-text="hidden.length + ' card' + (hidden.length === 1 ? '' : 's') + ' hidden'"></span>
   </div>
 
@@ -246,16 +246,16 @@
        :class="{ 'hidden': hidden.includes('kpi-sessions'), 'sc-hover-glow': hoveredId === 'kpi-sessions' }"
        class="group flex flex-col h-full rounded-lg bg-surface border border-line p-3.5
               transition-colors hover:border-line-2 hover:bg-surface-2 text-text">
-      <div class="flex items-center justify-between text-[10.5px] uppercase tracking-[0.1em] font-medium text-text-3">
+      <div class="flex items-center justify-between text-[12px] uppercase tracking-[0.1em] font-medium text-text-3">
         <span>Sessions</span>
         <span class="inline-block w-[18px] h-[18px] rounded-[4px] shrink-0" style="background: rgba(27,147,210,0.18);"></span>
       </div>
       <div class="flex items-baseline gap-2 mt-3.5 mb-1.5">
         <span class="text-[34px] leading-none font-medium tracking-[-0.03em] tabular-nums">{{ kpis.session_count }}</span>
-        {% if active_session %}<span class="font-mono text-[11px] text-ok">1 live</span>{% endif %}
+        {% if active_session %}<span class="font-mono text-[13px] text-ok">1 live</span>{% endif %}
       </div>
       {% if not kpis.session_count %}
-        <span class="text-[11.5px] text-text-3 leading-snug">Each session captures, validates, and reports against one environment.</span>
+        <span class="text-[13px] text-text-3 leading-snug">Each session captures, validates, and reports against one environment.</span>
       {% endif %}
       <div class="kpi-footer">
         <span class="kpi-footer-link">Manage</span>
@@ -268,7 +268,7 @@
        :class="{ 'hidden': hidden.includes('kpi-environments'), 'sc-hover-glow': hoveredId === 'kpi-environments' }"
        class="group flex flex-col h-full rounded-lg bg-surface border border-line p-3.5
               transition-colors hover:border-line-2 hover:bg-surface-2 text-text">
-      <div class="flex items-center justify-between text-[10.5px] uppercase tracking-[0.1em] font-medium text-text-3">
+      <div class="flex items-center justify-between text-[12px] uppercase tracking-[0.1em] font-medium text-text-3">
         <span>Environments</span>
         <span class="inline-block w-[18px] h-[18px] rounded-[4px] shrink-0" style="background: rgba(255,102,51,0.16);"></span>
       </div>
@@ -276,7 +276,7 @@
         <span class="text-[34px] leading-none font-medium tracking-[-0.03em] tabular-nums">{{ kpis.env_count }}</span>
       </div>
       {% if not kpis.env_count %}
-        <span class="text-[11.5px] text-text-3 leading-snug">Environments hold one Platform's connection and credentials.</span>
+        <span class="text-[13px] text-text-3 leading-snug">Environments hold one Platform's connection and credentials.</span>
       {% endif %}
       <div class="kpi-footer">
         <span class="kpi-footer-link">Manage</span>
@@ -289,18 +289,18 @@
        :class="{ 'hidden': hidden.includes('kpi-rules'), 'sc-hover-glow': hoveredId === 'kpi-rules' }"
        class="group flex flex-col h-full rounded-lg bg-surface border border-line p-3.5
               transition-colors hover:border-line-2 hover:bg-surface-2 text-text">
-      <div class="flex items-center justify-between text-[10.5px] uppercase tracking-[0.1em] font-medium text-text-3">
+      <div class="flex items-center justify-between text-[12px] uppercase tracking-[0.1em] font-medium text-text-3">
         <span>Active rules</span>
         <span class="inline-block w-[18px] h-[18px] rounded-[4px] shrink-0" style="background: rgba(153,202,60,0.22);"></span>
       </div>
       <div class="flex items-baseline gap-2 mt-3.5 mb-1.5">
         <span class="text-[34px] leading-none font-medium tracking-[-0.03em] tabular-nums">{{ kpis.rule_count }}</span>
         {% if ruleset and ruleset.name %}
-          <span class="font-mono text-[11px] text-text-3 truncate">{{ ruleset.name }}</span>
+          <span class="font-mono text-[13px] text-text-3 truncate">{{ ruleset.name }}</span>
         {% endif %}
       </div>
       {% if not kpis.rule_count %}
-        <span class="text-[11.5px] text-text-3 leading-snug">No ruleset loaded — rule profiles enable or disable groups of checks.</span>
+        <span class="text-[13px] text-text-3 leading-snug">No ruleset loaded — rule profiles enable or disable groups of checks.</span>
       {% endif %}
       <div class="kpi-footer">
         <span class="kpi-footer-link">Inspect</span>
@@ -313,7 +313,7 @@
        :class="{ 'hidden': hidden.includes('kpi-jobs'), 'sc-hover-glow': hoveredId === 'kpi-jobs' }"
        class="group flex flex-col h-full rounded-lg bg-surface border border-line p-3.5
               transition-colors hover:border-line-2 hover:bg-surface-2 text-text">
-      <div class="flex items-center justify-between text-[10.5px] uppercase tracking-[0.1em] font-medium text-text-3">
+      <div class="flex items-center justify-between text-[12px] uppercase tracking-[0.1em] font-medium text-text-3">
         <span>Running jobs</span>
         <span class="inline-block w-[18px] h-[18px] rounded-[4px] shrink-0" style="background: rgba(197,37,143,0.16);"></span>
       </div>
@@ -321,7 +321,7 @@
         <span class="text-[34px] leading-none font-medium tracking-[-0.03em] tabular-nums">{{ kpis.running_jobs }}</span>
       </div>
       {% if not kpis.running_jobs %}
-        <span class="text-[11.5px] text-text-3 leading-snug">No captures or diffs underway. Long-running tasks show up here.</span>
+        <span class="text-[13px] text-text-3 leading-snug">No captures or diffs underway. Long-running tasks show up here.</span>
       {% endif %}
       <div class="kpi-footer">
         <span class="kpi-footer-link">Open queue</span>
@@ -348,13 +348,13 @@
             style="animation: rotate 30s linear infinite;"></span>
     </div>
     <div>
-      <div class="text-[10.5px] uppercase tracking-[0.14em] text-accent font-semibold">Active session</div>
+      <div class="text-[12px] uppercase tracking-[0.14em] text-accent font-semibold">Active session</div>
       <div class="text-[17px] font-medium tracking-[-0.01em] my-1 flex items-center gap-2.5">
         {{ active_session.name or 'unnamed' }}
-        <span class="font-mono text-[13px] text-text-2 bg-bg-2 border border-line rounded-md px-2 py-0.5">{{ active_session.name }}</span>
+        <span class="font-mono text-[15px] text-text-2 bg-bg-2 border border-line rounded-md px-2 py-0.5">{{ active_session.name }}</span>
         <span class="chip run"><span class="dot"></span>Live</span>
       </div>
-      <div class="flex flex-wrap gap-x-[18px] gap-y-1.5 text-text-3 text-[12px]">
+      <div class="flex flex-wrap gap-x-[18px] gap-y-1.5 text-text-3 text-[14px]">
         {% for key, val in [('env', active_session.environment), ('ruleset', active_session.ruleset), ('tier', active_session.tier)] %}
           {% if val %}
             <span><span class="text-text-4 mr-1">{{ key }}</span><span class="font-mono text-text-2">{{ val }}</span></span>
@@ -373,7 +373,7 @@
            :class="{ 'hidden': hidden.includes('calendar'), 'sc-hover-glow': hoveredId === 'calendar' }"
            class="bg-surface border border-line rounded-lg p-4 mb-3">
     <div class="flex justify-between items-center mb-3">
-      <h3 class="m-0 text-[13px] font-semibold">
+      <h3 class="m-0 text-[15px] font-semibold">
         Audit activity
         <span class="footnote ml-2">
           trailing 12 months · local time
@@ -381,7 +381,7 @@
         </span>
       </h3>
       {% if calendar.total %}
-        <div class="flex flex-wrap gap-1.5 items-center text-text-3 text-[11px]">
+        <div class="flex flex-wrap gap-1.5 items-center text-text-3 text-[13px]">
           <span class="inline-flex items-center gap-1.5">less</span>
           <i class="w-[11px] h-[11px] rounded-xs inline-block bg-surface-2 border border-line"></i>
           <i class="w-[11px] h-[11px] rounded-xs inline-block border-0" style="background:oklch(from var(--accent) l c h / .18);"></i>
@@ -415,7 +415,7 @@
             </div>
           </div>
         </div>
-        <div class="flex flex-wrap gap-x-5 gap-y-2 mt-3 text-[12px] text-text-3">
+        <div class="flex flex-wrap gap-x-5 gap-y-2 mt-3 text-[14px] text-text-3">
           <div><b class="text-text font-semibold mr-1">{{ calendar.total }}</b>session{{ '' if calendar.total == 1 else 's' }} this year</div>
           <div><b class="text-bad font-semibold mr-1">{{ calendar.fail_days }}</b>day{{ '' if calendar.fail_days == 1 else 's' }} with failures</div>
           <div><b class="text-text font-semibold mr-1">{{ calendar.longest_gap }}</b>longest gap (days)</div>
@@ -426,7 +426,7 @@
         </div>
       </div>
     {% else %}
-      <div class="text-center py-8 text-text-3 text-[13px]">
+      <div class="text-center py-8 text-text-3 text-[15px]">
         No captures in the last 12&nbsp;months.
         <a href="/sessions/new" class="text-accent hover:text-accent-hover">Start a session</a>
         or
@@ -446,8 +446,8 @@
          :class="{ 'hidden': hidden.includes('recent-jobs'), 'sc-hover-glow': hoveredId === 'recent-jobs' }"
          class="flex-[1.6_1.6_0] min-w-0 bg-surface border border-line rounded-lg overflow-hidden">
       <div class="flex items-center px-4 py-3 border-b border-line">
-        <h3 class="m-0 text-[13px] font-semibold">Recent jobs</h3>
-        <span class="text-text-3 text-[12px] ml-1.5">last 24h</span>
+        <h3 class="m-0 text-[15px] font-semibold">Recent jobs</h3>
+        <span class="text-text-3 text-[14px] ml-1.5">last 24h</span>
         <div class="ml-auto inline-flex gap-1.5 items-center">
           {% if kpis.running_jobs %}
             <span class="chip run"><span class="dot"></span> {{ kpis.running_jobs }} running</span>
@@ -458,19 +458,19 @@
       <div>
         {% if recent_jobs %}
           {% for job in recent_jobs %}
-            <div class="flex items-center gap-3 px-4 py-2.5 text-[13px] border-b border-line last:border-b-0 hover:bg-surface-2">
+            <div class="flex items-center gap-3 px-4 py-2.5 text-[15px] border-b border-line last:border-b-0 hover:bg-surface-2">
               {% set dot_color = 'bg-accent' if job.status == 'running' else
                                 ('bg-ok'    if job.status == 'succeeded' else
                                 ('bg-bad'   if job.status == 'failed' else 'bg-text-4')) %}
               <span class="w-2 h-2 rounded-full shrink-0 {{ dot_color }}{% if job.status == 'running' %} animate-pulse{% endif %}"></span>
               <span class="font-medium truncate">{{ job.name }}</span>
-              <span class="font-mono text-[11.5px] text-text-3 truncate">{{ job.id }}</span>
+              <span class="font-mono text-[13px] text-text-3 truncate">{{ job.id }}</span>
               <span class="ml-auto text-text-3">{{ job.status }}</span>
               <span class="text-text-3 w-6 text-right">—</span>
             </div>
           {% endfor %}
         {% else %}
-          <div class="px-4 py-8 text-center text-text-3 text-[13px]">
+          <div class="px-4 py-8 text-center text-text-3 text-[15px]">
             <strong class="block text-text font-semibold mb-1">No recent jobs</strong>
             Start a session, run preflight, or fire a diff to see job activity here.
           </div>
@@ -482,26 +482,26 @@
          :class="{ 'hidden': hidden.includes('active-env'), 'sc-hover-glow': hoveredId === 'active-env' }"
          class="flex-[1_1_0] min-w-0 bg-surface border border-line rounded-lg overflow-hidden">
       <div class="flex items-center px-4 py-3 border-b border-line">
-        <h3 class="m-0 text-[13px] font-semibold">Active environment</h3>
+        <h3 class="m-0 text-[15px] font-semibold">Active environment</h3>
         <div class="ml-auto inline-flex gap-1.5 items-center">
           {% if active_env %}<span class="chip ok"><span class="dot"></span> Active</span>{% endif %}
         </div>
       </div>
       <div class="px-4 py-3.5">
         {% if active_env %}
-          <div class="flex items-center gap-2.5 text-[14px] font-medium mb-2">
-            <span class="inline-grid place-items-center w-7 h-7 rounded-md bg-accent-soft text-accent border border-line text-[12px] font-semibold">
+          <div class="flex items-center gap-2.5 text-[16px] font-medium mb-2">
+            <span class="inline-grid place-items-center w-7 h-7 rounded-md bg-accent-soft text-accent border border-line text-[14px] font-semibold">
               {{ active_env.name[0]|upper if active_env.name else '?' }}
             </span>
             <span>{{ active_env.name }}</span>
           </div>
           {% if active_env.platform_uri %}
-            <div class="flex items-center gap-1.5 text-text-2 text-[12px] font-mono mb-2.5">
+            <div class="flex items-center gap-1.5 text-text-2 text-[14px] font-mono mb-2.5">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="shrink-0"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
               <span class="truncate">{{ active_env.platform_uri }}</span>
             </div>
           {% endif %}
-          <div class="flex flex-wrap gap-x-4 gap-y-1.5 text-[12px] text-text-3 mb-3.5">
+          <div class="flex flex-wrap gap-x-4 gap-y-1.5 text-[14px] text-text-3 mb-3.5">
             <span><span class="text-text-4 mr-1">tier</span><span class="font-mono text-text-2">{{ active_env.tier or tier }}</span></span>
             {% if active_env.deployment_mode %}
               <span><span class="text-text-4 mr-1">mode</span><span class="font-mono text-text-2">{{ active_env.deployment_mode }}</span></span>
@@ -513,7 +513,7 @@
             <a class="btn sm" href="/environments">Switch</a>
           </div>
         {% else %}
-          <div class="py-4 text-center text-text-3 text-[13px]">
+          <div class="py-4 text-center text-text-3 text-[15px]">
             <strong class="block text-text font-semibold mb-1">No active environment</strong>
             <a href="/environments" class="text-accent hover:text-accent-hover">Create one →</a>
           </div>

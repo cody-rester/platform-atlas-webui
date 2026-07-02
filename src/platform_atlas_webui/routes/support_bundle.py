@@ -59,11 +59,17 @@ async def support_bundle_form(request: Request, job: str = "") -> HTMLResponse:
 
     active_env = ""
     tier = "standard"
+    connections: list[dict] = []
     try:
         from platform_atlas.core.context import ctx
+        from platform_atlas.core.handlers.support_bundle import _describe_connections
         atlas = ctx()
         active_env = getattr(atlas, "active_environment", "") or ""
         tier = (getattr(atlas.config, "tier", "") or "standard").lower()
+        connections = [
+            {"label": label, "value": value}
+            for label, value in _describe_connections(atlas.config, tier)
+        ]
     except Exception:  # noqa: BLE001
         pass
 
@@ -83,6 +89,7 @@ async def support_bundle_form(request: Request, job: str = "") -> HTMLResponse:
             job=job_record,
             active_env=active_env,
             tier=tier,
+            connections=connections,
             asset_types=asset_types,
         ),
     )

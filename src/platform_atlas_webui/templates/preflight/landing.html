@@ -10,12 +10,12 @@
       Preflight, <em class="not-italic text-accent">before you capture</em>
     </h1>
     {% if is_saas %}
-    <p class="text-[14px] text-text-2 max-w-[64ch]">
+    <p class="text-[16px] text-text-2 max-w-[64ch]">
       Verifies SSH and gateway connectivity to the gateway in the active SaaS
       environment — no Platform, MongoDB, or Redis checks.
     </p>
     {% else %}
-    <p class="text-[14px] text-text-2 max-w-[64ch]">
+    <p class="text-[16px] text-text-2 max-w-[64ch]">
       Verifies SSH, MongoDB, Redis, Platform OAuth, and gateway connectivity to every
       target in the active environment. <b>Standard mode</b> skips SSH/Mongo/Redis automatically.
     </p>
@@ -93,7 +93,7 @@
           {% if not job %}
             <span class="ml-auto inline-flex items-center gap-2"
                   x-data="{ busy: false }">
-              <span class="pf-status-chip text-[11px] text-text-4" id="pf-chip-{{ t.name }}"></span>
+              <span class="pf-status-chip text-[13px] text-text-4" id="pf-chip-{{ t.name }}"></span>
               <form hx-post="/preflight/test/{{ t.name }}"
                     hx-target="#pf-chip-{{ t.name }}"
                     hx-swap="innerHTML"
@@ -104,7 +104,7 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <button type="submit"
                         :disabled="busy"
-                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-line-2 text-[11px] text-text-2 hover:bg-surface-2 disabled:opacity-60 disabled:cursor-wait">
+                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-line-2 text-[13px] text-text-2 hover:bg-surface-2 disabled:opacity-60 disabled:cursor-wait">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" x-show="!busy"><path d="M3 12h3l2-6 4 12 2-6h7"/></svg>
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" x-show="busy" x-cloak class="animate-spin"><path d="M21 12a9 9 0 1 1-3-6.7"/></svg>
                   <span x-text="busy ? 'Testing…' : 'Test'"></span>

@@ -7,7 +7,7 @@
   <div>
     <div class="eyebrow"><span class="dot"></span> Drift alerts</div>
     <h1 class="text-[36px] leading-[1.05] font-semibold tracking-[-0.038em] mt-2 mb-1.5">Alerts</h1>
-    <p class="text-[14px] text-text-2 max-w-[64ch]">
+    <p class="text-[16px] text-text-2 max-w-[64ch]">
       One alert per rule whose observed value changed since the previous continuous-audit run.
       Acknowledged alerts re-open if drift recurs on the same rule.
     </p>
@@ -53,17 +53,17 @@
     </div>
   {% else %}
     <div style="overflow-x:auto;">
-      <table style="width:100%; border-collapse:collapse; font-size:13px;">
+      <table style="width:100%; border-collapse:collapse; font-size:15px;">
         <thead>
           <tr style="border-bottom:1px solid var(--line);">
-            <th style="text-align:left; padding:10px 14px; font-size:11px; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:.06em;">State</th>
-            <th style="text-align:left; padding:10px 14px; font-size:11px; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:.06em;">Severity</th>
-            <th style="text-align:left; padding:10px 14px; font-size:11px; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:.06em;">Rule</th>
-            <th style="text-align:left; padding:10px 14px; font-size:11px; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:.06em;">Path</th>
-            <th style="text-align:left; padding:10px 14px; font-size:11px; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:.06em;">Previous → Current</th>
-            <th style="text-align:right; padding:10px 14px; font-size:11px; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:.06em;">Count</th>
-            <th style="text-align:left; padding:10px 14px; font-size:11px; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:.06em;">Last seen</th>
-            <th style="text-align:right; padding:10px 14px; font-size:11px; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:.06em;">Action</th>
+            <th style="text-align:left; padding:10px 14px; font-size:13px; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:.06em;">State</th>
+            <th style="text-align:left; padding:10px 14px; font-size:13px; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:.06em;">Severity</th>
+            <th style="text-align:left; padding:10px 14px; font-size:13px; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:.06em;">Rule</th>
+            <th style="text-align:left; padding:10px 14px; font-size:13px; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:.06em;">Path</th>
+            <th style="text-align:left; padding:10px 14px; font-size:13px; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:.06em;">Previous → Current</th>
+            <th style="text-align:right; padding:10px 14px; font-size:13px; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:.06em;">Count</th>
+            <th style="text-align:left; padding:10px 14px; font-size:13px; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:.06em;">Last seen</th>
+            <th style="text-align:right; padding:10px 14px; font-size:13px; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:.06em;">Action</th>
           </tr>
         </thead>
         <tbody>
@@ -80,23 +80,23 @@
                   <span class="chip ok"><span class="dot"></span>Acked</span>
                 {% endif %}
               </td>
-              <td style="padding:7px 14px; font-family:var(--mono); font-size:12px; color:var(--text-3);">{{ a.severity or '—' }}</td>
+              <td style="padding:7px 14px; font-family:var(--mono); font-size:14px; color:var(--text-3);">{{ a.severity or '—' }}</td>
               <td style="padding:7px 14px;">
                 {% if _rule_label %}
                   <div style="font-weight:500;">{{ _rule_label }}</div>
                 {% else %}
                   <div style="font-weight:500; color:var(--text-4); font-style:italic;" title="The rule referenced by this alert no longer exists in the active ruleset.">(rule deleted)</div>
                 {% endif %}
-                <div style="font-size:11px; color:var(--text-4); font-family:var(--mono); margin-top:2px;">{{ a.alert_id }}</div>
+                <div style="font-size:13px; color:var(--text-4); font-family:var(--mono); margin-top:2px;">{{ a.alert_id }}</div>
               </td>
-              <td style="padding:7px 14px; font-family:var(--mono); font-size:12px; color:var(--text-3); max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ a.path }}">{{ a.path or '—' }}</td>
-              <td style="padding:7px 14px; font-family:var(--mono); font-size:12px;">
+              <td style="padding:7px 14px; font-family:var(--mono); font-size:14px; color:var(--text-3); max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ a.path }}">{{ a.path or '—' }}</td>
+              <td style="padding:7px 14px; font-family:var(--mono); font-size:14px;">
                 <span style="color:var(--text-3);">{{ a.latest_previous }}</span>
                 <span style="color:var(--text-4); margin:0 4px;">→</span>
                 <span style="color:var(--warn); font-weight:500;">{{ a.latest_current }}</span>
               </td>
-              <td style="padding:7px 14px; font-family:var(--mono); font-size:12px; text-align:right;">{{ a.occurrence_count }}</td>
-              <td style="padding:7px 14px; font-family:var(--mono); font-size:12px; color:var(--text-3);">{{ a.last_seen }}</td>
+              <td style="padding:7px 14px; font-family:var(--mono); font-size:14px; text-align:right;">{{ a.occurrence_count }}</td>
+              <td style="padding:7px 14px; font-family:var(--mono); font-size:14px; color:var(--text-3);">{{ a.last_seen }}</td>
               <td style="padding:7px 14px; text-align:right;">
                 {% if a.status == AlertStatus.UNACKED %}
                   <form method="post" action="/alerts/{{ a.alert_id }}/ack" class="inline" @submit="acking = true">
@@ -104,7 +104,7 @@
                     <button type="submit" class="btn sm" data-loading-label="Acking…" :disabled="acking">Ack</button>
                   </form>
                 {% else %}
-                  <span style="color:var(--text-4); font-size:12px;">{{ a.acked_at[:10] if a.acked_at else '' }}</span>
+                  <span style="color:var(--text-4); font-size:14px;">{{ a.acked_at[:10] if a.acked_at else '' }}</span>
                 {% endif %}
               </td>
             </tr>
@@ -128,11 +128,11 @@
   {% else %}
     <div style="max-height:420px; overflow-y:auto;">
       {% for ev in events %}
-        <div style="display:grid; grid-template-columns: 190px 80px 1fr 1fr; gap:12px; padding:8px 16px; border-bottom:1px solid var(--line); font-size:13px; align-items:center;">
-          <span style="font-family:var(--mono); font-size:12px; color:var(--text-3);">{{ ev.detected_at }}</span>
-          <span style="font-family:var(--mono); font-size:12px; color:var(--text-3);">{{ ev.severity }}</span>
-          <span style="font-weight:500;">{{ ev.rule_name }} <span style="color:var(--text-4); font-family:var(--mono); font-size:11px; font-weight:400;">({{ ev.rule_number }})</span></span>
-          <span style="font-family:var(--mono); font-size:12px; color:var(--text-2);">{{ ev.previous }} → <span style="color:var(--warn); font-weight:500;">{{ ev.current }}</span></span>
+        <div style="display:grid; grid-template-columns: 190px 80px 1fr 1fr; gap:12px; padding:8px 16px; border-bottom:1px solid var(--line); font-size:15px; align-items:center;">
+          <span style="font-family:var(--mono); font-size:14px; color:var(--text-3);">{{ ev.detected_at }}</span>
+          <span style="font-family:var(--mono); font-size:14px; color:var(--text-3);">{{ ev.severity }}</span>
+          <span style="font-weight:500;">{{ ev.rule_name }} <span style="color:var(--text-4); font-family:var(--mono); font-size:13px; font-weight:400;">({{ ev.rule_number }})</span></span>
+          <span style="font-family:var(--mono); font-size:14px; color:var(--text-2);">{{ ev.previous }} → <span style="color:var(--warn); font-weight:500;">{{ ev.current }}</span></span>
         </div>
       {% endfor %}
     </div>

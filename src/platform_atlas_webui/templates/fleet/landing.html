@@ -32,7 +32,7 @@
   <div>
     <div class="eyebrow"><span class="dot"></span> Fleet overview</div>
     <h1 class="text-[36px] leading-[1.05] font-semibold tracking-[-0.038em] mt-2 mb-1.5">Compliance at a glance</h1>
-    <p class="text-[14px] text-text-2 max-w-[64ch]">
+    <p class="text-[16px] text-text-2 max-w-[64ch]">
       Local-cache snapshot of every configured environment — last session age, pass rate, continuous-audit
       state, and unacked alerts. Read-only; this page never triggers a capture.
     </p>
@@ -118,7 +118,7 @@
 
 <section style="margin-top:18px;">
   <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:14px;">
-    <h3 style="margin:0; font-size:15px; font-weight:700;">Environments</h3>
+    <h3 style="margin:0; font-size:17px; font-weight:700;">Environments</h3>
     <span class="footnote" style="margin:0;">Sorted: stale + critical first · click a tile to drill in</span>
   </div>
   <div class="fleet-wall">
@@ -182,7 +182,7 @@
   </div>
 </section>
 
-<p style="color:var(--text-4); font-size:11px; margin-top:14px; text-align:center;">
+<p style="color:var(--text-4); font-size:13px; margin-top:14px; text-align:center;">
   Snapshot · {{ fleet_summary.last_activity_at or 'no activity yet' }}
 </p>
 

@@ -20,7 +20,7 @@ from platform_atlas.core.paths import ATLAS_ENVIRONMENTS_DIR
 
 _TOPOLOGY_FORM_FIELDS = (
     "deployment_mode", "iap_host", "mongo_host", "redis_host", "iag_host",
-    "saas_gateway_kind", "saas_gw4_ssh",
+    "saas_gateway_kind", "saas_gw4_ssh", "saas_gw5_same_host",
     "iap_host_ha", "iap_host_2", "iap_host_3",
     "mongo_host_ha", "mongo_host_2", "mongo_host_3",
     "redis_host_ha", "redis_host_2", "redis_host_3",
@@ -82,38 +82,24 @@ def _build_saas_topology(payload: dict[str, Any]) -> dict | None:
     except (TypeError, ValueError):
         ssh_port = 22
     ssh_key = (payload.get("ssh_key") or "").strip()
+    ssh_auth_method = (payload.get("ssh_auth_method") or "key").strip().lower()
+    if ssh_auth_method not in ("key", "password"):
+        ssh_auth_method = "key"
 
     def _gw_ssh_node(host: str, modules: list[str]) -> dict[str, Any]:
-        return {
+        n: dict[str, Any] = {
             "role": "iag", "host": host, "label": "iag-01",
             "transport": "ssh", "ssh_user": ssh_user, "ssh_port": ssh_port,
-            "ssh_key": ssh_key, "modules": modules,
+            "modules": modules,
         }
+        if ssh_auth_method == "password":
+            n["ssh_auth_method"] = "password"
+        elif ssh_key:
+            n["ssh_key"] = ssh_key
+        return n
 
     nodes: list[dict[str, Any]] = []
-    if kind == "gateway5":
-        source = (payload.get("gateway5_source") or "").strip().lower()
-        path = (payload.get("gateway5_source_path") or "").strip()
-        conf_path = (payload.get("gateway5_conf_path") or "").strip()
-        host = (payload.get("iag_host") or "").strip()
-        if source in ("compose", "helm") and path:
-            nodes.append({
-                "role": "iag", "host": "gateway5-file", "label": "iag5-file",
-                "transport": "gateway5_file", "gateway5_source_path": path,
-                "modules": ["gateway5"],
-            })
-        elif source == "conf" and host:
-            node = _gw_ssh_node(host, ["system", "gateway5", "filesystem"])
-            node["gateway5_conf_path"] = conf_path
-            nodes.append(node)
-        elif host:
-            nodes.append(_gw_ssh_node(host, ["system", "gateway5", "filesystem"]))
-        if not nodes:
-            raise ValueError(
-                "A SaaS Gateway 5 environment needs a source — an SSH host (for "
-                "printenv or the server gateway.conf), or a Compose / Helm file path."
-            )
-    else:  # gateway4
+    if kind in ("gateway4", "gw4-gw5"):
         host = (payload.get("iag_host") or "").strip()
         wants_ssh = (payload.get("saas_gw4_ssh") or "").strip().lower() in ("1", "on", "true", "yes")
         if wants_ssh and not host:
@@ -122,16 +108,61 @@ def _build_saas_topology(payload: dict[str, Any]) -> dict | None:
             )
         if wants_ssh and host:
             nodes.append(_gw_ssh_node(host, ["system", "gateway4", "filesystem"]))
-        if not nodes:
+        if kind == "gateway4" and not nodes:
             return None  # API-only GW4 — no topology needed
+
+    if kind in ("gateway5", "gw4-gw5"):
+        source = (payload.get("gateway5_source") or "").strip().lower()
+        path = (payload.get("gateway5_source_path") or "").strip()
+        conf_path = (payload.get("gateway5_conf_path") or "").strip()
+        same_host = (payload.get("saas_gw5_same_host") or "").strip().lower() in ("1", "on", "true", "yes")
+        host = (payload.get("iag_host") or "").strip()
+        if source in ("compose", "helm") and path:
+            nodes.append({
+                "role": "iag", "host": "gateway5-file", "label": "iag5-file",
+                "transport": "gateway5_file", "gateway5_source_path": path,
+                "modules": ["gateway5"],
+            })
+        elif same_host and nodes:
+            # Reuse the GW4 SSH node host; clone with GW5 modules.
+            gw4_node = nodes[0]
+            gw5_node = dict(gw4_node)
+            gw5_node["label"] = "iag5-01"
+            gw5_node["modules"] = ["system", "gateway5", "filesystem"]
+            if source == "conf":
+                gw5_node["gateway5_conf_path"] = conf_path
+            nodes.append(gw5_node)
+        elif source == "conf" and host:
+            node = _gw_ssh_node(host, ["system", "gateway5", "filesystem"])
+            node["gateway5_conf_path"] = conf_path
+            nodes.append(node)
+        elif host:
+            nodes.append(_gw_ssh_node(host, ["system", "gateway5", "filesystem"]))
+        gw5_count = sum(1 for n in nodes if "gateway5" in n.get("modules", []))
+        if kind == "gateway5" and not gw5_count:
+            raise ValueError(
+                "A SaaS Gateway 5 environment needs a source — an SSH host (for "
+                "printenv or the server gateway.conf), or a Compose / Helm file path."
+            )
+        if kind == "gw4-gw5" and not gw5_count:
+            raise ValueError(
+                "A GW4+GW5 environment needs a Gateway 5 source — an SSH host, "
+                "the same host as Gateway 4, or a Compose / Helm file path."
+            )
+
+    if not nodes:
+        return None  # API-only (should only happen for GW4-only after the block above)
 
     deployment: dict[str, Any] = {
         "mode": "gateway_only",
         "capture_scope": "primary_only",
         "nodes": nodes,
     }
-    if ssh_key and any(n.get("transport") == "ssh" for n in nodes):
-        deployment["ssh_defaults"] = {"key_path": ssh_key, "username": ssh_user, "port": ssh_port}
+    if any(n.get("transport") == "ssh" for n in nodes):
+        sd: dict[str, Any] = {"username": ssh_user, "port": ssh_port, "auth_method": ssh_auth_method}
+        if ssh_auth_method == "key" and ssh_key:
+            sd["key_path"] = ssh_key
+        deployment["ssh_defaults"] = sd
     return deployment
 
 
@@ -178,6 +209,9 @@ def build_topology_from_form(payload: dict[str, Any], existing: dict | None = No
     except (TypeError, ValueError):
         ssh_port = 22
     ssh_key = (payload.get("ssh_key") or "").strip()
+    ssh_auth_method = (payload.get("ssh_auth_method") or "key").strip().lower()
+    if ssh_auth_method not in ("key", "password"):
+        ssh_auth_method = "key"
 
     # IAP transport: applies to the primary IAP node in standalone and HA2.
     # Secondary/tertiary HA2 IAP slots are preserved-from-existing (same as
@@ -221,7 +255,9 @@ def build_topology_from_form(payload: dict[str, Any], existing: dict | None = No
             "ssh_user": ssh_user, "ssh_port": ssh_port,
             "primary": primary,
         }
-        if ssh_key:
+        if ssh_auth_method == "password":
+            n["ssh_auth_method"] = "password"
+        elif ssh_key:
             n["ssh_key"] = ssh_key
         return n
 
@@ -351,8 +387,10 @@ def build_topology_from_form(payload: dict[str, Any], existing: dict | None = No
             "nodes": nodes,
         }
 
-    if ssh_key:
-        deployment["ssh_defaults"] = {"key_path": ssh_key, "username": ssh_user, "port": ssh_port}
+    ssh_defaults: dict[str, Any] = {"username": ssh_user, "port": ssh_port, "auth_method": ssh_auth_method}
+    if ssh_auth_method == "key" and ssh_key:
+        ssh_defaults["key_path"] = ssh_key
+    deployment["ssh_defaults"] = ssh_defaults
     return deployment
 
 
@@ -362,19 +400,128 @@ def topology_summary(env_data: dict | None) -> dict:
     set so the template can render an empty/seed state."""
     deployment = (env_data or {}).get("deployment") or {}
     if not deployment:
-        return {"configured": False, "mode": "", "nodes": []}
+        return {"configured": False, "mode": "", "nodes": [], "has_control_master": False}
     mode = (deployment.get("mode") or "").strip()
     raw_nodes = deployment.get("nodes") or []
     nodes = []
+    has_cm = False
     for n in raw_nodes:
         if not isinstance(n, dict):
             continue
+        if (n.get("transport") or "") == "control_master":
+            has_cm = True
         nodes.append({
             "role": str(n.get("role") or "").lower(),
             "host": str(n.get("host") or ""),
             "primary": bool(n.get("primary")),
         })
-    return {"configured": True, "mode": mode, "nodes": nodes}
+    return {"configured": True, "mode": mode, "nodes": nodes, "has_control_master": has_cm}
+
+
+def cm_socket_status(env_data: dict | None) -> list[dict]:
+    """Return socket status for every ControlMaster node in ``env_data``.
+
+    Each entry: ``{label, status, path, target, ssh_cmd}`` where ``status``
+    is one of ``ok | missing | stale | unconfigured``.
+    """
+    import stat as _stat
+    import subprocess as _sp
+
+    deployment = (env_data or {}).get("deployment") or {}
+    raw_nodes = deployment.get("nodes") or []
+    cm_nodes = [
+        n for n in raw_nodes
+        if isinstance(n, dict) and (n.get("transport") or "") == "control_master"
+    ]
+
+    try:
+        from platform_atlas.core.context import ctx as _ctx
+        persist = f"{_ctx().config.control_persist_minutes}m"
+    except Exception:  # noqa: BLE001
+        persist = "60m"
+
+    results = []
+    for node in cm_nodes:
+        target = (node.get("ssh_control_target") or "").strip()
+        path = (node.get("ssh_control_socket") or "").strip()
+        label = (node.get("label") or node.get("role") or "node").strip()
+        try:
+            port = int(node.get("ssh_port") or 22)
+        except (TypeError, ValueError):
+            port = 22
+        port_arg = f"-p {port} " if port != 22 else ""
+        ssh_cmd = (
+            f"ssh -M -S {path} {port_arg}"
+            f"-o ControlPersist={persist} "
+            f"-o StrictHostKeyChecking=accept-new "
+            f"-o UserKnownHostsFile=/dev/null "
+            f"-fN {target}"
+        ) if path and target else ""
+
+        if not target:
+            results.append({"label": label, "status": "unconfigured", "path": path, "target": "", "ssh_cmd": ""})
+            continue
+        if not path:
+            results.append({"label": label, "status": "missing", "path": "", "target": target, "ssh_cmd": ""})
+            continue
+        p = Path(path)
+        if not p.exists():
+            results.append({"label": label, "status": "missing", "path": path, "target": target, "ssh_cmd": ssh_cmd})
+            continue
+        try:
+            if not _stat.S_ISSOCK(p.stat().st_mode):
+                results.append({"label": label, "status": "stale", "path": path, "target": target, "ssh_cmd": ssh_cmd})
+                continue
+        except OSError:
+            results.append({"label": label, "status": "stale", "path": path, "target": target, "ssh_cmd": ssh_cmd})
+            continue
+        try:
+            chk = _sp.run(
+                ["ssh", "-O", "check", "-S", path, target],
+                capture_output=True, text=True, timeout=5, check=False,
+            )
+            status = "ok" if chk.returncode == 0 else "stale"
+        except Exception:  # noqa: BLE001
+            status = "stale"
+        results.append({"label": label, "status": status, "path": path, "target": target, "ssh_cmd": ssh_cmd})
+
+    return results
+
+
+def clean_stale_sockets(env_data: dict | None) -> dict:
+    """Remove stale ControlMaster socket files from the filesystem.
+
+    Returns ``{cleaned: int, errors: list[str]}``.
+    """
+    statuses = cm_socket_status(env_data)
+    cleaned = 0
+    errors: list[str] = []
+    for s in statuses:
+        if s["status"] == "stale" and s["path"]:
+            p = Path(s["path"])
+            try:
+                p.unlink(missing_ok=True)
+                cleaned += 1
+            except OSError as exc:
+                errors.append(f"Could not remove {s['path']}: {exc}")
+    return {"cleaned": cleaned, "errors": errors}
+
+
+def store_ssh_password(env_name: str, backend: str, password: str) -> None:
+    """Write the SSH password into ``env_name``'s local secret store.
+
+    Direct-substrate write (mirrors ``store_ssh_passphrase``): the env being
+    edited may not be the active config, so ``active_secret_store()`` could
+    target the wrong backend. Vault-backed envs must not arrive here.
+    """
+    from platform_atlas.core.credentials import (
+        CredentialKey,
+        FileSecretStore,
+        KeyringSecretStore,
+        scoped_service_name,
+    )
+    substrate = FileSecretStore() if (backend or "").strip().lower() == "file" else KeyringSecretStore()
+    substrate.set(scoped_service_name(env_name), CredentialKey.SSH_PASSWORD.value, password)
 
 
 def store_ssh_passphrase(env_name: str, backend: str, passphrase: str) -> None:
@@ -486,11 +633,13 @@ def save_environment(payload: dict[str, Any]) -> Environment:
     base: dict[str, Any] = {}
     prior_tier = ""
     prior_kind = ""
+    prior_gateway_kind = ""
     if not creating:
         existing = mgr.load(name)
         base = existing.to_dict()
         prior_tier = (base.get("tier") or "").strip().lower()
         prior_kind = (base.get("saas_gateway_kind") or "").strip().lower()
+        prior_gateway_kind = (base.get("gateway_kind") or "").strip().lower()
 
     # Whitelist fields we accept from the form. Anything else is ignored.
     # ``organization_name`` is intentionally absent — it lives in the global
@@ -499,7 +648,7 @@ def save_environment(payload: dict[str, Any]) -> Environment:
     accepted = {
         "name", "description", "platform_uri",
         "platform_client_id", "credential_backend", "vault_secret_store", "tier",
-        "saas_gateway_kind",
+        "saas_gateway_kind", "gateway_kind",
         "gateway4_uri", "gateway4_username", "legacy_profile",
         "ssh_key",
         "values_yaml_path", "iag5_values_yaml_path",
@@ -535,6 +684,21 @@ def save_environment(payload: dict[str, Any]) -> Environment:
             "create a new environment to audit the other gateway."
         )
 
+    # "gw4-gw5" (dual-gateway) can only be set on a new environment. Editing an
+    # existing env that was ALREADY created as gw4-gw5 is fine (re-saving its own
+    # value); only setting it for the first time on an existing env is blocked.
+    if (not creating
+            and (base.get("gateway_kind") or "").strip().lower() == "gw4-gw5"
+            and prior_gateway_kind != "gw4-gw5"):
+        raise ValueError(
+            "Dual-gateway (GW4 + GW5) can only be configured on a new environment — "
+            "create a new environment to audit both gateways together."
+        )
+
+    # Strip empty gateway_kind (the "No Gateway" radio submits an empty string).
+    if not base.get("gateway_kind"):
+        base.pop("gateway_kind", None)
+
     # Legacy (2023.x) is a Platform concept — a SaaS environment audits a
     # standalone gateway and never carries the marker. Stripping it here
     # (not just hiding the form control) also self-heals stale data and
@@ -547,11 +711,11 @@ def save_environment(payload: dict[str, Any]) -> Environment:
     # per environment, fixed at create time).
     if (base.get("tier") or "").strip().lower() != "saas":
         base.pop("saas_gateway_kind", None)
-    elif (base.get("saas_gateway_kind") or "").strip().lower() not in ("gateway4", "gateway5"):
+    elif (base.get("saas_gateway_kind") or "").strip().lower() not in ("gateway4", "gateway5", "gw4-gw5"):
         raise ValueError(
-            "A SaaS environment needs a gateway kind — Gateway 4 or Gateway 5."
+            "A SaaS environment needs a gateway kind — Gateway 4, Gateway 5, or both."
         )
-    elif (base.get("saas_gateway_kind") or "").strip().lower() == "gateway4" \
+    elif (base.get("saas_gateway_kind") or "").strip().lower() in ("gateway4", "gw4-gw5") \
             and not (base.get("gateway4_uri") or "").strip():
         raise ValueError(
             "A SaaS Gateway 4 environment needs the Gateway 4 API URL — the "

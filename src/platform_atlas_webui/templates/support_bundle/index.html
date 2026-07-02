@@ -52,7 +52,7 @@
   color: var(--bad);
 }
 .phase-label {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--text-4);
   font-weight: 500;
   text-align: center;
@@ -80,7 +80,7 @@
 /* ── Live status message ───────────────────────────────────────── */
 .sb-status-msg {
   text-align: center;
-  font-size: 13.5px;
+  font-size: 16px;
   color: var(--text-2);
   min-height: 20px;
   line-height: 1.5;
@@ -94,7 +94,7 @@
   align-items: center;
   gap: 6px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-3);
   user-select: none;
   list-style: none;
@@ -102,7 +102,7 @@
 }
 .sb-log-toggle::-webkit-details-marker { display: none; }
 .sb-log-toggle .sb-toggle-arrow {
-  font-size: 8px;
+  font-size: 10px;
   transition: transform 0.2s;
   display: inline-block;
   color: var(--text-4);
@@ -114,7 +114,7 @@
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 10px 12px;
-  font-size: 11.5px;
+  font-size: 13px;
   font-family: var(--font-mono, "JetBrains Mono", monospace);
   line-height: 1.6;
   margin-top: 4px;
@@ -126,7 +126,7 @@
 .rl-warning { color: var(--warn); }
 .rl-phase   { color: var(--accent); font-weight: 600; margin-top: 2px; }
 .rl-info    { color: var(--text-3); }
-.rl-debug   { color: var(--text-4); font-size: 10.5px; }
+.rl-debug   { color: var(--text-4); font-size: 12px; }
 .rl-status  { color: var(--text-4); }
 
 /* ── Success / error hero ──────────────────────────────────────── */
@@ -189,32 +189,32 @@
 }
 .sbap-head { padding: 18px 20px 0; }
 .sbap-head-row { display: flex; align-items: flex-start; gap: 12px; }
-.sbap-title { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
-.sbap-subtitle { margin: 2px 0 0; font-size: 12px; color: var(--text-3); }
+.sbap-title { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+.sbap-subtitle { margin: 2px 0 0; font-size: 14px; color: var(--text-3); }
 .sbap-x { width: 30px; height: 30px; flex: 0 0 auto; border-radius: var(--r-md);
   border: 1px solid var(--line); background: var(--surface); color: var(--text-3);
-  display: grid; place-items: center; cursor: pointer; font-size: 13px; }
+  display: grid; place-items: center; cursor: pointer; font-size: 15px; }
 .sbap-x:hover { background: var(--surface-2); color: var(--text); }
 .sbap-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .sbap-tab { position: relative; display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px;
   border-radius: var(--r-md); border: 1px solid transparent; background: transparent;
-  color: var(--text-2); font-family: var(--ui); font-size: 13px; font-weight: 500;
+  color: var(--text-2); font-family: var(--ui); font-size: 15px; font-weight: 500;
   cursor: pointer; transition: background .14s, color .14s; }
 .sbap-tab:hover { background: var(--surface-2); }
 .sbap-tab.is-active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 .sbap-tic { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 7px;
   background: var(--accent-soft); color: var(--accent); flex: 0 0 auto; }
 .sbap-tab.is-active .sbap-tic { background: var(--accent); color: #fff; }
-.sbap-tabcount { font-size: 11px; opacity: 0.7; }
+.sbap-tabcount { font-size: 13px; opacity: 0.7; }
 .sbap-tabsel { position: absolute; top: -5px; right: -4px; display: grid; place-items: center;
   background: var(--accent); color: #fff; border-radius: 999px; padding: 0 5px;
-  font-size: 10px; font-weight: 700; min-width: 16px; height: 16px;
+  font-size: 12px; font-weight: 700; min-width: 16px; height: 16px;
   box-shadow: 0 0 0 2px var(--surface); }
 .sbap-toolbar { padding: 12px 16px; }
 .sbap-srch { position: relative; }
-.sbap-srch .sbap-mg { position: absolute; left: 13px; top: 9px; color: var(--text-4); pointer-events: none; font-size: 15px; }
+.sbap-srch .sbap-mg { position: absolute; left: 13px; top: 9px; color: var(--text-4); pointer-events: none; font-size: 17px; }
 .sbap-srch input { width: 100%; height: 38px; border: 1px solid var(--line); border-radius: var(--r-md);
-  background: var(--bg-2); color: var(--text); font-family: var(--ui); font-size: 13px;
+  background: var(--bg-2); color: var(--text); font-family: var(--ui); font-size: 15px;
   padding: 0 14px 0 36px; outline: none; transition: border-color .15s, box-shadow .15s, background .15s; }
 .sbap-srch input:focus { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px var(--accent-soft); }
 .sbap-list { flex: 1; overflow-y: auto; padding: 2px 8px 8px; min-height: 0; }
@@ -231,24 +231,24 @@
 .sbap-cbx::after { content: ""; position: absolute; left: 5px; top: 1.5px; width: 5px; height: 9px;
   border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg) scale(0); transition: transform .12s; }
 .sbap-row.is-sel .sbap-cbx::after { transform: rotate(45deg) scale(1); }
-.sbap-rowname { flex: 1; min-width: 0; font-size: 13px; font-weight: 500; color: var(--text);
+.sbap-rowname { flex: 1; min-width: 0; font-size: 15px; font-weight: 500; color: var(--text);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sbap-rowmeta { font-size: 11px; color: var(--text-4); font-family: var(--mono); flex-shrink: 0; }
-.sbap-empty { text-align: center; color: var(--text-4); font-size: 13px; padding: 40px 16px; line-height: 1.5; }
+.sbap-rowmeta { font-size: 13px; color: var(--text-4); font-family: var(--mono); flex-shrink: 0; }
+.sbap-empty { text-align: center; color: var(--text-4); font-size: 15px; padding: 40px 16px; line-height: 1.5; }
 .sbap-foot { display: flex; align-items: center; gap: 12px; padding: 12px 16px;
   border-top: 1px solid var(--line); background: var(--bg-2); }
 .sbap-pager { display: flex; align-items: center; gap: 8px; }
 .sbap-pgbtn { height: 30px; padding: 0 12px; border-radius: var(--r-md); border: 1px solid var(--line);
-  background: var(--surface); color: var(--text-2); font-family: var(--ui); font-size: 12px; cursor: pointer; }
+  background: var(--surface); color: var(--text-2); font-family: var(--ui); font-size: 14px; cursor: pointer; }
 .sbap-pgbtn:hover:not([disabled]) { background: var(--surface-2); }
 .sbap-pgbtn[disabled] { opacity: 0.45; cursor: not-allowed; }
-.sbap-pginfo { font-size: 11.5px; color: var(--text-4); }
+.sbap-pginfo { font-size: 13px; color: var(--text-4); }
 .sbap-foot-r { margin-left: auto; display: flex; align-items: center; gap: 10px; }
 .sbap-countpill { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px;
-  border-radius: 999px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; }
-.sbap-sel-lbl { font-size: 12.5px; color: var(--text-3); }
+  border-radius: 999px; background: var(--accent); color: #fff; font-size: 13px; font-weight: 700; }
+.sbap-sel-lbl { font-size: 14px; color: var(--text-3); }
 .sbap-linkbtn { background: none; border: none; cursor: pointer; color: var(--text-3);
-  font-size: 12.5px; font-family: var(--ui); padding: 0 2px; }
+  font-size: 14px; font-family: var(--ui); padding: 0 2px; }
 .sbap-linkbtn:hover { color: var(--bad); }
 
 /* ── Collect-bundle form inputs: pin legible text + placeholder ─────
@@ -268,7 +268,7 @@
   <div>
     <div class="eyebrow"><span class="dot"></span> Diagnostics</div>
     <h1 class="text-[36px] leading-[1.05] font-semibold tracking-[-0.038em] mt-2 mb-1.5">Support Bundle</h1>
-    <p class="text-[14px] text-text-2 max-w-[64ch]">
+    <p class="text-[16px] text-text-2 max-w-[64ch]">
       Collect Platform health endpoints, logs, system info, and a redacted Atlas config snapshot
       into a single ZIP — attach it to your Itential support ticket.
     </p>
@@ -529,7 +529,7 @@
         <h2 class="m-0 mb-1 text-[24px] font-semibold tracking-[-0.025em]" style="color: var(--ok);">
           Bundle ready
         </h2>
-        <p class="text-[13px] text-text-2 m-0 max-w-[44ch] leading-relaxed">
+        <p class="text-[15px] text-text-2 m-0 max-w-[44ch] leading-relaxed">
           Your support bundle is assembled and ready to download.
         </p>
 
@@ -537,28 +537,28 @@
         <div class="sb-file-card">
           <div class="flex items-start justify-between gap-4 mb-3">
             <div class="min-w-0">
-              <div class="text-[10px] font-semibold text-text-4 uppercase tracking-[0.08em] mb-1">Filename</div>
-              <div class="text-[13px] font-mono text-text leading-snug break-all">{{ job.result.bundle_name }}</div>
+              <div class="text-[12px] font-semibold text-text-4 uppercase tracking-[0.08em] mb-1">Filename</div>
+              <div class="text-[15px] font-mono text-text leading-snug break-all">{{ job.result.bundle_name }}</div>
             </div>
             <div class="text-right shrink-0">
-              <div class="text-[10px] font-semibold text-text-4 uppercase tracking-[0.08em] mb-1">Size</div>
-              <div class="text-[13px] font-mono text-text">{{ job.result.size_kb }}&nbsp;KB</div>
+              <div class="text-[12px] font-semibold text-text-4 uppercase tracking-[0.08em] mb-1">Size</div>
+              <div class="text-[15px] font-mono text-text">{{ job.result.size_kb }}&nbsp;KB</div>
             </div>
           </div>
 
           <div class="border-t border-line pt-3">
-            <div class="text-[10px] font-semibold text-text-4 uppercase tracking-[0.08em] mb-2">Contents</div>
+            <div class="text-[12px] font-semibold text-text-4 uppercase tracking-[0.08em] mb-2">Contents</div>
             <div class="flex flex-col gap-1.5">
               {% for item in (job.result.collected or []) %}
               <div class="flex items-center gap-2">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--ok);flex-shrink:0;"><polyline points="20 6 9 17 4 12"/></svg>
-                <span class="text-[12.5px] text-text-2">{{ item }}</span>
+                <span class="text-[14px] text-text-2">{{ item }}</span>
               </div>
               {% endfor %}
               {% for err in (job.result.errors or []) %}
               <div class="flex items-center gap-2">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--warn);flex-shrink:0;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                <span class="text-[12px]" style="color:var(--warn);">{{ err }}</span>
+                <span class="text-[14px]" style="color:var(--warn);">{{ err }}</span>
               </div>
               {% endfor %}
             </div>
@@ -568,18 +568,18 @@
         {# Download button + links #}
         <div class="flex flex-col items-center gap-2 mt-4 w-full max-w-[500px]">
           <a class="btn primary w-full"
-             style="justify-content:center;font-size:14px;padding:10px 20px;border-radius:8px;gap:8px;"
+             style="justify-content:center;font-size:16px;padding:10px 20px;border-radius:8px;gap:8px;"
              href="/support-bundle/download/{{ job.id }}"
              download="{{ job.result.bundle_name }}"
              hx-boost="false">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Download {{ job.result.bundle_name }}
           </a>
-          <p class="text-[11.5px] text-text-4 m-0 text-center leading-relaxed">
+          <p class="text-[13px] text-text-4 m-0 text-center leading-relaxed">
             Single-use — the file is removed from the server after download.
             Save it before navigating away.
           </p>
-          <div class="flex items-center gap-3 text-[12.5px]">
+          <div class="flex items-center gap-3 text-[14px]">
             <a href="/support-bundle" class="text-accent hover:underline">Collect another</a>
             <span class="text-text-4">·</span>
             <a href="/jobs/{{ job.id }}" class="text-text-3 hover:text-accent hover:underline">View full output</a>
@@ -609,11 +609,11 @@
         </h2>
 
         {% if job.error %}
-        <p class="text-[13px] text-text-2 m-0 mb-6 max-w-[38ch] leading-relaxed">{{ job.error }}</p>
+        <p class="text-[15px] text-text-2 m-0 mb-6 max-w-[38ch] leading-relaxed">{{ job.error }}</p>
         {% elif job.result and not job.result.ok and job.result.error %}
-        <p class="text-[13px] text-text-2 m-0 mb-6 max-w-[38ch] leading-relaxed">{{ job.result.error }}</p>
+        <p class="text-[15px] text-text-2 m-0 mb-6 max-w-[38ch] leading-relaxed">{{ job.result.error }}</p>
         {% else %}
-        <p class="text-[13px] text-text-2 m-0 mb-6">An error occurred while building the support bundle.</p>
+        <p class="text-[15px] text-text-2 m-0 mb-6">An error occurred while building the support bundle.</p>
         {% endif %}
 
         <div class="flex items-center gap-3">
@@ -633,6 +633,40 @@
 {# ════════════════════════════════════════════════════════════════ #}
 {% else %}
 
+{# ── Active environment context bar ─────────────────────────── #}
+<div class="mb-5 border border-line rounded-xl bg-surface-2 px-5 py-4">
+  <div class="flex items-center gap-2 mb-3">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="text-accent flex-shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    <span class="text-[13px] font-semibold text-text-2 uppercase tracking-[0.07em]">Active environment — confirm before collecting</span>
+  </div>
+  <div class="flex flex-wrap gap-x-8 gap-y-2.5 text-[15px]">
+    <div class="flex flex-col gap-0.5">
+      <span class="text-[12px] font-semibold text-text-4 uppercase tracking-[0.07em]">Environment</span>
+      <span class="font-mono font-semibold text-text">{{ active_env or '—' }}</span>
+    </div>
+    <div class="flex flex-col gap-0.5">
+      <span class="text-[12px] font-semibold text-text-4 uppercase tracking-[0.07em]">Tier</span>
+      <span class="text-text">{{ tier | capitalize }}</span>
+    </div>
+    {% for conn in connections %}
+    <div class="flex flex-col gap-0.5">
+      <span class="text-[12px] font-semibold text-text-4 uppercase tracking-[0.07em]">{{ conn.label }}</span>
+      <span class="font-mono text-text-2">{{ conn.value }}</span>
+    </div>
+    {% endfor %}
+    {% if not active_env %}
+    <div class="flex items-center text-[14px] text-warn italic">
+      No environment is active — bundle will use the default config.
+    </div>
+    {% endif %}
+  </div>
+  <p class="text-[13px] text-text-4 mt-3 m-0">
+    If this isn't the right environment, switch it first via
+    <a href="/environments" class="text-accent hover:underline">Environments</a>
+    before collecting the bundle.
+  </p>
+</div>
+
 <div class="grid grid-cols-1 lg:grid-cols-[1fr_296px] gap-4 items-start">
 
   <section class="card">
@@ -646,7 +680,7 @@
 
         <div>
           <label for="sb-ticket"
-                 class="block text-[11px] font-semibold text-text-3 uppercase tracking-[0.07em] mb-1.5">
+                 class="block text-[13px] font-semibold text-text-3 uppercase tracking-[0.07em] mb-1.5">
             Support ticket number
           </label>
           <input type="text" id="sb-ticket" name="ticket"
@@ -654,8 +688,8 @@
                  title="Enter ISD- followed by 4 or 5 digits (e.g. ISD-1234)"
                  value="ISD-" placeholder="ISD-1234"
                  autocomplete="off" spellcheck="false"
-                 class="w-full text-[13px] font-mono px-3 py-2 bg-surface-2 border border-line rounded-md focus:border-accent focus:outline-none">
-          <p class="text-[11px] text-text-4 mt-1 m-0">
+                 class="w-full text-[15px] font-mono px-3 py-2 bg-surface-2 border border-line rounded-md focus:border-accent focus:outline-none">
+          <p class="text-[13px] text-text-4 mt-1 m-0">
             Appears in the ZIP filename and manifest —
             e.g. <code class="font-mono">atlas-support-bundle-ISD-1234-…zip</code>
           </p>
@@ -663,32 +697,32 @@
 
         <div>
           <label for="sb-desc"
-                 class="block text-[11px] font-semibold text-text-3 uppercase tracking-[0.07em] mb-1.5">
+                 class="block text-[13px] font-semibold text-text-3 uppercase tracking-[0.07em] mb-1.5">
             Description
             <span class="text-text-4 font-normal normal-case tracking-normal">(optional)</span>
           </label>
           <textarea id="sb-desc" name="description" rows="3" maxlength="512"
                     placeholder="Brief description of the issue…"
-                    class="w-full text-[13px] px-3 py-2 bg-surface-2 border border-line rounded-md focus:border-accent focus:outline-none resize-y"></textarea>
+                    class="w-full text-[15px] px-3 py-2 bg-surface-2 border border-line rounded-md focus:border-accent focus:outline-none resize-y"></textarea>
         </div>
 
         <div>
           <label for="sb-days"
-                 class="block text-[11px] font-semibold text-text-3 uppercase tracking-[0.07em] mb-1.5">
+                 class="block text-[13px] font-semibold text-text-3 uppercase tracking-[0.07em] mb-1.5">
             Log window
           </label>
           <div class="flex items-center gap-2">
             <input type="number" id="sb-days" name="log_days" value="7" min="1" max="30"
-                   class="w-24 text-[13px] font-mono px-3 py-2 bg-surface-2 border border-line rounded-md focus:border-accent focus:outline-none">
-            <span class="text-[13px] text-text-3">days</span>
+                   class="w-24 text-[15px] font-mono px-3 py-2 bg-surface-2 border border-line rounded-md focus:border-accent focus:outline-none">
+            <span class="text-[15px] text-text-3">days</span>
           </div>
           {% if tier != 'extended' %}
-          <p class="text-[11px] text-text-4 mt-1 m-0 italic">
+          <p class="text-[13px] text-text-4 mt-1 m-0 italic">
             SSH logs require Extended tier — this setting is unused in
             {{ 'a SaaS gateway audit' if tier == 'saas' else 'Standard mode' }}.
           </p>
           {% else %}
-          <p class="text-[11px] text-text-4 mt-1 m-0">
+          <p class="text-[13px] text-text-4 mt-1 m-0">
             Look back this many days when fetching platform, webserver, and MongoDB logs via SSH.
           </p>
           {% endif %}
@@ -696,11 +730,11 @@
 
         {# ── Platform assets (optional) ─────────────────────────── #}
         <div class="border-t border-line pt-4">
-          <div class="text-[11px] font-semibold text-text-3 uppercase tracking-[0.07em]">
+          <div class="text-[13px] font-semibold text-text-3 uppercase tracking-[0.07em]">
             Platform assets
             <span class="text-text-4 font-normal normal-case tracking-normal">(optional)</span>
           </div>
-          <p class="text-[11px] text-text-4 mt-1 mb-2 m-0">
+          <p class="text-[13px] text-text-4 mt-1 mb-2 m-0">
             Export Workflows, JST Transformations, JSON Forms or whole Projects from
             <span class="font-mono">{{ active_env or 'this environment' }}</span> into the
             bundle — exported as-is from the Platform.
@@ -711,7 +745,7 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               <span data-label>Add Platform assets</span>
             </button>
-            <span class="chip text-[11px]" id="sbap-chip" style="display:none;"><span id="sbap-chip-count">0</span>&nbsp;selected</span>
+            <span class="chip text-[13px]" id="sbap-chip" style="display:none;"><span id="sbap-chip-count">0</span>&nbsp;selected</span>
           </div>
         </div>
 
@@ -724,11 +758,11 @@
 
   <aside class="card">
     <div class="card-head"><h3>What's collected</h3></div>
-    <div class="card-body flex flex-col gap-4 text-[13px]">
+    <div class="card-body flex flex-col gap-4 text-[15px]">
 
       <div>
-        <div class="font-semibold text-text mb-1 text-[12.5px]">Platform health endpoints</div>
-        <div class="text-[11.5px] text-text-3 leading-relaxed">
+        <div class="font-semibold text-text mb-1 text-[14px]">Platform health endpoints</div>
+        <div class="text-[13px] text-text-3 leading-relaxed">
           <code class="font-mono">/health/status</code> ·
           <code class="font-mono">/health/server</code> ·
           <code class="font-mono">/health/adapters</code> ·
@@ -738,35 +772,35 @@
       </div>
 
       <div>
-        <div class="font-semibold text-text mb-1 text-[12.5px]">Atlas config (redacted)</div>
-        <div class="text-[11.5px] text-text-3">Active config snapshot — credentials replaced with <code class="font-mono">***</code></div>
+        <div class="font-semibold text-text mb-1 text-[14px]">Atlas config (redacted)</div>
+        <div class="text-[13px] text-text-3">Active config snapshot — credentials replaced with <code class="font-mono">***</code></div>
       </div>
 
       <div>
         <div class="flex items-center gap-1.5 mb-1">
-          <span class="font-semibold text-text text-[12.5px]">Platform assets</span>
-          <span class="chip text-[10px]">optional</span>
+          <span class="font-semibold text-text text-[14px]">Platform assets</span>
+          <span class="chip text-[12px]">optional</span>
         </div>
-        <div class="text-[11.5px] text-text-3">Workflows, JST, JSON Forms or whole Projects you pick — exported as-is into <code class="font-mono">exports/</code></div>
+        <div class="text-[13px] text-text-3">Workflows, JST, JSON Forms or whole Projects you pick — exported as-is into <code class="font-mono">exports/</code></div>
       </div>
 
       {% if tier == 'extended' %}
       <div>
         <div class="flex items-center gap-1.5 mb-1">
-          <span class="font-semibold text-text text-[12.5px]">SSH logs</span>
-          <span class="chip text-[10px]">Extended</span>
+          <span class="font-semibold text-text text-[14px]">SSH logs</span>
+          <span class="chip text-[12px]">Extended</span>
         </div>
-        <div class="text-[11.5px] text-text-3">Platform, webserver, and MongoDB log analysis from the primary IAP node</div>
+        <div class="text-[13px] text-text-3">Platform, webserver, and MongoDB log analysis from the primary IAP node</div>
       </div>
       <div>
         <div class="flex items-center gap-1.5 mb-1">
-          <span class="font-semibold text-text text-[12.5px]">System info</span>
-          <span class="chip text-[10px]">Extended</span>
+          <span class="font-semibold text-text text-[14px]">System info</span>
+          <span class="chip text-[12px]">Extended</span>
         </div>
-        <div class="text-[11.5px] text-text-3">OS version, memory, disk, CPU, and uptime</div>
+        <div class="text-[13px] text-text-3">OS version, memory, disk, CPU, and uptime</div>
       </div>
       {% else %}
-      <div class="text-[11.5px] text-text-4 italic border-t border-line pt-3">
+      <div class="text-[13px] text-text-4 italic border-t border-line pt-3">
         {% if tier == 'saas' %}
           A SaaS gateway audit bundles the Atlas config snapshot only — there are no Platform/MongoDB log sources.
         {% else %}
@@ -775,7 +809,7 @@
       </div>
       {% endif %}
 
-      <div class="border-t border-line pt-3 text-[11px] text-text-4 leading-relaxed">
+      <div class="border-t border-line pt-3 text-[13px] text-text-4 leading-relaxed">
         All passwords, tokens, and secrets are redacted before bundling.
         The ZIP is written to a temp file and removed after download.
       </div>
@@ -896,7 +930,7 @@
     if (!listEl) return;
     var st = cur();
     if (st.loading && !st.items.length) { listEl.innerHTML = '<div class="sbap-empty">Loading…</div>'; return; }
-    if (st.error) { listEl.innerHTML = '<div class="sbap-empty">⚠ Couldn’t reach the Platform.<br><span style="font-size:11px;color:var(--text-4)">' + esc(st.error) + '</span></div>'; return; }
+    if (st.error) { listEl.innerHTML = '<div class="sbap-empty">⚠ Couldn’t reach the Platform.<br><span style="font-size:13px;color:var(--text-4)">' + esc(st.error) + '</span></div>'; return; }
     if (!st.items.length) { listEl.innerHTML = '<div class="sbap-empty">No matches.</div>'; return; }
     var m = cart[active] || {};
     listEl.innerHTML = st.items.map(function (it) {

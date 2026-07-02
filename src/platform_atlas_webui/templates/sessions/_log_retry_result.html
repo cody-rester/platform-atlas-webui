@@ -1,21 +1,21 @@
 {# Fragment returned by POST /sessions/<name>/retry-log-capture.
    Replaces the inner body of the per-module retry card. #}
 {% if ok %}
-  <div class="flex items-start gap-2.5 text-[12.5px]">
+  <div class="flex items-start gap-2.5 text-[14px]">
     <span class="text-ok shrink-0 mt-px">✓</span>
     <div class="flex-1 min-w-0">
       <div class="font-medium text-text">{{ message }}</div>
       {% if custom_path %}
-        <div class="text-text-3 font-mono text-[11.5px] mt-0.5 break-all">{{ custom_path }}</div>
+        <div class="text-text-3 font-mono text-[13px] mt-0.5 break-all">{{ custom_path }}</div>
       {% endif %}
       {% if persisted %}
-        <div class="text-text-3 text-[11.5px] mt-1">
+        <div class="text-text-3 text-[13px] mt-1">
           Saved to the active environment — future captures use this path automatically.
         </div>
       {% elif persist_error %}
-        <div class="text-warn text-[11.5px] mt-1">{{ persist_error }}</div>
+        <div class="text-warn text-[13px] mt-1">{{ persist_error }}</div>
       {% endif %}
-      <div class="text-text-3 text-[11.5px] mt-1.5">
+      <div class="text-text-3 text-[13px] mt-1.5">
         Re-run validate to incorporate the recovered log data.
       </div>
     </div>
@@ -27,15 +27,15 @@
         class="flex flex-col gap-2">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <input type="hidden" name="module" value="{{ module }}">
-    <div class="flex items-start gap-2 text-bad text-[12px]">
+    <div class="flex items-start gap-2 text-bad text-[14px]">
       <span class="shrink-0 mt-px">✗</span>
       <span class="flex-1">{{ message }}</span>
     </div>
     <input type="text" name="custom_path" value="{{ custom_path }}" required
            autocomplete="off" spellcheck="false"
            pattern="/.*" title="Absolute path required (must start with /)"
-           class="w-full text-[12px] font-mono px-2 py-1.5 bg-bg border border-line rounded-md focus:border-accent focus:outline-none">
-    <p class="text-[11px] text-text-3 m-0">
+           class="w-full text-[14px] font-mono px-2 py-1.5 bg-bg border border-line rounded-md focus:border-accent focus:outline-none">
+    <p class="text-[13px] text-text-3 m-0">
       Successful paths are saved to the active environment automatically.
     </p>
     <button class="btn sm" type="submit">Retry</button>

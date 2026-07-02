@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Form, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
@@ -179,6 +180,8 @@ async def check_ssh_connection(
     saas_ssh_port: str = Form(""),
     saas_ssh_key: str = Form(""),
     saas_ssh_passphrase: str = Form(""),
+    saas_ssh_auth_method: str = Form("key"),
+    saas_ssh_password: str = Form(""),
     env_name: str = Form(""),
 ) -> HTMLResponse:
     """HTMX endpoint: attempt an SSH connection with the form's current values.
@@ -197,6 +200,8 @@ async def check_ssh_connection(
         username=saas_ssh_user,
         key_path=saas_ssh_key,
         passphrase=saas_ssh_passphrase,
+        password=saas_ssh_password,
+        auth_method=saas_ssh_auth_method,
         env_name=env_name,
     )
     ok_style = "color:var(--green,#4ade80); font-size:12px; font-weight:500;"
@@ -289,7 +294,9 @@ async def save_environment(
     platform_client_id: str = Form(""),
     tier: str = Form("extended"),
     saas_gateway_kind: str = Form(""),
+    gateway_kind: str = Form(""),
     saas_gw4_ssh: str = Form(""),
+    saas_gw5_same_host: str = Form(""),
     saas_gw5_source: str = Form(""),
     saas_gw5_source_path: str = Form(""),
     saas_gw5_conf_path: str = Form(""),
@@ -298,7 +305,11 @@ async def save_environment(
     saas_ssh_port: str = Form(""),
     saas_ssh_key: str = Form(""),
     saas_ssh_passphrase: str = Form(""),
+    saas_ssh_auth_method: str = Form("key"),
+    saas_ssh_password: str = Form(""),
     ssh_passphrase: str = Form(""),
+    ssh_auth_method: str = Form("key"),
+    ssh_password: str = Form(""),
     credential_backend: str = Form("keyring"),
     vault_secret_store: str = Form("keyring"),
     gateway4_uri: str = Form(""),
@@ -368,7 +379,9 @@ async def save_environment(
         "platform_client_id": platform_client_id,
         "tier": tier or None,
         "saas_gateway_kind": saas_gateway_kind,
+        "gateway_kind": gateway_kind,
         "saas_gw4_ssh": saas_gw4_ssh,
+        "saas_gw5_same_host": saas_gw5_same_host,
         "credential_backend": credential_backend,
         # Only meaningful for Vault; None for the local backends so it stays out
         # of the env overlay.
@@ -405,6 +418,7 @@ async def save_environment(
         "gateway5_conf_path": gateway5_conf_path,
         "ssh_user": ssh_user,
         "ssh_port": ssh_port,
+        "ssh_auth_method": ssh_auth_method,
         "iap_transport": iap_transport,
         "iap_cm_socket": iap_cm_socket,
         "iap_cm_target": iap_cm_target,
@@ -418,6 +432,7 @@ async def save_environment(
         payload["ssh_user"] = saas_ssh_user
         payload["ssh_port"] = saas_ssh_port
         payload["ssh_key"] = (saas_ssh_key or ssh_key).strip()
+        payload["ssh_auth_method"] = saas_ssh_auth_method
         payload["gateway5_source"] = saas_gw5_source
         payload["gateway5_source_path"] = saas_gw5_source_path
         payload["gateway5_conf_path"] = saas_gw5_conf_path
@@ -457,6 +472,7 @@ async def save_environment(
     # put it). Blank means "keep whatever is already stored" — the form
     # never echoes the secret back.
     typed_passphrase = saas_ssh_passphrase if posted_tier == "saas" else ssh_passphrase
+    typed_password = saas_ssh_password if posted_tier == "saas" else ssh_password
     backend_choice = (credential_backend or "keyring").strip().lower()
     passphrase_failed = False
     if typed_passphrase and backend_choice in ("keyring", "file"):
@@ -466,6 +482,12 @@ async def save_environment(
             logger.exception("SSH passphrase store failed for env '%s' (backend=%s)",
                              env.name, backend_choice)
             passphrase_failed = True
+    if typed_password and backend_choice in ("keyring", "file"):
+        try:
+            env_svc.store_ssh_password(env.name, backend_choice, typed_password)
+        except Exception:  # noqa: BLE001 — env is saved; don't fail the request
+            logger.exception("SSH password store failed for env '%s' (backend=%s)",
+                             env.name, backend_choice)
 
     target = f"/environments/{env.name}"
     params = []
@@ -510,6 +532,59 @@ async def activate_environment(name: str, next: str = Form("")):
         pass
     target = _safe_next_url(next) or "/environments"
     return RedirectResponse(url=target, status_code=303)
+
+
+@router.get("/{name}/sockets", response_class=HTMLResponse)
+async def view_sockets(
+    request: Request,
+    name: str,
+    cleaned: int = Query(0),
+    clean_errors: str = Query(""),
+) -> HTMLResponse:
+    """ControlMaster socket status page. Redirects to env detail if no CM nodes."""
+    env = env_svc.get_environment(name)
+    if env is None:
+        raise HTTPException(status_code=404, detail=f"Environment '{name}' not found")
+
+    sockets = await run_in_threadpool(env_svc.cm_socket_status, env.get("data"))
+    if not sockets:
+        return RedirectResponse(url=f"/environments/{name}", status_code=303)
+
+    flash = None
+    if cleaned > 0:
+        flash = {"kind": "success", "message": f"Removed {cleaned} stale socket file{'s' if cleaned != 1 else ''}."}
+    elif cleaned == 0 and request.query_params.get("cleaned") is not None:
+        flash = {"kind": "info", "message": "No stale sockets to clean."}
+    if clean_errors:
+        flash = {"kind": "error", "message": clean_errors}
+
+    return _templates.TemplateResponse(
+        request,
+        "environments/sockets.html",
+        template_context(
+            request,
+            atlas_version=ATLAS_VERSION,
+            environment=env,
+            sockets=sockets,
+            flash=flash,
+        ),
+    )
+
+
+@router.post("/{name}/sockets/clean")
+async def clean_sockets(name: str):
+    env = env_svc.get_environment(name)
+    if env is None:
+        raise HTTPException(status_code=404, detail=f"Environment '{name}' not found")
+
+    result = await run_in_threadpool(env_svc.clean_stale_sockets, env.get("data"))
+    qs: dict[str, str] = {"cleaned": str(result["cleaned"])}
+    if result["errors"]:
+        qs["clean_errors"] = result["errors"][0]
+    return RedirectResponse(
+        url=f"/environments/{name}/sockets?" + urlencode(qs),
+        status_code=303,
+    )
 
 
 @router.post("/{name}/delete")

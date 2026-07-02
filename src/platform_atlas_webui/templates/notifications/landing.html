@@ -7,7 +7,7 @@
   <div>
     <div class="eyebrow"><span class="dot"></span> Outbound channels</div>
     <h1 class="text-[36px] leading-[1.05] font-semibold tracking-[-0.038em] mt-2 mb-1.5">Notifications</h1>
-    <p class="text-[14px] text-text-2 max-w-[64ch]">
+    <p class="text-[16px] text-text-2 max-w-[64ch]">
       Slack incoming-webhooks and generic webhooks receive drift events from continuous audit when a new
       alert is created or an acknowledged alert re-opens. Channels are scoped per environment so you can
       route production drift to a paging channel without spamming staging.
@@ -47,14 +47,14 @@
           </span>
         </div>
       {% else %}
-        <table class="data-table" style="width:100%; border-collapse:collapse; font-size:13px;">
+        <table class="data-table" style="width:100%; border-collapse:collapse; font-size:15px;">
           <thead>
             <tr style="background: var(--surface-2);">
-              <th style="text-align:left; padding:10px 14px; color:var(--text-3); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.04em;">Type</th>
-              <th style="text-align:left; padding:10px 14px; color:var(--text-3); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.04em;">Name</th>
-              <th style="text-align:left; padding:10px 14px; color:var(--text-3); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.04em;">URL</th>
-              <th style="text-align:left; padding:10px 14px; color:var(--text-3); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.04em;">Signed</th>
-              <th style="text-align:right; padding:10px 14px; color:var(--text-3); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.04em;">Actions</th>
+              <th style="text-align:left; padding:10px 14px; color:var(--text-3); font-weight:600; font-size:13px; text-transform:uppercase; letter-spacing:.04em;">Type</th>
+              <th style="text-align:left; padding:10px 14px; color:var(--text-3); font-weight:600; font-size:13px; text-transform:uppercase; letter-spacing:.04em;">Name</th>
+              <th style="text-align:left; padding:10px 14px; color:var(--text-3); font-weight:600; font-size:13px; text-transform:uppercase; letter-spacing:.04em;">URL</th>
+              <th style="text-align:left; padding:10px 14px; color:var(--text-3); font-weight:600; font-size:13px; text-transform:uppercase; letter-spacing:.04em;">Signed</th>
+              <th style="text-align:right; padding:10px 14px; color:var(--text-3); font-weight:600; font-size:13px; text-transform:uppercase; letter-spacing:.04em;">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -69,19 +69,19 @@
                 </td>
                 <td style="padding:12px 14px; vertical-align:top;">
                   <div style="font-weight:600;">{{ ch.name }}</div>
-                  <div style="color:var(--text-4); font-family:var(--mono); font-size:11px;">{{ ch.id }}</div>
+                  <div style="color:var(--text-4); font-family:var(--mono); font-size:13px;">{{ ch.id }}</div>
                 </td>
                 <td style="padding:12px 14px; vertical-align:top; max-width:320px; overflow:hidden; text-overflow:ellipsis;">
-                  <code style="font-family:var(--mono); font-size:11px; word-break:break-all;">{{ ch.url }}</code>
+                  <code style="font-family:var(--mono); font-size:13px; word-break:break-all;">{{ ch.url }}</code>
                   {% if ch.headers %}
-                    <div style="color:var(--text-4); font-size:10px; margin-top:4px;">+{{ ch.headers|length }} custom header{{ 's' if ch.headers|length != 1 else '' }}</div>
+                    <div style="color:var(--text-4); font-size:12px; margin-top:4px;">+{{ ch.headers|length }} custom header{{ 's' if ch.headers|length != 1 else '' }}</div>
                   {% endif %}
                 </td>
                 <td style="padding:12px 14px; vertical-align:top;">
                   {% if ch.type == CHANNEL_TYPE_WEBHOOK and ch.secret %}
                     <span class="chip ok" title="HMAC-SHA256 signing enabled"><span class="dot"></span>HMAC</span>
                   {% else %}
-                    <span style="color:var(--text-4); font-size:11px;">—</span>
+                    <span style="color:var(--text-4); font-size:13px;">—</span>
                   {% endif %}
                 </td>
                 <td style="padding:10px 14px; text-align:right; vertical-align:top; white-space:nowrap;">
@@ -143,7 +143,7 @@
             <label for="headers_raw">Custom headers</label>
             <textarea id="headers_raw" name="headers_raw" rows="3"
                       placeholder="Authorization: Bearer abc123&#10;X-Tenant: prod"
-                      style="font-family:var(--mono); font-size:12px;"></textarea>
+                      style="font-family:var(--mono); font-size:14px;"></textarea>
             <span class="hint">One <code>Key: Value</code> per line. <code>Content-Type</code> and <code>X-Atlas-*</code> headers are reserved.</span>
           </div>
           <div class="field">
@@ -174,7 +174,7 @@
             </span>
             <details class="hint" style="margin-top:8px;">
               <summary style="cursor:pointer; color:var(--text-2);">How does the receiver verify it?</summary>
-              <div style="margin-top:6px; padding:8px 10px; background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r); font-size:12px; line-height:1.6;">
+              <div style="margin-top:6px; padding:8px 10px; background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r); font-size:14px; line-height:1.6;">
                 Atlas adds <code>X-Atlas-Signature: sha256=&lt;hex&gt;</code> to every webhook,
                 where <code>&lt;hex&gt;</code> is <code>HMAC-SHA256(secret, raw_body)</code>.
                 Your receiver should:

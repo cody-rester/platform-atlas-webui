@@ -342,11 +342,11 @@ def bootstrap(
         )
     if is_saas:
         # A SaaS audit has no Platform anchor — it needs a gateway instead.
-        if saas_kind not in ("gateway4", "gateway5"):
-            raise ValueError("A SaaS environment needs a gateway kind — Gateway 4 or Gateway 5.")
-        if saas_kind == "gateway4" and not gateway4_uri.strip():
+        if saas_kind not in ("gateway4", "gateway5", "gw4-gw5"):
+            raise ValueError("A SaaS environment needs a gateway kind — Gateway 4, Gateway 5, or both.")
+        if saas_kind in ("gateway4", "gw4-gw5") and not gateway4_uri.strip():
             raise ValueError("A SaaS Gateway 4 environment needs the Gateway 4 API URL.")
-        if saas_kind == "gateway5" and (saas_gw5_source or "").strip().lower() in ("", "ssh", "conf") \
+        if saas_kind in ("gateway5", "gw4-gw5") and (saas_gw5_source or "").strip().lower() in ("", "ssh", "conf") \
                 and not saas_iag_host.strip():
             raise ValueError(
                 "A SaaS Gateway 5 environment needs a source — an SSH host (for printenv "
@@ -376,7 +376,7 @@ def bootstrap(
             vault_payload=vault_payload or {},
             tier=tier,
             env_name=env_name.strip(),
-            has_gateway4=bool(gateway4_uri.strip()) or saas_kind == "gateway4",
+            has_gateway4=bool(gateway4_uri.strip()) or saas_kind in ("gateway4", "gw4-gw5"),
             has_iag5=False,  # IAG5 URI lives on the env edit page, not the welcome form yet
         )
         if not vault_verify["ok"]:

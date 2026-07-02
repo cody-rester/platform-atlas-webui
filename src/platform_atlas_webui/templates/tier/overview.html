@@ -8,7 +8,7 @@
   <div>
     <div class="eyebrow"><span class="dot"></span> Configuration</div>
     <h1 class="text-[36px] leading-[1.05] font-semibold tracking-[-0.038em] mt-2 mb-1.5">Audit tier</h1>
-    <p class="text-[14px] text-text-2 max-w-[64ch]">
+    <p class="text-[16px] text-text-2 max-w-[64ch]">
       The tier controls how deeply Atlas audits your deployment.
       Currently running in <strong>{% if is_std %}Standard{% elif active_tier == 'saas' %}SaaS{% else %}Extended{% endif %} mode</strong>.
     </p>
@@ -41,17 +41,17 @@
       </div>
     </div>
     <div class="card-body" style="display:flex; flex-direction:column; gap:10px;">
-      <p style="font-size:13px; color:var(--text-2); margin:0;">
+      <p style="font-size:15px; color:var(--text-2); margin:0;">
         This environment audits a single Itential-managed SaaS gateway. Its tier is fixed
         when the environment is created and cannot be switched to Standard or Extended.
       </p>
-      <ul style="font-size:12px; color:var(--text-2); margin:0; padding-left:18px; line-height:1.7;">
+      <ul style="font-size:14px; color:var(--text-2); margin:0; padding-left:18px; line-height:1.7;">
         <li>Scoped to the gateway exposed by your Itential SaaS deployment</li>
         <li>No SSH, MongoDB, or Redis — infrastructure is managed by Itential</li>
         <li>Tier is locked for the lifetime of this environment</li>
       </ul>
       <div style="margin-top:4px;">
-        <span style="font-size:12px; color:var(--text-3);">
+        <span style="font-size:14px; color:var(--text-3);">
           Need Standard or Extended? Create a new environment with that tier.
         </span>
       </div>
@@ -74,13 +74,13 @@
       </div>
     </div>
     <div class="card-body" style="display:flex; flex-direction:column; gap:10px;">
-      <p style="font-size:13px; color:var(--text-2); margin:0;">
+      <p style="font-size:15px; color:var(--text-2); margin:0;">
         Connects via Platform OAuth and an optional IAG4 API token. No server credentials required.
       </p>
-      <p style="font-size:12px; color:var(--text-3); margin:0; font-style:italic;">
+      <p style="font-size:14px; color:var(--text-3); margin:0; font-style:italic;">
         Recommended for ongoing monitoring and locked-down environments where SSH/database access isn't permitted.
       </p>
-      <ul style="font-size:12px; color:var(--text-2); margin:0; padding-left:18px; line-height:1.7;">
+      <ul style="font-size:14px; color:var(--text-2); margin:0; padding-left:18px; line-height:1.7;">
         <li><strong>~54 rules</strong> across <code>platform</code> and <code>gateway4</code> categories</li>
         <li>No SSH, no MongoDB, no Redis</li>
         <li>Works in strict or locked-down environments</li>
@@ -92,7 +92,7 @@
         </div>
       {% else %}
         <div style="margin-top:4px;">
-          <span style="font-size:12px; color:var(--text-3);">This is your current tier.</span>
+          <span style="font-size:14px; color:var(--text-3);">This is your current tier.</span>
         </div>
       {% endif %}
     </div>
@@ -110,13 +110,13 @@
       </div>
     </div>
     <div class="card-body" style="display:flex; flex-direction:column; gap:10px;">
-      <p style="font-size:13px; color:var(--text-2); margin:0;">
+      <p style="font-size:15px; color:var(--text-2); margin:0;">
         Full infrastructure access — SSH into servers, query MongoDB and Redis directly, and inspect gateway configs.
       </p>
-      <p style="font-size:12px; color:var(--text-3); margin:0; font-style:italic;">
+      <p style="font-size:14px; color:var(--text-3); margin:0; font-style:italic;">
         Recommended for quarterly reviews and deep health audits where infrastructure-level visibility matters.
       </p>
-      <ul style="font-size:12px; color:var(--text-2); margin:0; padding-left:18px; line-height:1.7;">
+      <ul style="font-size:14px; color:var(--text-2); margin:0; padding-left:18px; line-height:1.7;">
         <li><strong>~107 rules</strong> — all Standard rules plus infrastructure checks</li>
         <li>SSH, MongoDB, Redis, IAG, system, filesystem, and Kubernetes collectors</li>
         <li>Requires SSH keys and database credentials to be configured</li>
@@ -127,7 +127,7 @@
         </div>
       {% else %}
         <div style="margin-top:4px;">
-          <span style="font-size:12px; color:var(--text-3);">This is your current tier.</span>
+          <span style="font-size:14px; color:var(--text-3);">This is your current tier.</span>
         </div>
       {% endif %}
     </div>
@@ -147,7 +147,7 @@
     <div class="tip-cmd"><span class="prompt">▸</span><span class="cmd">platform-atlas tier set standard</span></div>
     <div class="tip-cmd"><span class="prompt">▸</span><span class="cmd">platform-atlas tier set extended</span></div>
     <div class="tip-cmd"><span class="prompt">▸</span><span class="cmd">platform-atlas --tier standard capture</span></div>
-    <p style="font-size:11px; color:var(--text-3); margin:6px 0 0;">
+    <p style="font-size:13px; color:var(--text-3); margin:6px 0 0;">
       <code>--tier</code> on any command is a one-off override — it doesn't persist.
     </p>
   </div>
@@ -173,8 +173,8 @@
   outline: none;
 ">
   <div style="padding:22px 24px 18px; border-bottom:1px solid var(--line);">
-    <h2 id="modal-title" style="margin:0 0 6px; font-size:16px; font-weight:600;"></h2>
-    <p id="modal-subtitle" style="margin:0; font-size:13px; color:var(--text-3);"></p>
+    <h2 id="modal-title" style="margin:0 0 6px; font-size:18px; font-weight:600;"></h2>
+    <p id="modal-subtitle" style="margin:0; font-size:15px; color:var(--text-3);"></p>
   </div>
 
   <div style="padding:18px 24px;" id="modal-body"></div>
@@ -204,17 +204,17 @@
       title: "Switch to Standard mode?",
       subtitle: "This change takes effect on the next CLI invocation or WebUI restart.",
       body: [
-        "<p style='font-size:13px; color:var(--text-2); margin:0 0 12px;'>",
+        "<p style='font-size:15px; color:var(--text-2); margin:0 0 12px;'>",
         "Switching to <strong>Standard</strong> means Atlas will only use <strong>Platform OAuth</strong> (and an optional IAG4 token) to collect data.",
         " MongoDB, Redis, SSH, and all infrastructure collectors will be <strong>inactive</strong>.",
         " Approximately <strong>54 rules</strong> will be evaluated (instead of ~107).",
         "</p>",
-        "<div style='background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:14px; font-size:12px; color:var(--text-2); line-height:1.6;'>",
+        "<div style='background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:14px; font-size:14px; color:var(--text-2); line-height:1.6;'>",
         "<strong style='display:block; margin-bottom:6px; color:var(--text);'>What stays the same</strong>",
         "Existing captures and reports are not affected — they keep their original tier context.",
         " Any Extended-tier sessions will become view-only until you switch back — you won't be able to re-run capture, validate, or report on them.",
         "</div>",
-        "<div style='margin-top:14px; padding:12px 14px; background:oklch(60% 0.18 220/.07); border:1px solid oklch(60% 0.18 220/.25); border-radius:8px; font-size:12px; color:var(--text-2); line-height:1.6;'>",
+        "<div style='margin-top:14px; padding:12px 14px; background:oklch(60% 0.18 220/.07); border:1px solid oklch(60% 0.18 220/.25); border-radius:8px; font-size:14px; color:var(--text-2); line-height:1.6;'>",
         "<strong style='display:block; margin-bottom:4px; color:oklch(60% 0.18 220);'>Need help deciding?</strong>",
         "Itential's Customer Success team will work with you to determine which tier is right for your environment. Contact your Itential representative or reach out at <a href='mailto:support@itential.com' style='color:var(--accent);'>support@itential.com</a>.",
         "</div>"
@@ -224,11 +224,11 @@
       title: "Switch to Extended mode?",
       subtitle: "You'll be taken to your environment settings to add SSH, MongoDB, and Redis credentials.",
       body: [
-        "<p style='font-size:13px; color:var(--text-2); margin:0 0 12px;'>",
+        "<p style='font-size:15px; color:var(--text-2); margin:0 0 12px;'>",
         "Switching to <strong>Extended</strong> enables full infrastructure collectors — <strong>SSH, MongoDB, Redis, IAG, system, filesystem, and Kubernetes</strong>.",
         " All <strong>~107 rules</strong> will be evaluated.",
         "</p>",
-        "<div style='background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:14px; font-size:12px; color:var(--text-2); line-height:1.6;'>",
+        "<div style='background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:14px; font-size:14px; color:var(--text-2); line-height:1.6;'>",
         "<strong style='display:block; margin-bottom:6px; color:var(--text);'>What happens next</strong>",
         "After confirming, you'll be taken to your environment settings to supply the additional credentials Extended requires:",
         "<ul style='margin:8px 0 0; padding-left:18px; line-height:1.8;'>",
@@ -240,7 +240,7 @@
         "If you use <strong>HashiCorp Vault</strong>, add the new keys there and use the <em>Re-check credentials</em> button in your environment.",
         " If you use the <strong>OS keyring</strong>, you'll enter the credentials on the next screen — Atlas writes them to your keyring and verifies on the spot.",
         "</div>",
-        "<div style='margin-top:14px; padding:12px 14px; background:oklch(70% 0.18 30/.07); border:1px solid oklch(70% 0.18 30/.25); border-radius:8px; font-size:12px; color:var(--text-2); line-height:1.6;'>",
+        "<div style='margin-top:14px; padding:12px 14px; background:oklch(70% 0.18 30/.07); border:1px solid oklch(70% 0.18 30/.25); border-radius:8px; font-size:14px; color:var(--text-2); line-height:1.6;'>",
         "<strong style='display:block; margin-bottom:4px; color:oklch(70% 0.18 30);'>Need help getting set up?</strong>",
         "Itential's Customer Success team will work with you to configure your Extended environment. Contact your Itential representative or reach out at <a href='mailto:support@itential.com' style='color:var(--accent);'>support@itential.com</a>.",
         "</div>"

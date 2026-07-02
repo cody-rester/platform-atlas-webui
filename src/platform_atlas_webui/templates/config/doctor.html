@@ -14,7 +14,7 @@
       Config Doctor
       <em class="not-italic text-accent">— {{ counts.ok }} OK · {{ counts.warn }} warn · {{ counts.fail }} fail</em>
     </h1>
-    <p class="text-[14px] text-text-2 max-w-[64ch]">
+    <p class="text-[16px] text-text-2 max-w-[64ch]">
       Runs the same checks as <code>platform-atlas config doctor</code> — config
       file permissions, Python interpreter, disk space, credential backend,
       Platform / Gateway 4 reachability, active ruleset, and SSH key path.
@@ -32,7 +32,7 @@
 <section class="grid gap-3 mb-4" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
   <div class="card">
     <div class="px-4 py-3.5">
-      <div class="text-[11px] tracking-[0.1em] uppercase font-semibold text-text-4 pb-1.5">Summary</div>
+      <div class="text-[13px] tracking-[0.1em] uppercase font-semibold text-text-4 pb-1.5">Summary</div>
       <span class="chip {{ _chip_class[overall] }}">
         <span class="dot"></span>
         {% if overall == "ok" %}All checks passed
@@ -53,19 +53,19 @@
   </div>
   <div class="card">
     <div class="px-4 py-3.5">
-      <div class="text-[11px] tracking-[0.1em] uppercase font-semibold text-text-4 pb-1.5">Passing</div>
+      <div class="text-[13px] tracking-[0.1em] uppercase font-semibold text-text-4 pb-1.5">Passing</div>
       <div class="text-[28px] leading-none font-semibold text-ok" data-doctor-count="ok">{{ counts.ok }}</div>
     </div>
   </div>
   <div class="card">
     <div class="px-4 py-3.5">
-      <div class="text-[11px] tracking-[0.1em] uppercase font-semibold text-text-4 pb-1.5">Warnings</div>
+      <div class="text-[13px] tracking-[0.1em] uppercase font-semibold text-text-4 pb-1.5">Warnings</div>
       <div class="text-[28px] leading-none font-semibold text-warn" data-doctor-count="warn">{{ counts.warn }}</div>
     </div>
   </div>
   <div class="card">
     <div class="px-4 py-3.5">
-      <div class="text-[11px] tracking-[0.1em] uppercase font-semibold text-text-4 pb-1.5">Errors</div>
+      <div class="text-[13px] tracking-[0.1em] uppercase font-semibold text-text-4 pb-1.5">Errors</div>
       <div class="text-[28px] leading-none font-semibold text-bad" data-doctor-count="fail">{{ counts.fail }}</div>
     </div>
   </div>
@@ -92,7 +92,7 @@
        on load. The placeholder mimics a row with a pulsing "run" chip; the swap
        replaces it with the actual result row (data-doctor-status set). #}
     {% for probe in pending_probes %}
-      <div class="flex items-start gap-3 px-4 py-3 text-[13px] border-b border-line last:border-b-0"
+      <div class="flex items-start gap-3 px-4 py-3 text-[15px] border-b border-line last:border-b-0"
            hx-get="/config/doctor/probe/{{ probe.kind }}"
            hx-trigger="load"
            hx-swap="outerHTML"
@@ -103,7 +103,7 @@
         </span>
         <div class="min-w-0 flex-1">
           <div class="font-medium text-text">{{ probe.label }}</div>
-          <div class="text-text-3 mt-[2px] font-mono text-[12px]">Checking TCP reachability…</div>
+          <div class="text-text-3 mt-[2px] font-mono text-[14px]">Checking TCP reachability…</div>
         </div>
       </div>
     {% endfor %}
@@ -111,7 +111,7 @@
 </section>
 
 {# ── CLI parity footer ─────────────────────────────────────────── #}
-<section class="mt-4 text-[12.5px] text-text-3">
+<section class="mt-4 text-[14px] text-text-3">
   Want the same view in your terminal? Run
   <code class="bg-surface-2 px-1.5 py-0.5 rounded">platform-atlas config doctor</code>
   — exit code is <code>0</code> on all-pass, <code>1</code> on warnings, <code>2</code> on errors, so

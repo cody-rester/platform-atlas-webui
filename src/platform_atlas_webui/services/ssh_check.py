@@ -56,6 +56,38 @@ def _stored_passphrase(env_name: str) -> str:
         return ""
 
 
+def _stored_password(env_name: str) -> str:
+    """The environment's stored SSH password, or ``""``.
+
+    Mirrors ``_stored_passphrase`` — reads the env-scoped local store so
+    an edit-form Test-SSH click with a blank password field uses the stored
+    secret. Vault-backed environments return ``""`` (Vault is read-only at
+    capture time, not test time).
+    """
+    if not env_name:
+        return ""
+    try:
+        from platform_atlas.core.paths import ATLAS_ENVIRONMENTS_DIR
+        from platform_atlas.core.credentials import (
+            CredentialKey,
+            FileSecretStore,
+            KeyringSecretStore,
+            scoped_service_name,
+        )
+        env_file = ATLAS_ENVIRONMENTS_DIR / f"{env_name}.json"
+        if not env_file.is_file():
+            return ""
+        backend = (json.loads(env_file.read_text(encoding="utf-8"))
+                   .get("credential_backend") or "keyring").strip().lower()
+        if backend == "vault":
+            return ""
+        store = FileSecretStore() if backend == "file" else KeyringSecretStore()
+        return store.get(scoped_service_name(env_name), CredentialKey.SSH_PASSWORD.value) or ""
+    except Exception:  # noqa: BLE001
+        logger.debug("Stored-password lookup failed for env %r", env_name, exc_info=True)
+        return ""
+
+
 def test_ssh_connection(
     *,
     host: str,
@@ -63,18 +95,24 @@ def test_ssh_connection(
     username: str,
     key_path: str,
     passphrase: str,
+    password: str = "",
+    auth_method: str = "key",
     env_name: str = "",
 ) -> dict[str, Any]:
     """Attempt an SSH connection and a trivial command; never raises.
 
     Returns ``{"ok": bool, "message": str, "used_stored_passphrase": bool}``.
-    A blank ``passphrase`` falls back to the environment's stored one (so
-    testing on the edit form works without retyping the secret).
+    A blank ``passphrase``/``password`` falls back to the environment's stored
+    value so the edit form can test without retyping secrets.
     """
     host = (host or "").strip()
     username = (username or "").strip() or "atlas"
     key_path = (key_path or "").strip()
     passphrase = passphrase or ""
+    password = password or ""
+    auth_method = (auth_method or "key").strip().lower()
+    if auth_method not in ("key", "password"):
+        auth_method = "key"
 
     if not host:
         return {"ok": False, "message": "Enter the gateway SSH host first.",
@@ -84,38 +122,48 @@ def test_ssh_connection(
     except (TypeError, ValueError):
         port_num = 22
 
-    if key_path:
-        expanded = Path(key_path).expanduser()
-        if not expanded.is_file():
-            return {"ok": False,
-                    "message": f"SSH key not found: {expanded}",
-                    "used_stored_passphrase": False}
-        key_path = str(expanded)
-
     used_stored = False
-    if not passphrase:
-        passphrase = _stored_passphrase(env_name)
-        used_stored = bool(passphrase)
 
     from platform_atlas.core.transport import SSHCredentials, SSHTransport
 
     try:
-        creds = SSHCredentials(
-            hostname=host,
-            username=username,
-            port=port_num,
-            key_path=key_path or None,
-            key_passphrase=passphrase or None,
-            # No explicit key → agent auth, exactly like a saved "None
-            # (use SSH agent)" selection. With a key, the transport forces
-            # explicit-key mode itself (agent + discovery off).
-            use_agent=not key_path,
-            # WebUI-built topology nodes default to auto_add — mirror it
-            # so the test predicts what the capture will actually do.
-            host_key_policy="auto_add",
-            timeout=_CONNECT_TIMEOUT,
-            banner_timeout=_BANNER_TIMEOUT,
-        )
+        if auth_method == "password":
+            if not password:
+                password = _stored_password(env_name)
+                used_stored = bool(password)
+            creds = SSHCredentials(
+                hostname=host,
+                username=username,
+                port=port_num,
+                password=password or None,
+                use_agent=False,
+                discover_keys=False,
+                host_key_policy="auto_add",
+                timeout=_CONNECT_TIMEOUT,
+                banner_timeout=_BANNER_TIMEOUT,
+            )
+        else:
+            if key_path:
+                expanded = Path(key_path).expanduser()
+                if not expanded.is_file():
+                    return {"ok": False,
+                            "message": f"SSH key not found: {expanded}",
+                            "used_stored_passphrase": False}
+                key_path = str(expanded)
+            if not passphrase:
+                passphrase = _stored_passphrase(env_name)
+                used_stored = bool(passphrase)
+            creds = SSHCredentials(
+                hostname=host,
+                username=username,
+                port=port_num,
+                key_path=key_path or None,
+                key_passphrase=passphrase or None,
+                use_agent=not key_path,
+                host_key_policy="auto_add",
+                timeout=_CONNECT_TIMEOUT,
+                banner_timeout=_BANNER_TIMEOUT,
+            )
     except ValueError as exc:
         return {"ok": False, "message": str(exc), "used_stored_passphrase": used_stored}
 

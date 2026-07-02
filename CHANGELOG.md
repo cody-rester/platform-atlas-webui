@@ -5,6 +5,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.0] - 2026-06-24
+
+Requires `platform-atlas >=2.1.0,<3.0`.
+
+### Added
+
+- **ControlMaster SSH socket manager** — environments that use ControlMaster SSH now have a dedicated **SSH Sockets** page (`/environments/{name}/sockets`). It shows the live status of every CM node's socket (`open`, `stale`, `not found`, or `unconfigured`), surfaces a copy-pasteable `ssh -M` open command for each node that needs one, and provides a **Clean stale** button that removes stale socket files in one click so fresh connections can be opened. The page is invisible to environments with no ControlMaster nodes — only the affected environment's detail page shows the **SSH Sockets** button in its Topology card. Mirrors the CLI's `platform-atlas env sockets` command.
+
+- **Support bundle environment context bar** — a prominent "Active environment — confirm before collecting" panel above the bundle form shows the active environment name, tier, and every connection target (Platform URL, SSH hostname, or Gateway URL) before you submit, with a link to switch environments if the wrong one is active.
+
+### Added
+
+- **Select both Gateway 4 and Gateway 5 together** — SaaS and Extended environment forms now support the `gw4-gw5` gateway kind, letting you audit a GW4 API target and a GW5 node in a single run rather than choosing one or the other.
+
+### Fixed
+
+- **GW4 API target missing for `gw4-gw5` environments that have a GW5 topology node** — the core `Config.targets` / `Config.all_targets` fix (CLI 2.1.0) eliminates silent GW4 collector drop-out that affected runs started from the WebUI runner.
+
+### Changed
+
+- **Increased font sizes across the entire WebUI for better readability** — base body size raised from 13 px to 15 px; all hardcoded sizes in `atlas.css` and inline template styles scaled proportionally (11 px descriptive text → 13 px, 12 px labels → 14 px, 13 px body → 15 px). Display numbers and large headings are unchanged.
+
+---
+
 ## [2.0.0] - 2026-06-16
 
 Requires `platform-atlas >=2.0.0,<3.0`.

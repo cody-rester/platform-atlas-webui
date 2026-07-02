@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% block title %}SSH Sockets — {{ environment.name }} — Platform Atlas{% endblock %}
+{% block crumb %}
+  <a href="/environments" class="text-inherit hover:text-accent">Environments</a>
+  <span class="sep">›</span>
+  <a href="/environments/{{ environment.name }}" class="text-inherit hover:text-accent">{{ environment.name }}</a>
+  <span class="sep">›</span> SSH Sockets
+{% endblock %}
+
+{% block content %}
+<header class="flex items-end justify-between gap-6 pb-5 border-b border-line mb-6">
+  <div>
+    <div class="eyebrow"><span class="dot"></span> SSH Sockets · {{ environment.name }}</div>
+    <h1 class="text-[36px] leading-[1.05] font-semibold tracking-[-0.038em] mt-2 mb-1.5">
+      ControlMaster Sockets
+    </h1>
+    <p class="text-[16px] text-text-2 max-w-[70ch]">
+      Manage the SSH ControlMaster sockets for this environment. Stale sockets
+      cause <em class="not-italic text-text">"socket exists but is not responding"</em> errors during capture.
+      Open sockets by running the command shown for each node in your terminal.
+    </p>
+  </div>
+  <div class="flex items-center gap-2 shrink-0">
+    <a class="btn" href="/environments/{{ environment.name }}/sockets">Refresh</a>
+    {% set stale_count = sockets | selectattr('status', 'equalto', 'stale') | list | length %}
+    {% if stale_count > 0 %}
+      <form action="/environments/{{ environment.name }}/sockets/clean" method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="btn danger" type="submit"
+                title="Remove {{ stale_count }} stale socket file{{ 's' if stale_count != 1 else '' }} so fresh connections can be opened">
+          Clean {{ stale_count }} stale
+        </button>
+      </form>
+    {% else %}
+      <button class="btn" disabled title="No stale sockets to clean">Clean stale</button>
+    {% endif %}
+  </div>
+</header>
+
+{# ── Status summary banner ─────────────────────────────── #}
+{% set ok_count = sockets | selectattr('status', 'equalto', 'ok') | list | length %}
+{% set total = sockets | length %}
+{% set all_ok = ok_count == total %}
+
+<div class="flex gap-3 mb-6 flex-wrap">
+  {% for s in sockets %}
+    {% if s.status == 'ok' %}
+      {% set _dot = 'bg-ok' %}{% set _text = 'text-ok' %}{% set _label = 'Open' %}
+    {% elif s.status == 'stale' %}
+      {% set _dot = 'bg-warn' %}{% set _text = 'text-warn' %}{% set _label = 'Stale' %}
+    {% elif s.status == 'missing' %}
+      {% set _dot = 'bg-bad' %}{% set _text = 'text-bad' %}{% set _label = 'Not found' %}
+    {% else %}
+      {% set _dot = 'bg-text-4' %}{% set _text = 'text-text-3' %}{% set _label = 'Unconfigured' %}
+    {% endif %}
+    <div class="flex items-center gap-2 px-3 py-2 rounded-md bg-surface border border-line text-[14px]">
+      <span class="w-2 h-2 rounded-full {{ _dot }} shrink-0"></span>
+      <span class="font-medium font-mono">{{ s.label }}</span>
+      <span class="{{ _text }} font-medium">{{ _label }}</span>
+    </div>
+  {% endfor %}
+</div>
+
+{# ── Socket table ──────────────────────────────────────── #}
+<section class="card mb-5">
+  <div class="card-head">
+    <h3>Socket status</h3>
+    <span class="sub">{{ ok_count }} of {{ total }} open</span>
+  </div>
+  <div class="card-body p-0">
+    <table class="w-full text-[15px]">
+      <thead>
+        <tr class="text-text-3 border-b border-line">
+          <th class="text-left font-medium px-4 py-2.5">Node</th>
+          <th class="text-left font-medium px-4 py-2.5">Status</th>
+          <th class="text-left font-medium px-4 py-2.5">Socket path</th>
+          <th class="text-left font-medium px-4 py-2.5">SSH destination</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in sockets %}
+        <tr class="border-t border-line">
+          <td class="px-4 py-3 font-mono font-medium text-text">{{ s.label }}</td>
+          <td class="px-4 py-3">
+            {% if s.status == 'ok' %}
+              <span class="inline-flex items-center gap-1.5 text-ok font-medium">
+                <span class="w-1.5 h-1.5 rounded-full bg-ok shrink-0"></span>Open
+              </span>
+            {% elif s.status == 'stale' %}
+              <span class="inline-flex items-center gap-1.5 text-warn font-medium">
+                <span class="w-1.5 h-1.5 rounded-full bg-warn shrink-0"></span>Stale
+              </span>
+            {% elif s.status == 'missing' %}
+              <span class="inline-flex items-center gap-1.5 text-bad font-medium">
+                <span class="w-1.5 h-1.5 rounded-full bg-bad shrink-0"></span>Not found
+              </span>
+            {% else %}
+              <span class="inline-flex items-center gap-1.5 text-text-3 font-medium">
+                <span class="w-1.5 h-1.5 rounded-full bg-text-4 shrink-0"></span>Unconfigured
+              </span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-3 font-mono text-[13px] text-text-2 break-all">
+            {{ s.path or '—' }}
+          </td>
+          <td class="px-4 py-3 font-mono text-[13px] text-text-2">
+            {{ s.target or '—' }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{# ── Open-socket commands ──────────────────────────────── #}
+{% set needs_open = sockets | selectattr('ssh_cmd') | rejectattr('status', 'equalto', 'ok') | rejectattr('status', 'equalto', 'unconfigured') | list %}
+{% if needs_open %}
+<section class="card mb-5">
+  <div class="card-head">
+    <h3>Open sockets</h3>
+    <span class="sub">Run in your terminal to establish master connections</span>
+  </div>
+  <div class="card-body flex flex-col gap-4">
+    <p class="text-[15px] text-text-2 m-0">
+      Atlas can't open SSH connections interactively from the browser — run these in your
+      terminal. Each command starts a background master connection that Atlas will multiplex
+      captures through. Once open, refresh this page to confirm the status.
+    </p>
+    {% for s in needs_open %}
+    <div>
+      <div class="flex items-center justify-between mb-1.5">
+        <span class="text-[13px] font-medium text-text-3 uppercase tracking-[0.06em]">{{ s.label }}
+          {% if s.status == 'stale' %}
+            <span class="ml-1.5 text-warn text-[11px] font-semibold uppercase tracking-wider">· stale — clean first</span>
+          {% endif %}
+        </span>
+        <button type="button"
+                class="text-[12px] text-accent hover:text-accent-hover font-medium px-2 py-1 rounded hover:bg-surface-2 transition-colors"
+                onclick="(function(btn){
+                  var code = btn.closest('.ssh-cmd-block').querySelector('code');
+                  navigator.clipboard.writeText(code.textContent.trim()).then(function(){
+                    btn.textContent = 'Copied!';
+                    setTimeout(function(){ btn.textContent = 'Copy'; }, 1800);
+                  });
+                })(this)">Copy</button>
+      </div>
+      <div class="ssh-cmd-block bg-bg border border-line rounded-md px-4 py-3 overflow-x-auto">
+        <code class="font-mono text-[13px] text-text-2 whitespace-pre select-all">{{ s.ssh_cmd }}</code>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{# ── Unconfigured nodes ───────────────────────────────── #}
+{% set unconfigured = sockets | selectattr('status', 'equalto', 'unconfigured') | list %}
+{% if unconfigured %}
+<section class="card mb-5">
+  <div class="card-head">
+    <h3>Unconfigured nodes</h3>
+  </div>
+  <div class="card-body">
+    <p class="text-[15px] text-text-2 m-0 mb-3">
+      The following nodes have no SSH destination set. Atlas can't generate an open command
+      or check socket health without one. Edit the environment to fix this.
+    </p>
+    <ul class="m-0 p-0 list-none flex flex-col gap-1.5">
+      {% for s in unconfigured %}
+        <li class="flex items-center gap-2 text-[14px]">
+          <span class="w-1.5 h-1.5 rounded-full bg-text-4 shrink-0"></span>
+          <span class="font-mono text-text-2">{{ s.label }}</span>
+          <span class="text-text-3">— no SSH destination</span>
+        </li>
+      {% endfor %}
+    </ul>
+    <div class="mt-4">
+      <a class="btn sm" href="/environments/{{ environment.name }}/edit">Edit topology →</a>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{# ── All open banner ──────────────────────────────────── #}
+{% if all_ok %}
+<div class="flex items-center gap-3 px-5 py-4 rounded-lg border mb-5"
+     style="border-color: oklch(72% .22 145/.45); background: oklch(72% .22 145/.07);">
+  <div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
+       style="background: oklch(72% .22 145/.18); color: oklch(78% .18 145);">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+         stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+  </div>
+  <div>
+    <p class="text-[15px] font-medium m-0">All sockets are open and responding</p>
+    <p class="text-[14px] text-text-2 m-0">Atlas can multiplex captures through these connections.</p>
+  </div>
+</div>
+{% endif %}
+
+<div class="text-[13px] text-text-3 mt-2">
+  To manage sockets from the CLI:
+  <code class="font-mono bg-surface border border-line rounded px-1.5 py-0.5 text-text-2">platform-atlas env sockets {{ environment.name }}</code>
+  ·
+  <code class="font-mono bg-surface border border-line rounded px-1.5 py-0.5 text-text-2">platform-atlas env sockets {{ environment.name }} --clean</code>
+</div>
+
+{% endblock %}

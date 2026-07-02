@@ -18,7 +18,7 @@
     <h1 class="text-[36px] leading-[1.05] font-semibold tracking-[-0.038em] mt-2 mb-1.5">
       {{ environment.name }}, <em class="not-italic text-accent">{{ 'SaaS' if environment.tier == 'saas' else environment.tier|capitalize }}</em>
     </h1>
-    <p class="text-[14px] text-text-2 max-w-[64ch]">{{ d.get('description') or 'No description.' }}</p>
+    <p class="text-[16px] text-text-2 max-w-[64ch]">{{ d.get('description') or 'No description.' }}</p>
   </div>
   <div class="flex items-center gap-2">
     <a class="btn primary" href="/environments/{{ environment.name }}/edit">Edit</a>
@@ -52,21 +52,21 @@
     </div>
     <div class="flex-1 min-w-0">
       {% if show_just_created %}
-        <h3 class="text-[15px] m-0 mb-1">Environment <code>{{ environment.name }}</code> created — next, set up credentials</h3>
-        <p class="text-[13px] text-text-2 m-0 mb-2.5 leading-relaxed">
+        <h3 class="text-[17px] m-0 mb-1">Environment <code>{{ environment.name }}</code> created — next, set up credentials</h3>
+        <p class="text-[15px] text-text-2 m-0 mb-2.5 leading-relaxed">
           Atlas needs credentials to connect on behalf of this environment. They're stored
           {% if d.get('credential_backend') == 'vault' %}in your HashiCorp Vault{% else %}in your OS keyring{% endif %}
           under <code>platform-atlas/{{ environment.name }}</code> — never in plain text on disk.
         </p>
       {% else %}
-        <h3 class="text-[15px] m-0 mb-1">{{ missing_creds | length }} required credential{{ '' if missing_creds|length == 1 else 's' }} missing</h3>
-        <p class="text-[13px] text-text-2 m-0 mb-2.5 leading-relaxed">This environment can't run captures until its required credentials are stored.</p>
+        <h3 class="text-[17px] m-0 mb-1">{{ missing_creds | length }} required credential{{ '' if missing_creds|length == 1 else 's' }} missing</h3>
+        <p class="text-[15px] text-text-2 m-0 mb-2.5 leading-relaxed">This environment can't run captures until its required credentials are stored.</p>
       {% endif %}
 
       {% if missing_creds %}
         <ul class="flex flex-wrap gap-1.5 m-0 mb-3 p-0 list-none">
           {% for c in missing_creds %}
-            <li title="{{ c.key }}" class="text-[11px] py-1 px-2 rounded bg-surface-2 border border-line text-text-2 font-mono">{{ c.display }}</li>
+            <li title="{{ c.key }}" class="text-[13px] py-1 px-2 rounded bg-surface-2 border border-line text-text-2 font-mono">{{ c.display }}</li>
           {% endfor %}
         </ul>
       {% endif %}
@@ -80,7 +80,7 @@
           </button>
         </form>
         {% if show_just_created %}
-          <a class="text-[12px] text-text-3 no-underline px-2 py-1.5 rounded hover:text-text hover:bg-surface-2"
+          <a class="text-[14px] text-text-3 no-underline px-2 py-1.5 rounded hover:text-text hover:bg-surface-2"
              href="/environments/{{ environment.name }}">I'll do this later</a>
         {% endif %}
       </div>
@@ -95,8 +95,8 @@
   <div class="card">
     <div class="card-head"><h3>Platform</h3></div>
     <div class="card-body">
-      <div class="font-mono text-[12.5px] text-text break-all">{{ d.get('platform_uri') or '—' }}</div>
-      <div class="text-text-3 text-[11.5px] mt-1.5">
+      <div class="font-mono text-[14px] text-text break-all">{{ d.get('platform_uri') or '—' }}</div>
+      <div class="text-text-3 text-[13px] mt-1.5">
         Client ID: <span class="font-mono text-text-2">{{ d.get('platform_client_id') or '—' }}</span>
       </div>
     </div>
@@ -105,8 +105,8 @@
   <div class="card">
     <div class="card-head"><h3>Gateway 4</h3></div>
     <div class="card-body">
-      <div class="font-mono text-[12.5px] text-text break-all">{{ d.get('gateway4_uri') or '—' }}</div>
-      <div class="text-text-3 text-[11.5px] mt-1.5">
+      <div class="font-mono text-[14px] text-text break-all">{{ d.get('gateway4_uri') or '—' }}</div>
+      <div class="text-text-3 text-[13px] mt-1.5">
         Username: <span class="text-text-2">{{ d.get('gateway4_username') or '—' }}</span>
       </div>
     </div>
@@ -128,11 +128,16 @@
         {{ topology.mode | capitalize }} · {{ topology.nodes | length }} node{{ '' if topology.nodes|length == 1 else 's' }}
       {% else %}Not configured{% endif %}
     </span>
-    <div class="right"><a class="btn sm" href="/environments/{{ environment.name }}/edit">Edit topology</a></div>
+    <div class="right flex items-center gap-2">
+      {% if topology and topology.has_control_master %}
+        <a class="btn sm" href="/environments/{{ environment.name }}/sockets">SSH Sockets</a>
+      {% endif %}
+      <a class="btn sm" href="/environments/{{ environment.name }}/edit">Edit topology</a>
+    </div>
   </div>
   <div class="card-body">
     {% if topology and topology.configured and topology.nodes %}
-      <table class="w-full text-[13px]">
+      <table class="w-full text-[15px]">
         <thead>
           <tr class="text-text-3">
             <th class="text-left font-medium pb-2">Role</th>
@@ -152,12 +157,12 @@
       </table>
     {% else %}
       {% if environment.tier == 'saas' %}
-      <p class="text-text-2 text-[13px]">
+      <p class="text-text-2 text-[15px]">
         No deployment topology defined yet. Captures will fail until you set up the gateway host.
         <a href="/environments/{{ environment.name }}/edit" class="text-accent hover:text-accent-hover">Configure topology →</a>
       </p>
       {% else %}
-      <p class="text-text-2 text-[13px]">
+      <p class="text-text-2 text-[15px]">
         No deployment topology defined yet. Captures will fail until you set up at least
         Platform, MongoDB, and Redis hosts.
         <a href="/environments/{{ environment.name }}/edit" class="text-accent hover:text-accent-hover">Configure topology →</a>
@@ -184,7 +189,7 @@
     </div>
   </div>
   <div class="card-body">
-    <pre class="m-0 max-h-[400px] overflow-auto bg-bg border border-line rounded-none px-4 py-3.5 font-mono text-[12.5px] leading-relaxed text-text-2 whitespace-pre break-all">{{ d | tojson(indent=2) }}</pre>
+    <pre class="m-0 max-h-[400px] overflow-auto bg-bg border border-line rounded-none px-4 py-3.5 font-mono text-[14px] leading-relaxed text-text-2 whitespace-pre break-all">{{ d | tojson(indent=2) }}</pre>
   </div>
 </section>
 

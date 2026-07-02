@@ -32,10 +32,10 @@
     border-radius: 0 0 var(--r-lg) var(--r-lg);
     overflow: hidden;
   }
-  .rs-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .rs-table { width: 100%; border-collapse: collapse; font-size: 16px; }
   .rs-table thead th {
     text-align: left; padding: 11px 14px;
-    font-size: 11.5px; font-weight: 600;
+    font-size: 13px; font-weight: 600;
     color: var(--text-3); letter-spacing: .06em; text-transform: uppercase;
     background: var(--surface-2); border-bottom: 1px solid var(--line);
     white-space: nowrap; position: sticky; top: 0; z-index: 1;
@@ -50,29 +50,29 @@
   .rs-table tbody tr.is-open { background: var(--surface-2); }
   .rs-table td { padding: 11px 14px; vertical-align: middle; }
   .rs-table tbody tr:last-child td { border-bottom: none; }
-  .rs-table .col-num   { font-family: var(--mono); font-size: 12.5px; color: var(--text-3); white-space: nowrap; }
+  .rs-table .col-num   { font-family: var(--mono); font-size: 14px; color: var(--text-3); white-space: nowrap; }
   .rs-table .col-sev   { width: 100px; }
   .rs-table .col-cat   { width: 120px; }
   .rs-table .col-name  { font-weight: 500; color: var(--text); }
-  .rs-table .col-name .desc { display: block; font-weight: 400; color: var(--text-3); font-size: 12.5px; margin-top: 3px; }
-  .rs-table .col-path  { font-family: var(--mono); font-size: 12px; color: var(--text-3); white-space: nowrap; max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
+  .rs-table .col-name .desc { display: block; font-weight: 400; color: var(--text-3); font-size: 14px; margin-top: 3px; }
+  .rs-table .col-path  { font-family: var(--mono); font-size: 14px; color: var(--text-3); white-space: nowrap; max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
   .rs-table .col-status { white-space: nowrap; }
 
   /* Compact density */
-  .rs-table.is-compact { font-size: 12px; }
-  .rs-table.is-compact thead th { padding: 6px 14px; font-size: 10.5px; }
+  .rs-table.is-compact { font-size: 14px; }
+  .rs-table.is-compact thead th { padding: 6px 14px; font-size: 12px; }
   .rs-table.is-compact tbody td { padding: 5px 14px; }
   .rs-table.is-compact .col-num,
-  .rs-table.is-compact .col-path { font-size: 11px; }
+  .rs-table.is-compact .col-path { font-size: 13px; }
   .rs-table.is-compact .col-name .desc { display: none; }
   .rs-table.is-compact .sev-pill,
-  .rs-table.is-compact .cat-pill { font-size: 10px; padding: 1px 7px; }
-  .rs-table.is-compact .status-pill { font-size: 11px; }
-  .rs-table.is-compact .rule-toggle-btn { font-size: 10.5px; padding: 2px 8px; }
+  .rs-table.is-compact .cat-pill { font-size: 12px; padding: 1px 7px; }
+  .rs-table.is-compact .status-pill { font-size: 13px; }
+  .rs-table.is-compact .rule-toggle-btn { font-size: 12px; padding: 2px 8px; }
 
   .sev-pill {
     display: inline-flex; align-items: center; gap: 5px;
-    font-size: 11.5px; font-weight: 600; padding: 3px 10px;
+    font-size: 13px; font-weight: 600; padding: 3px 10px;
     border-radius: 999px; border: 1px solid;
     text-transform: uppercase; letter-spacing: .05em;
   }
@@ -82,7 +82,7 @@
   .sev-pill.is-other    { color: var(--text-3); border-color: var(--line-2); }
 
   .cat-pill {
-    display: inline-block; font-size: 11.5px; padding: 3px 9px;
+    display: inline-block; font-size: 13px; padding: 3px 9px;
     border-radius: 4px; border: 1px solid var(--line-2);
     color: var(--text-2); background: var(--surface-2);
     font-family: var(--mono); letter-spacing: .02em;
@@ -90,7 +90,7 @@
 
   .status-pill {
     display: inline-flex; align-items: center; gap: 5px;
-    font-size: 12px; color: var(--text-3);
+    font-size: 14px; color: var(--text-3);
   }
   .status-pill .dot { width: 7px; height: 7px; border-radius: 999px; background: var(--text-4); }
   .status-pill.is-on .dot { background: var(--ok); box-shadow: 0 0 0 2px oklch(from var(--ok) l c h / .15); }
@@ -110,7 +110,7 @@
   .col-status-inner { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
 
   .rule-toggle-btn {
-    font-size: 11.5px; font-weight: 500; line-height: 1;
+    font-size: 13px; font-weight: 500; line-height: 1;
     padding: 3px 10px; border-radius: 999px; cursor: pointer;
     border: 1px solid #b36b00; color: #b36b00; background: transparent;
     transition: background .15s, color .15s; white-space: nowrap;
@@ -136,8 +136,8 @@
     border-bottom: 1px solid var(--line);
     display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
   }
-  .suppress-modal-head h3 { margin: 0; font-size: 15px; font-weight: 600; color: var(--text); }
-  .suppress-modal-head .rule-ref { font-family: var(--mono); font-size: 12px; color: var(--text-3); margin-top: 3px; }
+  .suppress-modal-head h3 { margin: 0; font-size: 17px; font-weight: 600; color: var(--text); }
+  .suppress-modal-head .rule-ref { font-family: var(--mono); font-size: 14px; color: var(--text-3); margin-top: 3px; }
   .suppress-modal-close {
     background: none; border: none; cursor: pointer; padding: 2px;
     color: var(--text-3); line-height: 1; font-size: 20px;
@@ -146,13 +146,13 @@
   .suppress-modal-close:hover { color: var(--text); }
   .suppress-modal-body { padding: 18px 20px 20px; }
   .suppress-modal-body label {
-    display: block; font-size: 12px; font-weight: 600;
+    display: block; font-size: 14px; font-weight: 600;
     color: var(--text-2); margin-bottom: 6px; letter-spacing: .03em;
   }
-  .suppress-modal-body .hint { font-size: 11.5px; color: var(--text-3); margin-bottom: 10px; }
+  .suppress-modal-body .hint { font-size: 13px; color: var(--text-3); margin-bottom: 10px; }
   .suppress-modal-body textarea {
     width: 100%; box-sizing: border-box;
-    padding: 9px 11px; font-size: 13px; line-height: 1.5;
+    padding: 9px 11px; font-size: 15px; line-height: 1.5;
     background: var(--bg); color: var(--text);
     border: 1px solid var(--line); border-radius: 4px;
     resize: vertical; min-height: 80px;
@@ -167,13 +167,13 @@
     display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px;
   }
   .suppress-modal-actions .btn-cancel {
-    padding: 7px 16px; font-size: 13px; border-radius: var(--r-md);
+    padding: 7px 16px; font-size: 15px; border-radius: var(--r-md);
     border: 1px solid var(--line); background: transparent; color: var(--text-2);
     cursor: pointer; transition: background .15s;
   }
   .suppress-modal-actions .btn-cancel:hover { background: var(--surface-2); }
   .suppress-modal-actions .btn-confirm {
-    padding: 7px 16px; font-size: 13px; font-weight: 600;
+    padding: 7px 16px; font-size: 15px; font-weight: 600;
     border-radius: var(--r-md); border: none;
     background: #b36b00; color: #fff; cursor: pointer;
     transition: background .15s;
@@ -183,25 +183,25 @@
   /* Expanded row drawer */
   .rs-drawer-row td { padding: 0 !important; background: var(--bg); }
   .rs-drawer { padding: 16px 22px 18px; border-top: 1px dashed var(--line-2); display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 18px; }
-  .rs-drawer h5 { margin: 0 0 6px; font-size: 12px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--text-3); }
-  .rs-drawer p, .rs-drawer .kv { font-size: 13px; color: var(--text-2); line-height: 1.55; margin: 0 0 12px; }
-  .rs-drawer .kv code { font-family: var(--mono); font-size: 12px; color: var(--text); background: var(--surface); padding: 1px 6px; border: 1px solid var(--line); border-radius: 4px; }
-  .rs-msg { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; padding: 9px 11px; border-radius: 6px; margin-bottom: 6px; line-height: 1.45; }
+  .rs-drawer h5 { margin: 0 0 6px; font-size: 14px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--text-3); }
+  .rs-drawer p, .rs-drawer .kv { font-size: 15px; color: var(--text-2); line-height: 1.55; margin: 0 0 12px; }
+  .rs-drawer .kv code { font-family: var(--mono); font-size: 14px; color: var(--text); background: var(--surface); padding: 1px 6px; border: 1px solid var(--line); border-radius: 4px; }
+  .rs-msg { display: flex; align-items: flex-start; gap: 8px; font-size: 15px; padding: 9px 11px; border-radius: 6px; margin-bottom: 6px; line-height: 1.45; }
   .rs-msg.is-pass { color: var(--ok);  background: var(--ok-soft);  border: 1px solid oklch(from var(--ok) l c h / .25); }
   .rs-msg.is-fail { color: var(--bad); background: var(--bad-soft); border: 1px solid oklch(from var(--bad) l c h / .25); }
-  .rs-msg .label { font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: .07em; padding: 1px 6px; border-radius: 3px; background: rgba(255,255,255,.1); flex-shrink: 0; margin-top: 2px; }
+  .rs-msg .label { font-weight: 600; text-transform: uppercase; font-size: 12px; letter-spacing: .07em; padding: 1px 6px; border-radius: 3px; background: rgba(255,255,255,.1); flex-shrink: 0; margin-top: 2px; }
   .rs-drawer .suppression-box {
     padding: 10px 12px; border-radius: 6px; margin-bottom: 12px;
     background: rgba(255,153,0,0.08); border: 1px solid rgba(255,153,0,0.30);
   }
   .rs-drawer .suppression-box .sup-label {
-    font-size: 10.5px; font-weight: 700; letter-spacing: .07em;
+    font-size: 12px; font-weight: 700; letter-spacing: .07em;
     text-transform: uppercase; color: #a05a00; margin-bottom: 4px;
   }
-  .rs-drawer .suppression-box .sup-reason { font-size: 13px; color: #7a4400; line-height: 1.5; }
+  .rs-drawer .suppression-box .sup-reason { font-size: 15px; color: #7a4400; line-height: 1.5; }
 
   .rs-empty { padding: 50px 20px; text-align: center; color: var(--text-3); }
-  .rs-empty strong { display: block; margin-bottom: 4px; color: var(--text); font-size: 14px; }
+  .rs-empty strong { display: block; margin-bottom: 4px; color: var(--text); font-size: 16px; }
 
   @media (max-width: 920px) {
     .rs-table .col-path { display: none; }
@@ -218,10 +218,10 @@
       {{ ruleset.name or ruleset.ruleset_id or 'No ruleset loaded' }}{% if ruleset.profile %}, <em class="not-italic text-accent">{{ ruleset.profile }}</em>{% endif %}
     </h1>
     {% if ruleset.description %}
-      <p class="text-[14px] text-text-2 max-w-[64ch]">{{ ruleset.description }}</p>
+      <p class="text-[16px] text-text-2 max-w-[64ch]">{{ ruleset.description }}</p>
     {% endif %}
     {% if ruleset.ruleset_id %}
-      <div class="flex flex-wrap gap-y-1.5 gap-x-3.5 mt-2.5 text-[12px] text-text-3 [&_.sep]:text-text-4 [&_b]:text-text-2 [&_b]:font-medium">
+      <div class="flex flex-wrap gap-y-1.5 gap-x-3.5 mt-2.5 text-[14px] text-text-3 [&_.sep]:text-text-4 [&_b]:text-text-2 [&_b]:font-medium">
         <span><b>{{ ruleset.rule_count }}</b> rules</span>
         {% if ruleset.version %}<span class="sep">·</span><span>v{{ ruleset.version }}</span>{% endif %}
         {% if ruleset.target_product %}<span class="sep">·</span><span>{{ ruleset.target_product }}</span>{% endif %}
@@ -245,9 +245,9 @@
     ('Categories', ruleset.categories|length,           ruleset.categories.keys()|join(', '),  'ok'),
   ] %}
     <div class="{{ _stat_base }} {% if accent %}border-l-[3px] border-l-{{ accent }}{% endif %}">
-      <span class="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-text-3">{{ label }}</span>
+      <span class="text-[12px] font-semibold uppercase tracking-[0.07em] text-text-3">{{ label }}</span>
       <span class="text-[22px] font-semibold text-text tracking-[-0.02em] leading-none tabular-nums">{{ value }}</span>
-      <span class="text-[11px] text-text-4">{{ sub }}</span>
+      <span class="text-[13px] text-text-4">{{ sub }}</span>
     </div>
   {% endfor %}
 </section>
@@ -308,14 +308,14 @@
         <div class="flex items-center gap-2.5 px-4 py-2.5 border-b border-line last:border-b-0">
           <span class="w-[7px] h-[7px] rounded-full shrink-0 {% if r.is_active %}bg-ok{% else %}bg-text-4{% endif %}"></span>
           <div class="flex-1 min-w-0">
-            <div class="text-[12.5px] font-medium text-text">{{ r.name or r.id }}</div>
-            <div class="text-[11px] text-text-4 font-mono mt-px">{{ r.id }}</div>
+            <div class="text-[14px] font-medium text-text">{{ r.name or r.id }}</div>
+            <div class="text-[13px] text-text-4 font-mono mt-px">{{ r.id }}</div>
           </div>
-          <span class="text-[11px] text-text-3 whitespace-nowrap">
+          <span class="text-[13px] text-text-3 whitespace-nowrap">
             {{ r.rule_count }} rules{% if r.version %} · v{{ r.version }}{% endif %}
           </span>
           {% if r.is_active %}
-            <span class="chip ok shrink-0" style="font-size: 10px;"><span class="dot"></span>Active</span>
+            <span class="chip ok shrink-0" style="font-size: 12px;"><span class="dot"></span>Active</span>
           {% endif %}
         </div>
       {% endfor %}
@@ -326,39 +326,39 @@
 {# ── Rules table ── #}
 {% if ruleset.rules %}
 
-{% set _filter_base = "rs-filter-btn h-[26px] px-2.5 border border-line rounded-full bg-surface-2 text-text-2 text-[11.5px] font-medium cursor-pointer inline-flex items-center gap-1 transition-colors hover:border-line-2 hover:text-text" %}
+{% set _filter_base = "rs-filter-btn h-[26px] px-2.5 border border-line rounded-full bg-surface-2 text-text-2 text-[13px] font-medium cursor-pointer inline-flex items-center gap-1 transition-colors hover:border-line-2 hover:text-text" %}
 <div class="flex flex-wrap gap-3 items-center px-3.5 py-3 bg-surface border border-line border-b-0 rounded-t-lg">
   <input type="search" id="rs-search"
          placeholder="Search rules — name, number, path, category…"
          autocomplete="off" spellcheck="false"
-         class="flex-1 min-w-[220px] h-[34px] pl-[34px] pr-3 bg-bg text-text border border-line rounded-md text-[13px] outline-hidden focus:border-accent focus:shadow-[0_0_0_3px_var(--accent-soft)] transition-[border-color,box-shadow] duration-100"
+         class="flex-1 min-w-[220px] h-[34px] pl-[34px] pr-3 bg-bg text-text border border-line rounded-md text-[15px] outline-hidden focus:border-accent focus:shadow-[0_0_0_3px_var(--accent-soft)] transition-[border-color,box-shadow] duration-100"
          style="background-image: url(&quot;data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236b7480' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='7'/><line x1='21' y1='21' x2='16.65' y2='16.65'/></svg>&quot;); background-repeat: no-repeat; background-position: 11px center;">
 
   <div class="inline-flex items-center gap-1">
-    <span class="text-[11px] text-text-3 mr-1 uppercase tracking-wider font-semibold">Severity</span>
+    <span class="text-[13px] text-text-3 mr-1 uppercase tracking-wider font-semibold">Severity</span>
     <button type="button" class="{{ _filter_base }} is-active" data-filter="severity" data-value="">All</button>
     {% for sev in ['critical', 'warning', 'info'] %}
       {% set count = ruleset.severities.get(sev, 0) %}
       {% if count %}
         <button type="button" class="{{ _filter_base }}" data-filter="severity" data-value="{{ sev }}">
-          {{ sev|capitalize }} <span class="tabular-nums opacity-70 text-[10.5px]">{{ count }}</span>
+          {{ sev|capitalize }} <span class="tabular-nums opacity-70 text-[12px]">{{ count }}</span>
         </button>
       {% endif %}
     {% endfor %}
   </div>
 
   <div class="inline-flex items-center gap-1">
-    <span class="text-[11px] text-text-3 mr-1 uppercase tracking-wider font-semibold">Category</span>
+    <span class="text-[13px] text-text-3 mr-1 uppercase tracking-wider font-semibold">Category</span>
     <button type="button" class="{{ _filter_base }} is-active" data-filter="category" data-value="">All</button>
     {% for cat, count in ruleset.categories.items()|sort %}
       <button type="button" class="{{ _filter_base }}" data-filter="category" data-value="{{ cat }}">
-        {{ cat }} <span class="tabular-nums opacity-70 text-[10.5px]">{{ count }}</span>
+        {{ cat }} <span class="tabular-nums opacity-70 text-[12px]">{{ count }}</span>
       </button>
     {% endfor %}
   </div>
 
   <div class="inline-flex items-center gap-1 ml-auto">
-    <span class="text-[11px] text-text-3 mr-1 uppercase tracking-wider font-semibold">Density</span>
+    <span class="text-[13px] text-text-3 mr-1 uppercase tracking-wider font-semibold">Density</span>
     <button type="button" class="{{ _filter_base }} rs-density-btn is-active" data-density="cozy"
             title="Default row height">Cozy</button>
     <button type="button" class="{{ _filter_base }} rs-density-btn" data-density="compact"
@@ -470,7 +470,7 @@
                 <p class="kv"><code>{{ r.path or '—' }}</code></p>
 
                 {% if r.alt_path %}
-                  <h5>Alt path <span style="font-weight:400; text-transform:none; letter-spacing:0; color: var(--text-4); font-size: 10.5px; margin-left: 4px;">SSH fallback</span></h5>
+                  <h5>Alt path <span style="font-weight:400; text-transform:none; letter-spacing:0; color: var(--text-4); font-size: 12px; margin-left: 4px;">SSH fallback</span></h5>
                   <p class="kv"><code>{{ r.alt_path }}</code></p>
                 {% endif %}
 
@@ -501,8 +501,8 @@
 {% else %}
 <section class="card">
   <div class="card-body" style="text-align:center; padding: 40px 16px;">
-    <strong style="font-size: 14px; color: var(--text);">No rules loaded</strong>
-    <p style="margin-top: 6px; font-size: 12px; color: var(--text-3);">Pick a ruleset above and click <strong>Activate</strong>.</p>
+    <strong style="font-size: 16px; color: var(--text);">No rules loaded</strong>
+    <p style="margin-top: 6px; font-size: 14px; color: var(--text-3);">Pick a ruleset above and click <strong>Activate</strong>.</p>
   </div>
 </section>
 {% endif %}
@@ -523,7 +523,7 @@
       <textarea id="suppress-modal-reason" rows="3"
                 placeholder="e.g. Waived by security team per ticket INC-1234…"
                 maxlength="500"></textarea>
-      <div id="suppress-modal-error" style="display:none;font-size:12px;color:var(--bad);margin-top:6px;"></div>
+      <div id="suppress-modal-error" style="display:none;font-size:14px;color:var(--bad);margin-top:6px;"></div>
       <div class="suppress-modal-actions">
         <button type="button" class="btn-cancel" id="suppress-modal-cancel">Cancel</button>
         <button type="button" class="btn-confirm" id="suppress-modal-confirm">Suppress Rule</button>

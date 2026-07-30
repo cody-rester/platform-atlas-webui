@@ -7,21 +7,28 @@
   <div>
     <div class="eyebrow"><span class="dot"></span> Configuration</div>
     <h1 class="text-[36px] leading-[1.05] font-semibold tracking-[-0.038em] mt-2 mb-1.5">
-      Extended mode, <em class="not-italic text-accent">credential check</em>
+      {% if pending %}Extended setup, <em class="not-italic text-accent">not yet active</em>
+      {% else %}Extended mode, <em class="not-italic text-accent">credential check</em>{% endif %}
     </h1>
     <p class="text-[16px] text-text-2 max-w-[64ch]">
-      Before running Extended captures, Atlas needs access to MongoDB, Redis, and SSH credentials.
-      Verify they are available below, then continue.
+      {% if pending %}
+        Atlas is still running in <strong>Standard mode</strong> — the tier only switches to Extended once every
+        required credential below is verified present and you click <strong>Finish upgrade</strong>. Leaving this
+        page any other way keeps your environment in Standard, unchanged.
+      {% else %}
+        Before running Extended captures, Atlas needs access to MongoDB, Redis, and SSH credentials.
+        Verify they are available below, then continue.
+      {% endif %}
     </p>
   </div>
   <div class="flex items-center gap-2">
     <form action="/tier/revert-to-standard" method="post" class="inline"
           data-confirm-action data-confirm-kind="danger"
-          data-confirm-title="Revert to Standard?"
-          data-confirm-message="Cancel the Extended upgrade and revert to Standard mode?"
-          data-confirm-label="Revert">
+          data-confirm-title="{% if pending %}Cancel upgrade?{% else %}Revert to Standard?{% endif %}"
+          data-confirm-message="{% if pending %}Cancel the Extended upgrade? Nothing will have changed — you're still in Standard mode.{% else %}Revert to Standard mode?{% endif %}"
+          data-confirm-label="{% if pending %}Cancel upgrade{% else %}Revert{% endif %}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <button class="btn danger" type="submit">Cancel — revert to Standard</button>
+      <button class="btn danger" type="submit">{% if pending %}Cancel upgrade{% else %}Revert to Standard{% endif %}</button>
     </form>
   </div>
 </header>
@@ -338,26 +345,36 @@
     Re-check
   </a>
 
-  {% if all_required_present %}
+  {% if pending %}
+    {% if all_required_present %}
+      <form action="/tier/extended/setup/finish" method="post" style="display:inline;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="btn primary" type="submit">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          Finish upgrade — switch to Extended
+        </button>
+      </form>
+    {% else %}
+      <button class="btn primary" disabled title="All required credentials must be present before finishing">
+        Finish upgrade ({{ cred_status.credentials | selectattr('required') | selectattr('present') | list | length }}/{{ cred_status.credentials | selectattr('required') | list | length }} required present)
+      </button>
+    {% endif %}
+  {% else %}
     <a class="btn primary" href="/tier">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-      All credentials verified — continue
+      Back to Tier
     </a>
-  {% else %}
-    <button class="btn primary" disabled title="All required credentials must be present before continuing">
-      Continue ({{ cred_status.credentials | selectattr('required') | selectattr('present') | list | length }}/{{ cred_status.credentials | selectattr('required') | list | length }} required present)
-    </button>
   {% endif %}
 
   <span style="flex:1;"></span>
 
   <form action="/tier/revert-to-standard" method="post" style="display:inline;"
         data-confirm-action data-confirm-kind="danger"
-          data-confirm-title="Revert to Standard?"
-          data-confirm-message="Cancel the Extended upgrade and revert to Standard mode?"
-          data-confirm-label="Revert">
+        data-confirm-title="{% if pending %}Cancel upgrade?{% else %}Revert to Standard?{% endif %}"
+        data-confirm-message="{% if pending %}Cancel the Extended upgrade? Nothing will have changed — you're still in Standard mode.{% else %}Revert to Standard mode?{% endif %}"
+        data-confirm-label="{% if pending %}Cancel upgrade{% else %}Revert{% endif %}">
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <button class="btn danger" type="submit">Cancel — revert to Standard</button>
+    <button class="btn danger" type="submit">{% if pending %}Cancel upgrade{% else %}Revert to Standard{% endif %}</button>
   </form>
 
 </div>

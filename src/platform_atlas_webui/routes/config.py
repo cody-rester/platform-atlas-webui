@@ -242,10 +242,12 @@ async def save_config(
     dark_mode: str = Form(""),
     theme: str = Form(""),
     extended_validation_checks: str = Form(""),
+    enable_rbac_collection: str = Form(""),
     debug: str = Form(""),
     tier: str = Form(""),
     manual_input_mode: str = Form(""),
     webui_palette_enabled: str = Form(""),
+    network_policy: str = Form(""),
 ):
     # Connection-shaped fields (platform_uri, platform_client_id, gateway4_*)
     # are environment-scoped and intentionally not exposed on this page —
@@ -258,6 +260,7 @@ async def save_config(
         "dark_mode": dark_mode,
         "theme": theme,
         "extended_validation_checks": extended_validation_checks,
+        "enable_rbac_collection": enable_rbac_collection,
         "debug": debug,
         "manual_input_mode": manual_input_mode,
         "webui_palette_enabled": webui_palette_enabled,
@@ -268,6 +271,10 @@ async def save_config(
     posted_tier = (tier or "").strip().lower()
     if posted_tier in ("standard", "extended", "saas"):
         updates["tier"] = posted_tier
+    # Only a known network_policy value is written — reject blanks and typos.
+    posted_policy = (network_policy or "").strip().lower()
+    if posted_policy in ("allow", "disallow"):
+        updates["network_policy"] = posted_policy
     config_svc.update_config(updates)
     # Env-overlay tier wins over root in load_config(), so writing tier here
     # without mirroring would let an active overlay silently undo the change.

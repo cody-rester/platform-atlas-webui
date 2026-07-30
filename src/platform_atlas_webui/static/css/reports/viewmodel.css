@@ -2404,3 +2404,52 @@ html[data-mode="light"] .vm-backdrop__wash--info   { opacity: 0.5; }
 }
 .vm-extended-card-titlerow .vm-extended-card-title { margin: 0; }
 .vm-extended-card-titlerow .vm-copy-btn { margin-left: auto; }
+
+/* ──────────────────────────────────────────────────────────────────
+ * Resources bar — links to docs/guides, sits below the identity footer
+ * ────────────────────────────────────────────────────────────────── */
+.vm-resources-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  padding: 14px 4px;
+  margin-top: 20px;
+  border-top: 1px solid var(--vm-divider);
+}
+.vm-resources-bar-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  white-space: nowrap;
+  margin-right: 4px;
+}
+.vm-resources-bar-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 4px;
+  align-items: center;
+}
+.vm-resources-bar-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--accent);
+  text-decoration: none;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--vm-panel-border);
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.vm-resources-bar-link:hover {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border-color: var(--accent);
+}
+.vm-resources-bar-link svg {
+  flex-shrink: 0;
+  opacity: 0.65;
+}

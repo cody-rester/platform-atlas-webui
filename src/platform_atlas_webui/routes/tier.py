@@ -1,10 +1,19 @@
 """Tier route — view the active tier and switch from the browser.
 
-POST /tier/set rewrites ``~/.atlas/config.json`` via the same atomic
-write the CLI's ``tier set`` handler uses, so changes are immediately
-visible to a fresh CLI invocation. The current process keeps its
-already-resolved tier until restart — flipping tier mid-process would
-invalidate cached collectors.
+Switching to Extended is a guided walkthrough, not a single write: POST
+/tier/set marks the upgrade *pending* (``pending_tier_upgrade`` in
+config.json) and sends the user to /tier/extended/setup to supply SSH,
+MongoDB, and Redis credentials. The ``tier`` field itself is only written
+by /tier/extended/setup/finish, once every required credential is
+present — so leaving the walkthrough at any point (closing the tab,
+hitting Cancel) leaves the environment in Standard, unchanged. Switching
+to Standard needs no extra credentials and is written immediately, same
+as before.
+
+Writes go through the same atomic write the CLI's ``tier set`` handler
+uses, so changes are immediately visible to a fresh CLI invocation. The
+current process keeps its already-resolved tier until restart — flipping
+tier mid-process would invalidate cached collectors.
 """
 
 from __future__ import annotations
@@ -32,11 +41,15 @@ async def tier_overview(request: Request) -> HTMLResponse:
     # config.json value rather than the frozen in-memory context loaded at startup.
     active_tier = "extended"
     org = ""
+    pending_extended = False
     try:
         import os
         data = json.loads(ATLAS_CONFIG_FILE.read_text(encoding="utf-8"))
         active_tier = data.get("tier", "extended")
         org = data.get("organization_name", "")
+        # Set by /tier/set while an Extended upgrade is awaiting credential
+        # verification — the root ``tier`` field hasn't changed yet.
+        pending_extended = bool(data.get("pending_tier_upgrade")) and active_tier != "extended"
         # The active environment's overlay tier wins over the root config tier
         # (same precedence as load_config), so this page reflects the tier the
         # active environment actually runs as — not a stale root default. Without
@@ -63,6 +76,7 @@ async def tier_overview(request: Request) -> HTMLResponse:
             atlas_version=ATLAS_VERSION,
             active_tier=active_tier,
             organization_name=org,
+            pending_extended=pending_extended,
         ),
     )
     response.headers["Cache-Control"] = "no-store"
@@ -71,7 +85,7 @@ async def tier_overview(request: Request) -> HTMLResponse:
 
 @router.post("/set")
 async def tier_set(new_tier: Literal["standard", "extended"] = Form(...)):
-    """Persist the new tier into config.json and redirect back to /tier."""
+    """Start an Extended upgrade (pending) or switch to Standard (immediate)."""
     if not ATLAS_CONFIG_FILE.is_file():
         raise HTTPException(
             status_code=400,
@@ -82,7 +96,23 @@ async def tier_set(new_tier: Literal["standard", "extended"] = Form(...)):
     except (OSError, json.JSONDecodeError) as exc:
         raise HTTPException(status_code=500, detail=f"Could not read config: {exc}") from exc
 
-    data["tier"] = new_tier
+    if new_tier == "extended":
+        # Don't flip the tier yet — mark the upgrade pending and send the user
+        # to the credential walkthrough. ``tier`` itself is only written by
+        # /tier/extended/setup/finish once every required credential is
+        # verified present, so abandoning the walkthrough here leaves the
+        # environment in Standard, unchanged.
+        data["pending_tier_upgrade"] = True
+        try:
+            atomic_write_json(ATLAS_CONFIG_FILE, data)
+        except Exception as exc:  # noqa: BLE001 — surface IO failures to the user
+            raise HTTPException(status_code=500, detail=f"Could not write config: {exc}") from exc
+        return RedirectResponse(url="/tier/extended/setup", status_code=303)
+
+    # Standard needs no extra credentials — switch immediately and clear any
+    # Extended upgrade that was left pending.
+    data["tier"] = "standard"
+    data.pop("pending_tier_upgrade", None)
     try:
         atomic_write_json(ATLAS_CONFIG_FILE, data)
     except Exception as exc:  # noqa: BLE001 — surface IO failures to the user
@@ -94,7 +124,7 @@ async def tier_set(new_tier: Literal["standard", "extended"] = Form(...)):
     # SaaS environments (tier fixed at create time — the switch then only
     # changes the global default, exactly what the /tier overview promises),
     # and invalidates the resolve_active_tier() cache.
-    config_svc.mirror_tier_to_active_overlay(new_tier)
+    config_svc.mirror_tier_to_active_overlay("standard")
 
     # Reload the in-memory context so subsequent operations (capture, validate)
     # immediately use the new tier without requiring a server restart.
@@ -103,12 +133,6 @@ async def tier_set(new_tier: Literal["standard", "extended"] = Form(...)):
         init_context()
     except Exception:
         pass  # Best-effort — the disk write already succeeded
-
-    # Switching to Extended requires additional credentials (SSH, Mongo, Redis).
-    # Send the user to the credential check page so they can verify before proceeding.
-    # Switching to Standard needs nothing extra.
-    if new_tier == "extended":
-        return RedirectResponse(url="/tier/extended/setup", status_code=303)
 
     return RedirectResponse(url="/tier", status_code=303)
 
@@ -269,7 +293,18 @@ def _read_ssh_key_path() -> str:
 
 @router.get("/extended/setup", response_class=HTMLResponse)
 async def extended_setup(request: Request) -> HTMLResponse:
-    """Credential verification page shown after switching to Extended tier."""
+    """Credential walkthrough for a pending Extended upgrade, or a standing
+    recheck page for an environment that's already Extended. Not reachable
+    otherwise — there's nothing to verify."""
+    try:
+        raw = json.loads(ATLAS_CONFIG_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        raw = {}
+    pending = bool(raw.get("pending_tier_upgrade"))
+    already_extended = raw.get("tier") == "extended" and not pending
+    if not pending and not already_extended:
+        return RedirectResponse(url="/tier", status_code=303)
+
     cred_status = _check_extended_credentials()
     all_required_present = all(
         c["present"] for c in cred_status["credentials"] if c["required"]
@@ -282,8 +317,49 @@ async def extended_setup(request: Request) -> HTMLResponse:
             cred_status=cred_status,
             all_required_present=all_required_present,
             ssh_key_path=_read_ssh_key_path(),
+            pending=pending,
         ),
     )
+
+
+@router.post("/extended/setup/finish")
+async def finish_extended_setup():
+    """Confirm the pending Extended upgrade — the only place ``tier`` is
+    actually written to ``extended``, and only once every required
+    credential is verified present."""
+    cred_status = _check_extended_credentials()
+    all_required_present = all(
+        c["present"] for c in cred_status["credentials"] if c["required"]
+    )
+    if not all_required_present:
+        # Nothing to finish yet — required credentials are still missing.
+        return RedirectResponse(url="/tier/extended/setup", status_code=303)
+
+    if not ATLAS_CONFIG_FILE.is_file():
+        raise HTTPException(
+            status_code=400,
+            detail=f"Atlas config not found at {ATLAS_CONFIG_FILE}",
+        )
+    try:
+        data = json.loads(ATLAS_CONFIG_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=500, detail=f"Could not read config: {exc}") from exc
+
+    data["tier"] = "extended"
+    data.pop("pending_tier_upgrade", None)
+    try:
+        atomic_write_json(ATLAS_CONFIG_FILE, data)
+    except Exception as exc:  # noqa: BLE001 — surface IO failures to the user
+        raise HTTPException(status_code=500, detail=f"Could not write config: {exc}") from exc
+
+    config_svc.mirror_tier_to_active_overlay("extended")
+    try:
+        from platform_atlas.core.context import init_context
+        init_context()
+    except Exception:
+        pass  # Best-effort — the disk write already succeeded
+
+    return RedirectResponse(url="/tier?upgraded=1", status_code=303)
 
 
 @router.post("/extended/setup/credential")
@@ -357,12 +433,16 @@ async def save_ssh_key(ssh_key: str = Form("")):
 
 @router.post("/revert-to-standard")
 async def revert_to_standard():
-    """Cancel the Extended upgrade — revert config.json to Standard tier."""
+    """Cancel a pending Extended upgrade, or downgrade an active Extended
+    environment — either way, config.json ends up at Standard with no
+    upgrade left pending. If the upgrade was only ever pending, ``tier``
+    was already Standard, so this just clears the pending flag."""
     if not ATLAS_CONFIG_FILE.is_file():
         return RedirectResponse(url="/tier", status_code=303)
     try:
         data = json.loads(ATLAS_CONFIG_FILE.read_text(encoding="utf-8"))
         data["tier"] = "standard"
+        data.pop("pending_tier_upgrade", None)
         atomic_write_json(ATLAS_CONFIG_FILE, data)
         # Same SaaS-aware overlay mirror as tier_set above.
         config_svc.mirror_tier_to_active_overlay("standard")

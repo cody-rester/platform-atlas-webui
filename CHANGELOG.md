@@ -5,6 +5,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.2.0] - 2026-07-06
+
+Requires `platform-atlas >=2.2.0,<3.0`.
+
+### Added
+
+- **`network_policy` setting on the Settings page** — the Behaviour section of `/config` now exposes the `network_policy` field (`allow` / `disallow`) introduced in platform-atlas 2.2.0, letting users block all third-party outbound connections directly from the WebUI.
+- **`enable_rbac_collection` setting on the Settings page** — lets you turn on Platform 6 RBAC capture from the WebUI, matching the CLI's 2.2.0 config field. The RBAC tab itself isn't rendered in the WebUI report viewer yet, so captured data won't display here until that lands in a future release.
+
+### Changed
+
+- **Switching to Extended no longer flips the tier before credentials are verified** — clicking Switch to Extended used to write the tier immediately, so abandoning the credential-check page left the environment half-configured in Extended. The tier now switches only once every required credential is confirmed present and you click Finish upgrade; leaving any other way keeps you in Standard, unchanged. Mirrors the CLI's guided `tier upgrade` walkthrough.
+
+---
+
 ## [2.1.0] - 2026-06-24
 
 Requires `platform-atlas >=2.1.0,<3.0`.

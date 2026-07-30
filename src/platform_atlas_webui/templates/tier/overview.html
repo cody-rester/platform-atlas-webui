@@ -3,6 +3,7 @@
 {% block crumb %}Tier{% endblock %}
 {% block content %}
 {% set is_std = active_tier == 'standard' %}
+{% set pending_extended = pending_extended | default(false) %}
 
 <header class="flex items-end justify-between gap-6 pb-5 border-b border-line mb-6">
   <div>
@@ -14,6 +15,17 @@
     </p>
   </div>
 </header>
+
+{% if pending_extended %}
+{# ── Pending-upgrade banner — tier hasn't switched yet ── #}
+<div class="flash flash--warn mb-6 flex items-center gap-3">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+  <span>
+    <strong>Extended upgrade in progress</strong> — still running in Standard mode until credentials are verified.
+    <a href="/tier/extended/setup" class="text-accent hover:text-accent-hover">Continue setup &rarr;</a>
+  </span>
+</div>
+{% endif %}
 
 {# ── Current tier banner ── #}
 <div class="flash flash--info mb-6 flex items-center gap-3">
@@ -121,7 +133,15 @@
         <li>SSH, MongoDB, Redis, IAG, system, filesystem, and Kubernetes collectors</li>
         <li>Requires SSH keys and database credentials to be configured</li>
       </ul>
-      {% if is_std %}
+      {% if pending_extended %}
+        <div style="margin-top:4px; display:flex; gap:8px; align-items:center;">
+          <a class="btn sm primary" href="/tier/extended/setup">Resume setup</a>
+          <form action="/tier/revert-to-standard" method="post" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="btn sm" type="submit">Cancel</button>
+          </form>
+        </div>
+      {% elif is_std %}
         <div style="margin-top:4px;">
           <button class="btn sm" onclick="openTierModal('extended')">Switch to Extended</button>
         </div>

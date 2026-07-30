@@ -39,6 +39,7 @@ EDITABLE_FIELDS: tuple[str, ...] = (
     "dark_mode",
     "theme",
     "extended_validation_checks",
+    "enable_rbac_collection",
     "debug",
     "webui_theme",
     "webui_mode",
@@ -53,6 +54,7 @@ EDITABLE_FIELDS: tuple[str, ...] = (
     "gateway4_uri",
     "gateway4_username",
     "manual_input_mode",
+    "network_policy",
 )
 
 
@@ -227,7 +229,7 @@ def _coerce(key: str, raw: Any) -> Any:
     """Coerce form values (strings) to the right type for known boolean fields."""
     bool_keys = {
         "verify_ssl", "dark_mode",
-        "extended_validation_checks", "debug",
+        "extended_validation_checks", "enable_rbac_collection", "debug",
         "webui_palette_enabled",
     }
     if key in bool_keys:

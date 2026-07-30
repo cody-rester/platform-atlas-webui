@@ -289,11 +289,26 @@
       <label for="extended_validation_checks">Run extended validation checks</label>
     </div>
     <div class="field field--row">
+      <input id="enable_rbac_collection" name="enable_rbac_collection" type="checkbox" value="1" {% if cfg.get('enable_rbac_collection') %}checked{% endif %}>
+      <label for="enable_rbac_collection">RBAC authorization collection</label>
+    </div>
+    <div class="field field--row col-span-full">
+      <span class="hint">Pulls the full RBAC graph (accounts, groups, roles, methods) from Platform 6's <code>/authorization/*</code> APIs for the RBAC tab in the CLI's <code>--unified</code> report. Disabled by default — privacy-sensitive. Requires <code>platform-atlas &gt;=2.2.0</code>. The RBAC tab itself is not yet rendered in this WebUI report viewer.</span>
+    </div>
+    <div class="field field--row">
       <input id="debug" name="debug" type="checkbox" value="1" {% if cfg.get('debug') %}checked{% endif %}>
       <label for="debug">Debug logging</label>
     </div>
     <div class="field field--row col-span-full">
       <span class="hint">Verbose Atlas logging (collector metrics, session <code>debug.log</code> detail). Takes effect for jobs started after saving.</span>
+    </div>
+    <div class="field">
+      <label for="network_policy">Network policy</label>
+      <select id="network_policy" name="network_policy">
+        <option value="allow" {% if cfg.get('network_policy', 'allow') in ('allow', '', None) %}selected{% endif %}>allow — permit third-party connections (Google Fonts, GitLab, GitHub)</option>
+        <option value="disallow" {% if cfg.get('network_policy') == 'disallow' %}selected{% endif %}>disallow — block all third-party connections, embed fonts in reports</option>
+      </select>
+      <span class="hint">Controls outbound connections not part of the audited environment. <strong>allow</strong> (default) permits Google Fonts in reports, GitLab adapter version checks, GitHub ruleset updates, and webhook notifications. <strong>disallow</strong> blocks all of these; reports embed fonts as self-contained data URIs.</span>
     </div>
     <div class="field">
       <label for="manual_input_mode">Manual input mode</label>
